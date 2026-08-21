@@ -576,7 +576,7 @@ class MessageGroupController extends Controller
         }
 
         $pendingMessages = $phone->messageGroups->where('status', 'pending')->count();
-        if ($pendingMessages >= 1) {
+        if ($pendingMessages >= 10) {
             return response()->json([
                 'success' => false,
                 'message' => __('messages.send_limit'),

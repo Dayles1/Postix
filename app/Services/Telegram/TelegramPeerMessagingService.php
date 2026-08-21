@@ -16,18 +16,57 @@ class TelegramPeerMessagingService
     {
         $path = $userPhone->session_path;
 
+        Log::info('telegram_init_madeline_start', [
+            'user_phone_id' => $userPhone->id,
+            'phone' => $this->normalizePhone((string) $userPhone->phone),
+            'session_path_exists' => (bool) ($path && File::exists($path)),
+            'session_path' => $path,
+        ]);
+
         if (!$path || !File::exists($path)) {
             $this->madeline = null;
+
+            Log::warning('telegram_init_madeline_failed', [
+                'user_phone_id' => $userPhone->id,
+                'reason' => 'session_file_missing',
+            ]);
+
             return false;
         }
 
         try {
+            $startedAt = microtime(true);
+
             $this->madeline = new API($path);
             $this->madeline->start();
+
+            Log::info('telegram_init_madeline_ok', [
+                'user_phone_id' => $userPhone->id,
+                'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+            ]);
 
             return true;
         } catch (Throwable $e) {
             $this->madeline = null;
+
+            $err = $this->cleanError($e->getMessage());
+            $key = $this->mapErrorToKey($err);
+
+            Log::error('telegram_unknown_error', [
+                'stage' => 'init_madeline',
+                'message' => $e->getMessage(),
+                'context' => [
+                    'user_phone_id' => $userPhone->id,
+                    'phone' => $this->normalizePhone((string) $userPhone->phone),
+                    'session_path' => $path,
+                    'error_key' => $key,
+                    'clean_error' => $err,
+                    'exception_class' => get_class($e),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                ],
+            ]);
+
             return false;
         }
     }
@@ -129,16 +168,36 @@ class TelegramPeerMessagingService
     {
         $peer = $this->parsePeer($rawPeer);
 
-        if (!$peer['ok']) {
-            return $this->failResult('peer_invalid', $peer['reason'] ?? 'peer invalid', $rawPeer);
+        Log::info('telegram_peer_inspect_start', [
+            'raw_peer' => $rawPeer,
+            'parsed_type' => $peer['type'] ?? null,
+            'parsed_ok' => $peer['ok'] ?? false,
+        ]);
+
+        if (!($peer['ok'] ?? false)) {
+            $result = $this->failResult('peer_invalid', $peer['reason'] ?? 'peer invalid', $rawPeer);
+
+            Log::info('telegram_peer_inspect_result', [
+                'raw_peer' => $rawPeer,
+                'result' => $result,
+            ]);
+
+            return $result;
         }
 
         if (!$this->madeline) {
-            return $this->failResult('madeline_not_initialized', 'session ishlamayapti', $rawPeer);
+            $result = $this->failResult('madeline_not_initialized', 'session ishlamayapti', $rawPeer);
+
+            Log::warning('telegram_peer_inspect_result', [
+                'raw_peer' => $rawPeer,
+                'result' => $result,
+            ]);
+
+            return $result;
         }
 
         try {
-            return match ($peer['type']) {
+            $result = match ($peer['type']) {
                 'username' => $this->inspectUsername($peer),
                 'id' => $this->inspectId($peer),
                 'invite_link' => $this->inspectInviteLink($peer),
@@ -146,6 +205,20 @@ class TelegramPeerMessagingService
                 'phone' => $this->inspectPhone($peer),
                 default => $this->failResult('peer_invalid', 'peer turi noma’lum', $rawPeer),
             };
+
+            Log::info('telegram_peer_inspect_result', [
+                'raw_peer' => $rawPeer,
+                'result' => [
+                    'ok' => $result['ok'] ?? false,
+                    'sendable' => $result['sendable'] ?? false,
+                    'error_key' => $result['error_key'] ?? null,
+                    'reason' => $result['reason'] ?? null,
+                    'resolved_peer' => $result['resolved_peer'] ?? null,
+                    'peer_type' => $result['peer_type'] ?? null,
+                ],
+            ]);
+
+            return $result;
         } catch (Throwable $e) {
             $err = $this->cleanError($e->getMessage());
             $key = $this->mapErrorToKey($err);
@@ -153,18 +226,74 @@ class TelegramPeerMessagingService
             if ($key === 'unknown_error') {
                 $this->logUnknownError('inspect_peer', $e, [
                     'peer' => $rawPeer,
-                    'peer_type' => $peer['type'] ?? null,
                     'clean_error' => $err,
                 ]);
             }
 
-            return $this->failResult($key, $this->humanReason($key), $rawPeer, $err);
+            $result = $this->failResult($key, $this->humanReason($key), $rawPeer, $err);
+
+            Log::warning('telegram_peer_inspect_result', [
+                'raw_peer' => $rawPeer,
+                'result' => $result,
+            ]);
+
+            return $result;
         }
+    }
+
+    public function debugInspectPeers(array $peers, int $limit = 10): array
+    {
+        $items = array_slice(array_values($peers), 0, $limit);
+        $results = [];
+
+        Log::info('telegram_peer_debug_batch_start', [
+            'count' => count($items),
+            'limit' => $limit,
+        ]);
+
+        foreach ($items as $index => $peer) {
+            $peer = trim((string) $peer);
+
+            $startedAt = microtime(true);
+            $result = $this->inspectPeer($peer);
+            $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
+
+            $row = [
+                'index' => $index,
+                'peer' => $peer,
+                'duration_ms' => $durationMs,
+                'ok' => $result['ok'] ?? false,
+                'sendable' => $result['sendable'] ?? false,
+                'error_key' => $result['error_key'] ?? null,
+                'reason' => $result['reason'] ?? null,
+                'resolved_peer' => $result['resolved_peer'] ?? null,
+                'peer_type' => $result['peer_type'] ?? null,
+            ];
+
+            $results[] = $row;
+
+            Log::info('telegram_peer_debug_item', $row);
+        }
+
+        Log::info('telegram_peer_debug_batch_done', [
+            'count' => count($results),
+        ]);
+
+        return $results;
     }
 
     public function sendMessageToPeer(string $rawPeer, string $message, ?array $precheck = null): array
     {
         $inspect = $precheck ?? $this->inspectPeer($rawPeer);
+
+        Log::info('telegram_send_prepare', [
+            'raw_peer' => $rawPeer,
+            'inspect_ok' => $inspect['ok'] ?? false,
+            'inspect_sendable' => $inspect['sendable'] ?? false,
+            'inspect_error_key' => $inspect['error_key'] ?? null,
+            'inspect_reason' => $inspect['reason'] ?? null,
+            'resolved_peer' => $inspect['resolved_peer'] ?? null,
+        ]);
 
         if (!($inspect['ok'] ?? false) || !($inspect['sendable'] ?? false)) {
             return [
@@ -181,17 +310,24 @@ class TelegramPeerMessagingService
         }
 
         try {
+            $startedAt = microtime(true);
+
             $response = $this->madeline->messages->sendMessage([
                 'peer' => $inspect['resolved_peer'],
                 'message' => $message,
                 'parse_mode' => 'HTML',
             ]);
-//             Log::info('telegram_send_response_debug', [
-//     'peer' => $rawPeer,
-//     'response_type' => $response['_'] ?? null,
-//     'response' => $response,
-// ]);
+
+            $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
             [$status, $telegramMessageId] = $this->extractSendResult($response);
+
+            Log::info('telegram_send_result', [
+                'raw_peer' => $rawPeer,
+                'duration_ms' => $durationMs,
+                'status' => $status,
+                'telegram_message_id' => $telegramMessageId,
+                'resolved_peer' => $inspect['resolved_peer'],
+            ]);
 
             return [
                 'ok' => true,
@@ -216,12 +352,24 @@ class TelegramPeerMessagingService
 
             if ($this->isHtmlParseError($err)) {
                 try {
+                    $startedAt = microtime(true);
+
                     $response = $this->madeline->messages->sendMessage([
                         'peer' => $inspect['resolved_peer'],
                         'message' => $message,
                     ]);
 
+                    $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
                     [$status, $telegramMessageId] = $this->extractSendResult($response);
+
+                    Log::info('telegram_send_result', [
+                        'raw_peer' => $rawPeer,
+                        'duration_ms' => $durationMs,
+                        'status' => $status,
+                        'telegram_message_id' => $telegramMessageId,
+                        'resolved_peer' => $inspect['resolved_peer'],
+                        'fallback' => 'plain_text',
+                    ]);
 
                     return [
                         'ok' => true,
@@ -277,58 +425,281 @@ class TelegramPeerMessagingService
 
     private function inspectUsername(array $peer): array
     {
-        $info = $this->madeline->getInfo($peer['username']);
+        $username = $peer['username'] ?? '';
+        $rawPeer = $peer['raw'] ?? $username;
 
-        $type = $info['type'] ?? $info['_'] ?? null;
-        $peerId = $info['bot_api_id']
-            ?? $info['user_id']
-            ?? $info['chat_id']
-            ?? $info['channel_id']
-            ?? $info['peer_id']
-            ?? null;
+        Log::info('telegram_inspect_username_start', [
+            'raw_peer' => $rawPeer,
+            'username' => $username,
+        ]);
 
-        if ($type === 'user') {
-            return $this->inspectUserPeer($peer, $info, $peer['username']);
+        try {
+            $info = $this->madeline->getInfo($username);
+
+            Log::info('telegram_inspect_username_info', [
+                'raw_peer' => $rawPeer,
+                'username' => $username,
+                'info_type' => is_array($info) ? ($info['type'] ?? $info['_'] ?? null) : null,
+                'info_keys' => is_array($info) ? array_keys($info) : null,
+            ]);
+        } catch (Throwable $e) {
+            $err = $this->cleanError($e->getMessage());
+            $key = $this->mapErrorToKey($err);
+
+            if ($key === 'unknown_error') {
+                $this->logUnknownError('inspect_username', $e, [
+                    'peer' => $rawPeer,
+                    'username' => $username,
+                ]);
+            }
+
+            return $this->failResult($key, $this->humanReason($key), $rawPeer, $err);
         }
 
-        if (!in_array($type, ['chat', 'supergroup', 'channel'], true)) {
-            return $this->failResult('peer_invalid', 'peer turi noma’lum', $peer['raw']);
-        }
-
-        return $this->inspectChatLikePeer($peer['username'], $peerId ?: $peer['username'], 'username', $peer['raw']);
+        return $this->inspectResolvedPeer(
+            sourcePeer: $peer,
+            info: $info,
+            resolvedPeer: $username,
+            rawPeer: $rawPeer
+        );
     }
 
     private function inspectId(array $peer): array
     {
-        $info = $this->madeline->getInfo($peer['id']);
+        $id = $peer['id'] ?? null;
+        $rawPeer = $peer['raw'] ?? (string) $id;
 
-        $type = $info['type'] ?? $info['_'] ?? null;
-        $peerId = $info['bot_api_id']
-            ?? $info['user_id']
-            ?? $info['chat_id']
-            ?? $info['channel_id']
-            ?? $info['peer_id']
-            ?? $peer['id'];
-
-        if ($type === 'user') {
-            return $this->inspectUserPeer($peer, $info, $peerId);
+        if ($id === null || $id === '') {
+            return $this->failResult('peer_invalid', 'peer id bo‘sh', $rawPeer);
         }
 
-        if (!in_array($type, ['chat', 'supergroup', 'channel'], true)) {
-            return $this->failResult('peer_invalid', 'ID peer topilmadi', $peer['raw']);
+        Log::info('telegram_inspect_id_start', [
+            'raw_peer' => $rawPeer,
+            'id' => $id,
+        ]);
+
+        try {
+            $info = $this->madeline->getInfo($id);
+
+            Log::info('telegram_inspect_id_info', [
+                'raw_peer' => $rawPeer,
+                'id' => $id,
+                'info_type' => is_array($info) ? ($info['type'] ?? $info['_'] ?? null) : null,
+                'info_keys' => is_array($info) ? array_keys($info) : null,
+            ]);
+        } catch (Throwable $e) {
+            $err = $this->cleanError($e->getMessage());
+            $key = $this->mapErrorToKey($err);
+
+            if ($key === 'unknown_error') {
+                $this->logUnknownError('inspect_id', $e, [
+                    'peer' => $rawPeer,
+                    'id' => $id,
+                ]);
+            }
+
+            return $this->failResult($key, $this->humanReason($key), $rawPeer, $err);
         }
 
-        return $this->inspectChatLikePeer($peerId, $peerId, 'id', $peer['raw']);
+        return $this->inspectResolvedPeer(
+            sourcePeer: $peer,
+            info: $info,
+            resolvedPeer: $id,
+            rawPeer: $rawPeer
+        );
     }
 
-    private function inspectUserPeer(array $peer, array $info, string|int $resolvedPeer): array
+    private function inspectInternalLink(array $peer): array
     {
+        $chatId = $peer['internal_id'] ?? null;
+        $rawPeer = $peer['raw'] ?? null;
+
+        if (!$chatId) {
+            return $this->failResult('peer_invalid', 'internal link invalid', $rawPeer);
+        }
+
+        $resolvedPeer = '-100' . $chatId;
+
+        Log::info('telegram_inspect_internal_link_start', [
+            'raw_peer' => $rawPeer,
+            'resolved_peer' => $resolvedPeer,
+        ]);
+
+        try {
+            $info = $this->madeline->getInfo($resolvedPeer);
+
+            Log::info('telegram_inspect_internal_link_info', [
+                'raw_peer' => $rawPeer,
+                'resolved_peer' => $resolvedPeer,
+                'info_type' => is_array($info) ? ($info['type'] ?? $info['_'] ?? null) : null,
+                'info_keys' => is_array($info) ? array_keys($info) : null,
+            ]);
+        } catch (Throwable $e) {
+            $err = $this->cleanError($e->getMessage());
+            $key = $this->mapErrorToKey($err);
+
+            if ($key === 'unknown_error') {
+                $this->logUnknownError('inspect_internal_link', $e, [
+                    'peer' => $rawPeer,
+                    'resolved_peer' => $resolvedPeer,
+                ]);
+            }
+
+            return $this->failResult($key, $this->humanReason($key), $rawPeer, $err);
+        }
+
+        return $this->inspectResolvedPeer(
+            sourcePeer: $peer,
+            info: $info,
+            resolvedPeer: $resolvedPeer,
+            rawPeer: $rawPeer
+        );
+    }
+
+    private function inspectInviteLink(array $peer): array
+    {
+        $hash = $peer['hash'] ?? null;
+        $rawPeer = $peer['raw'] ?? null;
+
+        if (!$hash) {
+            return $this->failResult('invite_invalid', 'invite link yaroqsiz', $rawPeer);
+        }
+
+        Log::info('telegram_inspect_invite_start', [
+            'raw_peer' => $rawPeer,
+            'hash' => $hash,
+        ]);
+
+        try {
+            $invite = $this->madeline->messages->checkChatInvite([
+                'hash' => $hash,
+            ]);
+
+            Log::info('telegram_inspect_invite_result', [
+                'raw_peer' => $rawPeer,
+                'invite_type' => $invite['_'] ?? null,
+                'invite_keys' => array_keys($invite ?? []),
+            ]);
+        } catch (Throwable $e) {
+            $err = $this->cleanError($e->getMessage());
+            $key = $this->mapErrorToKey($err);
+
+            if ($key === 'unknown_error') {
+                $this->logUnknownError('inspect_invite_link', $e, [
+                    'peer' => $rawPeer,
+                    'hash' => $hash,
+                ]);
+            }
+
+            return $this->failResult($key, $this->humanReason($key), $rawPeer, $err);
+        }
+
+        $type = $invite['_'] ?? null;
+
+        if ($type === 'chatInviteAlready') {
+            $chat = $invite['chat'] ?? [];
+            $resolvedPeer = $this->resolvePeerIdFromInfo($chat, $rawPeer);
+
+            if ($resolvedPeer === '' || $resolvedPeer === null) {
+                return $this->failResult('peer_not_found', 'chat invite already, lekin peer topilmadi', $rawPeer);
+            }
+
+            return $this->inspectResolvedPeer(
+                sourcePeer: $peer,
+                info: $chat,
+                resolvedPeer: $resolvedPeer,
+                rawPeer: $rawPeer,
+                fromInviteAlready: true
+            );
+        }
+
+        if ($type === 'chatInvite') {
+            return $this->failResult('not_member', 'member emas', $rawPeer);
+        }
+
+        return $this->failResult('invite_invalid', 'invite link yaroqsiz', $rawPeer);
+    }
+
+    private function inspectPhone(array $peer): array
+    {
+        return $this->failResult(
+            'phone_not_supported_directly',
+            'telefon raqam peer emas',
+            $peer['raw'] ?? null
+        );
+    }
+
+    private function inspectResolvedPeer(
+        array $sourcePeer,
+        mixed $info,
+        string|int|null $resolvedPeer,
+        ?string $rawPeer = null,
+        bool $fromInviteAlready = false
+    ): array {
+        $rawPeer = $rawPeer ?? ($sourcePeer['raw'] ?? null);
+
+        if (!is_array($info)) {
+            $info = [];
+        }
+
+        $peerType = $this->resolvePeerTypeFromInfo($info);
+        $peerId = $this->resolvePeerIdFromInfo($info, $resolvedPeer);
+
+        Log::info('telegram_inspect_resolved_peer', [
+            'raw_peer' => $rawPeer,
+            'resolved_peer' => $resolvedPeer,
+            'peer_id' => $peerId,
+            'peer_type' => $peerType,
+            'info_keys' => array_keys($info),
+            'from_invite_already' => $fromInviteAlready,
+        ]);
+
+        if ($peerId === '' || $peerId === null) {
+            return $this->failResult('peer_not_found', 'peer topilmadi', $rawPeer);
+        }
+
+        if ($peerType === 'user' || $peerType === 'bot') {
+            return $this->inspectUserPeer($sourcePeer, $info, $peerId, $rawPeer);
+        }
+
+        if (in_array($peerType, ['chat', 'channel', 'supergroup', 'megagroup'], true)) {
+            return $this->inspectChatPeer($sourcePeer, $info, $peerId, $rawPeer, $fromInviteAlready);
+        }
+
+        if (($info['user_id'] ?? null) || ($info['bot_api_id'] ?? null)) {
+            return $this->inspectUserPeer($sourcePeer, $info, $peerId, $rawPeer);
+        }
+
+        if (($info['channel_id'] ?? null) || ($info['chat_id'] ?? null) || ($info['peer_id'] ?? null)) {
+            return $this->inspectChatPeer($sourcePeer, $info, $peerId, $rawPeer, $fromInviteAlready);
+        }
+
+        return $this->failResult('peer_not_found', 'peer topilmadi', $rawPeer);
+    }
+
+    private function inspectUserPeer(array $sourcePeer, array $info, string|int $resolvedPeer, ?string $rawPeer = null): array
+    {
+        $rawPeer = $rawPeer ?? ($sourcePeer['raw'] ?? null);
+
+        Log::info('telegram_inspect_user_peer', [
+            'raw_peer' => $rawPeer,
+            'resolved_peer' => $resolvedPeer,
+            'info_keys' => array_keys($info),
+            'deleted' => $info['deleted'] ?? null,
+            'blocked' => $info['blocked'] ?? null,
+            'restricted' => $info['restricted'] ?? null,
+        ]);
+
         if (($info['deleted'] ?? false) === true) {
-            return $this->failResult('peer_not_found', 'foydalanuvchi o‘chirilgan', $peer['raw']);
+            return $this->failResult('peer_not_found', 'foydalanuvchi o‘chirilgan', $rawPeer);
+        }
+
+        if (($info['blocked'] ?? false) === true) {
+            return $this->failResult('user_is_blocked', 'foydalanuvchi bloklangan', $rawPeer);
         }
 
         if (($info['restricted'] ?? false) === true) {
-            return $this->failResult('restricted', 'foydalanuvchi restricted', $peer['raw']);
+            return $this->failResult('restricted', 'foydalanuvchi restricted', $rawPeer);
         }
 
         return [
@@ -337,124 +708,95 @@ class TelegramPeerMessagingService
             'peer_type' => 'user',
             'resolved_peer' => $resolvedPeer,
             'error_key' => null,
-            'reason' => 'private user ok',
+            'reason' => 'user ok',
             'session_error' => false,
         ];
     }
 
-    private function inspectInternalLink(array $peer): array
-    {
-        $peerId = '-100' . $peer['internal_id'];
+    private function inspectChatPeer(
+        array $sourcePeer,
+        array $info,
+        string|int $resolvedPeer,
+        ?string $rawPeer = null,
+        bool $fromInviteAlready = false
+    ): array {
+        $rawPeer = $rawPeer ?? ($sourcePeer['raw'] ?? null);
 
-        return $this->inspectChatLikePeer($peerId, $peerId, 'internal_link', $peer['raw']);
-    }
+        Log::info('telegram_inspect_chat_peer_start', [
+            'raw_peer' => $rawPeer,
+            'resolved_peer' => $resolvedPeer,
+            'from_invite_already' => $fromInviteAlready,
+            'info_keys' => array_keys($info),
+        ]);
 
-    private function inspectInviteLink(array $peer): array
-    {
-        try {
-            $invite = $this->madeline->messages->checkChatInvite([
-                'hash' => $peer['hash'],
-            ]);
+        $fullInfo = $this->safeGetFullInfo($resolvedPeer);
 
-            $type = $invite['_'] ?? null;
+        Log::info('telegram_inspect_chat_peer_fullinfo', [
+            'raw_peer' => $rawPeer,
+            'resolved_peer' => $resolvedPeer,
+            'fullinfo_is_array' => is_array($fullInfo),
+            'fullinfo_keys' => is_array($fullInfo) ? array_keys($fullInfo) : null,
+            'fullinfo_top_keys' => is_array($fullInfo) ? array_slice(array_keys($fullInfo), 0, 15) : null,
+        ]);
 
-            if ($type === 'chatInviteAlready') {
-                $chat = $invite['chat'] ?? null;
-                $chatId = $chat['id'] ?? null;
-
-                if (!$chatId) {
-                    return $this->failResult('chat_info_missing', 'invite chat topilmadi', $peer['raw']);
-                }
-
-                return $this->inspectChatLikePeer($chatId, $chatId, 'invite_link', $peer['raw']);
-            }
-
-            if ($type === 'chatInvite') {
-                try {
-                    $joined = $this->madeline->messages->importChatInvite([
-                        'hash' => $peer['hash'],
-                    ]);
-
-                    $chat = $joined['chats'][0] ?? null;
-                    $chatId = $chat['id'] ?? null;
-
-                    if (!$chatId) {
-                        return $this->failResult('chat_info_missing', 'invite qabul qilindi, lekin chat topilmadi', $peer['raw']);
-                    }
-
-                    return $this->inspectChatLikePeer($chatId, $chatId, 'invite_link', $peer['raw']);
-                } catch (Throwable $e) {
-                    $err = $this->cleanError($e->getMessage());
-                    $key = $this->mapErrorToKey($err);
-
-                    if ($key === 'unknown_error') {
-                        Log::error('telegram_unknown_error', [
-                            'stage' => 'invite_join',
-                            'peer' => $peer['raw'],
-                        ]);
-                    }
-
-                    return $this->failResult($key, $this->humanReason($key), $peer['raw']);
-                }
-            }
-
-            return $this->failResult('invite_invalid', 'invite link yaroqsiz', $peer['raw']);
-        } catch (Throwable $e) {
-            $err = $this->cleanError($e->getMessage());
-            $key = $this->mapErrorToKey($err);
-
-            if ($key === 'unknown_error') {
-                Log::error('telegram_unknown_error', [
-                    'stage' => 'invite_check',
-                    'peer' => $peer['raw'],
-                ]);
-            }
-
-            return $this->failResult($key, $this->humanReason($key), $peer['raw']);
-        }
-    }
-
-    private function inspectPhone(array $peer): array
-    {
-        return $this->failResult(
-            'phone_not_supported_directly',
-            'telefon raqam peer emas; contact orqali resolve qilish kerak',
-            $peer['raw']
-        );
-    }
-
-    private function inspectChatLikePeer(string|int $resolvedPeer, string|int $peerId, string $peerType, string $rawPeer): array
-    {
-        $participant = $this->safeGetParticipant($peerId);
-
-        if (!$participant) {
-            return $this->failResult('not_member', 'member emas', $rawPeer);
-        }
-
-        $participantBlock = $this->extractParticipantBlock($participant);
-        $participantType = $participantBlock['_'] ?? $participant['_'] ?? null;
-
-        if (in_array($participantType, ['channelParticipantBanned', 'channelParticipantLeft'], true)) {
-            return $this->failResult('not_member', 'member emas yoki chiqib ketgan', $rawPeer);
-        }
-
-        if ($this->isParticipantBannedToSend($participant)) {
-            return $this->failResult('chat_write_forbidden', 'yozish taqiqlangan', $rawPeer);
-        }
-
-        $full = $this->madeline->getFullInfo($peerId);
-        $chat = $this->extractChatBlock($full);
+        $chat = $this->extractChatBlock($fullInfo);
 
         if (!$chat) {
+            Log::warning('telegram_inspect_chat_peer_missing_chat_block', [
+                'raw_peer' => $rawPeer,
+                'resolved_peer' => $resolvedPeer,
+                'fullinfo_keys' => is_array($fullInfo) ? array_keys($fullInfo) : null,
+                'fullinfo_dump_short' => is_array($fullInfo) ? array_slice($fullInfo, 0, 5, true) : null,
+            ]);
+
             return $this->failResult('chat_info_missing', 'chat ma’lumoti topilmadi', $rawPeer);
         }
 
-        $isAdmin = $this->isAdminOrCreator($participant);
+        $participant = $this->safeGetParticipant($resolvedPeer);
 
-        $defaultBannedRights = $chat['default_banned_rights'] ?? [];
-        $canSendMessages = $chat['can_send_messages'] ?? null;
-        $slowmodeSeconds = (int) ($chat['slowmode_seconds'] ?? 0);
+        Log::info('telegram_inspect_chat_peer_participant', [
+            'raw_peer' => $rawPeer,
+            'resolved_peer' => $resolvedPeer,
+            'participant_is_null' => $participant === null,
+            'participant_type' => is_array($participant)
+                ? ($participant['participant']['_'] ?? $participant['_'] ?? null)
+                : null,
+            'participant_keys' => is_array($participant) ? array_keys($participant) : null,
+        ]);
+
+        if (!$fromInviteAlready) {
+            if ($participant === null) {
+                if (($chat['left'] ?? false) === true || ($chat['kicked'] ?? false) === true) {
+                    return $this->failResult('not_member', 'member emas', $rawPeer);
+                }
+
+                if (($chat['deactivated'] ?? false) === true) {
+                    return $this->failResult('peer_not_found', 'chat deaktivatsiya qilingan', $rawPeer);
+                }
+
+                return $this->failResult('not_member', 'member emas', $rawPeer);
+            }
+
+            if ($this->isLeftOrBannedParticipant($participant)) {
+                return $this->failResult('not_member', 'member emas', $rawPeer);
+            }
+        }
+
+        $isAdmin = $this->isAdminOrCreator($participant);
         $isBroadcast = (bool) ($chat['broadcast'] ?? false);
+        $slowmodeSeconds = (int) ($chat['slowmode_seconds'] ?? 0);
+        $canSendMessages = $chat['can_send_messages'] ?? null;
+        $defaultBannedRights = $chat['default_banned_rights'] ?? [];
+
+        Log::info('telegram_inspect_chat_peer_rules', [
+            'raw_peer' => $rawPeer,
+            'resolved_peer' => $resolvedPeer,
+            'is_admin' => $isAdmin,
+            'is_broadcast' => $isBroadcast,
+            'slowmode_seconds' => $slowmodeSeconds,
+            'can_send_messages' => $canSendMessages,
+            'default_banned_rights' => $defaultBannedRights,
+        ]);
 
         if ($isBroadcast && !$isAdmin) {
             return $this->failResult('chat_write_forbidden', 'broadcast kanalga faqat admin yozishi mumkin', $rawPeer);
@@ -464,26 +806,16 @@ class TelegramPeerMessagingService
             return $this->failResult('chat_write_forbidden', 'guruh/channel yozishni taqiqlagan', $rawPeer);
         }
 
-        if ($slowmodeSeconds > 0) {
-            return [
-                'ok' => true,
-                'sendable' => true,
-                'peer_type' => $peerType,
-                'resolved_peer' => $resolvedPeer,
-                'error_key' => null,
-                'reason' => "slowmode bor ({$slowmodeSeconds}s)",
-                'slowmode_seconds' => $slowmodeSeconds,
-                'session_error' => false,
-            ];
-        }
-
         return [
             'ok' => true,
             'sendable' => true,
-            'peer_type' => $peerType,
+            'peer_type' => $this->resolvePeerTypeFromInfo($info) ?? 'chat',
             'resolved_peer' => $resolvedPeer,
             'error_key' => null,
-            'reason' => 'yozish mumkin',
+            'reason' => $slowmodeSeconds > 0
+                ? "slowmode bor ({$slowmodeSeconds}s)"
+                : 'member ok',
+            'slowmode_seconds' => $slowmodeSeconds > 0 ? $slowmodeSeconds : null,
             'session_error' => false,
         ];
     }
@@ -491,37 +823,128 @@ class TelegramPeerMessagingService
     private function safeGetParticipant(string|int $channel): mixed
     {
         try {
-            return $this->madeline->channels->getParticipant([
+            $result = $this->madeline->channels->getParticipant([
                 'channel' => $channel,
                 'participant' => 'me',
             ]);
+
+            return $result;
         } catch (Throwable $e) {
+            Log::warning('telegram_safe_get_participant_failed', [
+                'channel' => $channel,
+                'message' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    private function safeGetFullInfo(string|int $peer): mixed
+    {
+        try {
+            $result = $this->madeline->getFullInfo($peer);
+
+            return $result;
+        } catch (Throwable $e) {
+            Log::warning('telegram_safe_get_full_info_failed', [
+                'peer' => $peer,
+                'message' => $e->getMessage(),
+            ]);
+
             return null;
         }
     }
 
     private function extractParticipantBlock(mixed $participant): array
     {
-        if (is_array($participant) && isset($participant['participant']) && is_array($participant['participant'])) {
+        if (!is_array($participant)) {
+            return [];
+        }
+
+        if (isset($participant['participant']) && is_array($participant['participant'])) {
             return $participant['participant'];
         }
 
-        return is_array($participant) ? $participant : [];
+        return $participant;
     }
 
-    private function isParticipantBannedToSend(mixed $participant): bool
+    private function extractChatBlock(mixed $fullInfo): ?array
+    {
+        if (!is_array($fullInfo)) {
+            return null;
+        }
+
+        foreach (['Chat', 'chat', 'full_chat', 'fullChat', 'full'] as $key) {
+            if (isset($fullInfo[$key]) && is_array($fullInfo[$key])) {
+                return $fullInfo[$key];
+            }
+        }
+
+        return null;
+    }
+
+    private function resolvePeerIdFromInfo(array $info, string|int|null $fallback): string|int
+    {
+        foreach ([
+            'bot_api_id',
+            'peer_id',
+            'channel_id',
+            'chat_id',
+            'user_id',
+            'id',
+        ] as $key) {
+            if (array_key_exists($key, $info) && $info[$key] !== null && $info[$key] !== '') {
+                return $info[$key];
+            }
+        }
+
+        return $fallback ?? '';
+    }
+
+    private function resolvePeerTypeFromInfo(array $info): ?string
+    {
+        $type = $info['type'] ?? $info['_'] ?? null;
+
+        if (is_string($type) && $type !== '') {
+            return match ($type) {
+                'megagroup' => 'supergroup',
+                'chatInviteAlready' => 'chat',
+                default => $type,
+            };
+        }
+
+        if (($info['bot_api_id'] ?? null) !== null || ($info['user_id'] ?? null) !== null) {
+            return 'user';
+        }
+
+        if (($info['channel_id'] ?? null) !== null) {
+            return !empty($info['broadcast']) ? 'channel' : (!empty($info['megagroup']) ? 'supergroup' : 'channel');
+        }
+
+        if (($info['chat_id'] ?? null) !== null) {
+            return 'chat';
+        }
+
+        return null;
+    }
+
+    private function isLeftOrBannedParticipant(mixed $participant): bool
     {
         $block = $this->extractParticipantBlock($participant);
         $type = $block['_'] ?? null;
 
-        if ($type === 'channelParticipantBanned') {
+        if (in_array($type, [
+            'channelParticipantBanned',
+            'channelParticipantLeft',
+            'chatParticipantLeft',
+        ], true)) {
             return true;
         }
 
-        $bannedRights = $block['banned_rights'] ?? null;
-
-        if (is_array($bannedRights) && (($bannedRights['send_messages'] ?? null) === true)) {
-            return true;
+        if (($block['banned_rights'] ?? null) && is_array($block['banned_rights'])) {
+            if (($block['banned_rights']['view_messages'] ?? false) === true) {
+                return true;
+            }
         }
 
         return false;
@@ -536,6 +959,10 @@ class TelegramPeerMessagingService
             return true;
         }
 
+        if (in_array($type, ['chatParticipantCreator', 'chatParticipantAdmin'], true)) {
+            return true;
+        }
+
         if (!empty($block['admin_rights'])) {
             return true;
         }
@@ -545,13 +972,11 @@ class TelegramPeerMessagingService
 
     private function isWriteForbiddenByDefaults(mixed $canSendMessages, array $defaultBannedRights): bool
     {
-        $sendMessagesBanned = $defaultBannedRights['send_messages'] ?? null;
-
         if ($canSendMessages === false) {
             return true;
         }
 
-        if ($sendMessagesBanned === true) {
+        if (($defaultBannedRights['send_messages'] ?? false) === true) {
             return true;
         }
 
@@ -559,70 +984,57 @@ class TelegramPeerMessagingService
     }
 
     private function extractSendResult(mixed $response): array
-{
-    $telegramMessageId = null;
-    $status = 'sent';
+    {
+        $telegramMessageId = null;
+        $status = 'sent';
 
-    if (!is_array($response)) {
-        return [$status, null];
-    }
-
-    $type = $response['_'] ?? null;
-
-    // Short responses
-    if (in_array($type, ['updateShortSentMessage', 'updateShortMessage', 'updateShortChatMessage'], true)) {
-        $telegramMessageId = $response['id'] ?? null;
-
-        if ($type === 'updateShortSentMessage' && (($response['scheduled'] ?? false) === true)) {
-            $status = 'scheduled';
+        if (!is_array($response)) {
+            return [$status, null];
         }
 
-        return [$status, $telegramMessageId];
-    }
+        $type = $response['_'] ?? null;
 
-    // Normal updates response
-    if (!empty($response['updates']) && is_array($response['updates'])) {
-        foreach ($response['updates'] as $update) {
-            if (!is_array($update)) {
-                continue;
-            }
+        if (in_array($type, ['updateShortSentMessage', 'updateShortMessage', 'updateShortChatMessage'], true)) {
+            $telegramMessageId = $response['id'] ?? null;
 
-            $updateType = $update['_'] ?? null;
-
-            if ($updateType === 'updateNewScheduledMessage' && isset($update['message']['id'])) {
+            if ($type === 'updateShortSentMessage' && (($response['scheduled'] ?? false) === true)) {
                 $status = 'scheduled';
-                $telegramMessageId = $update['message']['id'];
-                break;
             }
 
-            if (in_array($updateType, [
-                'updateNewMessage',
-                'updateNewChannelMessage',
-                'updateEditMessage',
-                'updateEditChannelMessage',
-            ], true)) {
-                $message = $update['message'] ?? null;
+            return [$status, $telegramMessageId];
+        }
 
-                if (is_array($message) && isset($message['id'])) {
-                    $telegramMessageId = $message['id'];
+        if (!empty($response['updates']) && is_array($response['updates'])) {
+            foreach ($response['updates'] as $update) {
+                if (!is_array($update)) {
+                    continue;
+                }
+
+                $updateType = $update['_'] ?? null;
+
+                if ($updateType === 'updateNewScheduledMessage' && isset($update['message']['id'])) {
+                    $status = 'scheduled';
+                    $telegramMessageId = $update['message']['id'];
                     break;
+                }
+
+                if (in_array($updateType, [
+                    'updateNewMessage',
+                    'updateNewChannelMessage',
+                    'updateEditMessage',
+                    'updateEditChannelMessage',
+                ], true)) {
+                    $message = $update['message'] ?? null;
+
+                    if (is_array($message) && isset($message['id'])) {
+                        $telegramMessageId = $message['id'];
+                        break;
+                    }
                 }
             }
         }
-    }
 
-    return [$status, $telegramMessageId];
-}
-
-    private function extractChatBlock(array $fullInfo): ?array
-    {
-        foreach (['Chat', 'chat', 'full_chat'] as $key) {
-            if (isset($fullInfo[$key]) && is_array($fullInfo[$key])) {
-                return $fullInfo[$key];
-            }
-        }
-
-        return null;
+        return [$status, $telegramMessageId];
     }
 
     private function failResult(string $errorKey, string $reason, ?string $peer = null, ?string $exception = null): array
@@ -724,6 +1136,10 @@ class TelegramPeerMessagingService
             return 'invite_invalid';
         }
 
+        if (str_contains($e, 'phone number invalid') || str_contains($e, 'phone not supported')) {
+            return 'phone_not_supported_directly';
+        }
+
         return 'unknown_error';
     }
 
@@ -770,15 +1186,16 @@ class TelegramPeerMessagingService
             'madeline_not_initialized' => 'madeline yoqilmagan',
             'invite_invalid' => 'invite link yaroqsiz',
             'phone_not_supported_directly' => 'telefon raqamni direkt peer qilib bo‘lmaydi',
+            'restricted' => 'cheklangan',
             default => $errorKey,
         };
     }
-
 
     private function cleanError(string $err): string
     {
         return trim(preg_replace('/\s+/', ' ', $err));
     }
+
     private function logUnknownError(string $stage, Throwable $e, array $context = []): void
     {
         Log::error('telegram_unknown_error', [

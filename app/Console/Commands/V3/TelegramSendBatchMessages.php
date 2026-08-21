@@ -23,7 +23,7 @@ class TelegramSendBatchMessages extends Command
         parent::__construct();
     }
 
-    public function handle()
+    public function handle(): int
     {
         $groupId = (int) $this->argument('groupId');
         $batchNo = (int) $this->argument('batchNo');
@@ -86,7 +86,13 @@ class TelegramSendBatchMessages extends Command
                         sleep($this->perMessageSpacingSeconds);
                     }
 
-                    $peer = (string) $message->peer;
+                    $peer = trim((string) $message->peer);
+
+                    if ($peer === '') {
+                        $this->markMessageFailed($message, 'peer_invalid');
+                        $this->failPeerPendingMessages($group, $peer, 'peer_invalid');
+                        continue;
+                    }
 
                     $inspect = $peerInspectionCache[$peer]
                         ??= $this->telegramService->inspectPeer($peer);
@@ -110,7 +116,7 @@ class TelegramSendBatchMessages extends Command
 
                     $result = $this->telegramService->sendMessageToPeer(
                         $peer,
-                        $group->message_text,
+                        (string) $group->message_text,
                         $inspect
                     );
 
@@ -189,6 +195,7 @@ class TelegramSendBatchMessages extends Command
             $message->id
         );
     }
+
     private function logPeerFailure(MessageGroup $group, string $peer, string $errorKey, string $stage, ?int $messageId = null): void
     {
         Log::warning('telegram_peer_failed', [
