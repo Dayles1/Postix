@@ -168,11 +168,6 @@ class TelegramPeerMessagingService
     {
         $peer = $this->parsePeer($rawPeer);
 
-        Log::info('telegram_peer_inspect_start', [
-            'raw_peer' => $rawPeer,
-            'parsed_type' => $peer['type'] ?? null,
-            'parsed_ok' => $peer['ok'] ?? false,
-        ]);
 
         if (!($peer['ok'] ?? false)) {
             $result = $this->failResult('peer_invalid', $peer['reason'] ?? 'peer invalid', $rawPeer);
@@ -565,21 +560,14 @@ class TelegramPeerMessagingService
             return $this->failResult('invite_invalid', 'invite link yaroqsiz', $rawPeer);
         }
 
-        Log::info('telegram_inspect_invite_start', [
-            'raw_peer' => $rawPeer,
-            'hash' => $hash,
-        ]);
+        
 
         try {
             $invite = $this->madeline->messages->checkChatInvite([
                 'hash' => $hash,
             ]);
 
-            Log::info('telegram_inspect_invite_result', [
-                'raw_peer' => $rawPeer,
-                'invite_type' => $invite['_'] ?? null,
-                'invite_keys' => array_keys($invite ?? []),
-            ]);
+           
         } catch (Throwable $e) {
             $err = $this->cleanError($e->getMessage());
             $key = $this->mapErrorToKey($err);
@@ -645,14 +633,7 @@ class TelegramPeerMessagingService
         $peerType = $this->resolvePeerTypeFromInfo($info);
         $peerId = $this->resolvePeerIdFromInfo($info, $resolvedPeer);
 
-        Log::info('telegram_inspect_resolved_peer', [
-            'raw_peer' => $rawPeer,
-            'resolved_peer' => $resolvedPeer,
-            'peer_id' => $peerId,
-            'peer_type' => $peerType,
-            'info_keys' => array_keys($info),
-            'from_invite_already' => $fromInviteAlready,
-        ]);
+        
 
         if ($peerId === '' || $peerId === null) {
             return $this->failResult('peer_not_found', 'peer topilmadi', $rawPeer);
@@ -722,12 +703,7 @@ class TelegramPeerMessagingService
     ): array {
         $rawPeer = $rawPeer ?? ($sourcePeer['raw'] ?? null);
 
-        Log::info('telegram_inspect_chat_peer_start', [
-            'raw_peer' => $rawPeer,
-            'resolved_peer' => $resolvedPeer,
-            'from_invite_already' => $fromInviteAlready,
-            'info_keys' => array_keys($info),
-        ]);
+        
 
         $fullInfo = $this->safeGetFullInfo($resolvedPeer);
 
@@ -742,12 +718,6 @@ class TelegramPeerMessagingService
         $chat = $this->extractChatBlock($fullInfo);
 
         if (!$chat) {
-            Log::warning('telegram_inspect_chat_peer_missing_chat_block', [
-                'raw_peer' => $rawPeer,
-                'resolved_peer' => $resolvedPeer,
-                'fullinfo_keys' => is_array($fullInfo) ? array_keys($fullInfo) : null,
-                'fullinfo_dump_short' => is_array($fullInfo) ? array_slice($fullInfo, 0, 5, true) : null,
-            ]);
 
             return $this->failResult('chat_info_missing', 'chat ma’lumoti topilmadi', $rawPeer);
         }
@@ -788,15 +758,7 @@ class TelegramPeerMessagingService
         $canSendMessages = $chat['can_send_messages'] ?? null;
         $defaultBannedRights = $chat['default_banned_rights'] ?? [];
 
-        Log::info('telegram_inspect_chat_peer_rules', [
-            'raw_peer' => $rawPeer,
-            'resolved_peer' => $resolvedPeer,
-            'is_admin' => $isAdmin,
-            'is_broadcast' => $isBroadcast,
-            'slowmode_seconds' => $slowmodeSeconds,
-            'can_send_messages' => $canSendMessages,
-            'default_banned_rights' => $defaultBannedRights,
-        ]);
+        
 
         if ($isBroadcast && !$isAdmin) {
             return $this->failResult('chat_write_forbidden', 'broadcast kanalga faqat admin yozishi mumkin', $rawPeer);

@@ -39,5 +39,13 @@ return [
         'login' => env('WAREHOUSE_API_LOGIN'),
         'password' => env('WAREHOUSE_API_PASSWORD'),
     ],
+    'telegram' => [
+
+        'api_id' => env('TELEGRAM_API_ID'),
+        'api_hash' => env('TELEGRAM_API_HASH'),
+        'driver_check_chat_link' => env('TELEGRAM_DRIVER_CHECK_CHAT_LINK'),
+        'driver_check_account_id' => env('TELEGRAM_DRIVER_CHECK_ACCOUNT_ID'),
+
+    ],
 
 ];
