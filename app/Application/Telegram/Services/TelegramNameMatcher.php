@@ -6,35 +6,61 @@ namespace App\Application\Telegram\Services;
 
 final class TelegramNameMatcher
 {
-    /*
-     * ============================================================
-     * SCORE CONFIGURATION
-     * ============================================================
+    private const EXACT_SCORE = 100.0;
+
+    /**
+     * A token with the same characters in the same order,
+     * but with extra/missing characters, gives a strong signal.
      */
+    private const ORDERED_SCORE = 70.0;
 
-    private const CONFIRM_SCORE = 80.0;
+    /**
+     * Phonetic similarity is weaker than ordered identity.
+     */
+    private const PHONETIC_SCORE = 60.0;
 
-    private const STRONG_TOKEN_SCORE = 82.0;
+    /**
+     * Fuzzy similarity is only fallback evidence.
+     */
+    private const FUZZY_MIN_SCORE = 40.0;
 
-    private const USEFUL_TOKEN_SCORE = 55.0;
+    private const CONFIRM_SCORE = 70.0;
 
     private const MIN_TOKEN_LENGTH = 2;
 
-    /**
-     * Some very short names produce too many false positives.
-     */
-    private const SINGLE_TOKEN_CONFIRM_LENGTH = 7;
-
-    /**
-     * Maximum number of token results kept in response.
-     */
     private const MAX_MATCHES = 100;
 
-    /*
-     * ============================================================
-     * PUBLIC API
-     * ============================================================
+    /**
+     * Tokens that are usually not identity-bearing by themselves.
+     *
+     * IMPORTANT:
+     *
+     * We do NOT remove these from the nickname.
+     *
+     * They are only treated as weak/noise when they are the
+     * ONLY token being compared.
+     *
+     * Example:
+     *
+     * "Nozim bek"
+     *
+     * Nozim -> identity evidence.
+     * bek   -> extra nickname part.
      */
+    private const WEAK_STANDALONE_TOKENS = [
+        'bek',
+        'beg',
+        'jon',
+        'jan',
+        'hon',
+        'xon',
+        'boy',
+        'aka',
+        'opa',
+        'uka',
+        'bro',
+        'sis',
+    ];
 
     public function match(
         ?string $expectedName,
@@ -49,11 +75,11 @@ final class TelegramNameMatcher
                         $telegramFirstName,
                         $telegramLastName,
                     ],
-                    static fn($value): bool =>
-                    $value !== null
-                    && trim((string) $value) !== '',
-                )
-            )
+                    static fn ($value): bool =>
+                        $value !== null
+                        && trim((string) $value) !== '',
+                ),
+            ),
         );
 
         if (
@@ -62,21 +88,18 @@ final class TelegramNameMatcher
         ) {
             return $this->noDataResult(
                 $expectedName,
-                $telegramFullName ?: null,
+                $telegramFullName !== ''
+                    ? $telegramFullName
+                    : null,
             );
         }
 
-        /*
-         * --------------------------------------------------------
-         * Normalize names.
-         * --------------------------------------------------------
-         */
         $normalizedExpected = $this->normalizeName(
-            $expectedName
+            $expectedName,
         );
 
         $normalizedTelegram = $this->normalizeName(
-            $telegramFullName
+            $telegramFullName,
         );
 
         if (
@@ -89,17 +112,12 @@ final class TelegramNameMatcher
             );
         }
 
-        /*
-         * --------------------------------------------------------
-         * Tokenize.
-         * --------------------------------------------------------
-         */
         $expectedTokens = $this->tokens(
-            $expectedName
+            $normalizedExpected,
         );
 
         $telegramTokens = $this->tokens(
-            $telegramFullName
+            $normalizedTelegram,
         );
 
         if (
@@ -113,23 +131,17 @@ final class TelegramNameMatcher
         }
 
         /*
-         * --------------------------------------------------------
-         * Exact full-name equality.
-         * --------------------------------------------------------
+         * ---------------------------------------------------------
+         * EXACT FULL NAME
+         * ---------------------------------------------------------
          */
         if (
             $normalizedExpected === $normalizedTelegram
         ) {
-            $matches = [];
-
-            foreach ($expectedTokens as $token) {
-                $matches[] = [
-                    'expected' => $token,
-                    'actual' => $token,
-                    'score' => 100.0,
-                    'reason' => 'exact',
-                ];
-            }
+            $matches = $this->buildTokenMatches(
+                $expectedTokens,
+                $telegramTokens,
+            );
 
             return $this->result(
                 expectedName: $expectedName,
@@ -144,14 +156,22 @@ final class TelegramNameMatcher
                 telegramTokens: $telegramTokens,
                 reasons: [
                     'exact_full_name',
+                    'strong_name_match',
                 ],
+                weightedTokenScore: 100.0,
+                fullNameSimilarity: 100.0,
+                partialScore: 100.0,
+                multiTokenScore: 100.0,
+                identityScore: 100.0,
+                matchedTokenCount: count($telegramTokens),
+                usefulTokenCount: count($telegramTokens),
             );
         }
 
         /*
-         * --------------------------------------------------------
-         * Token matching.
-         * --------------------------------------------------------
+         * ---------------------------------------------------------
+         * TOKEN MATCHING
+         * ---------------------------------------------------------
          */
         $matches = $this->buildTokenMatches(
             $expectedTokens,
@@ -176,195 +196,142 @@ final class TelegramNameMatcher
             );
         }
 
-        $strongMatches = array_values(
+        /*
+         * ---------------------------------------------------------
+         * MAIN BUSINESS RULE
+         * ---------------------------------------------------------
+         *
+         * We do NOT average all Telegram tokens.
+         *
+         * We search for the BEST identity evidence.
+         *
+         * This is important because Telegram nickname can be:
+         *
+         *   Tenison
+         *   Roberta Carlos
+         *   Nozim bek
+         *
+         * and extra nickname words must not destroy a good match.
+         */
+        $bestIdentityMatch = $this->bestIdentityMatch(
+            $matches,
+        );
+
+        if ($bestIdentityMatch === null) {
+            return $this->result(
+                expectedName: $expectedName,
+                telegramName: $telegramFullName,
+                normalizedExpected: $normalizedExpected,
+                normalizedTelegram: $normalizedTelegram,
+                matched: false,
+                score: 0.0,
+                level: 'none',
+                matches: $matches,
+                expectedTokens: $expectedTokens,
+                telegramTokens: $telegramTokens,
+                reasons: [
+                    'no_identity_match',
+                ],
+            );
+        }
+
+        $score = (float) (
+            $bestIdentityMatch['score'] ?? 0.0
+        );
+
+        /*
+         * ---------------------------------------------------------
+         * MULTIPLE IDENTITY TOKENS
+         * ---------------------------------------------------------
+         *
+         * If several meaningful Telegram tokens independently
+         * match expected identity, confidence increases.
+         *
+         * Exact + exact -> 100
+         * Ordered + ordered -> 85
+         * Exact + ordered -> 100
+         */
+        $identityMatches = array_values(
             array_filter(
                 $matches,
-                static fn(array $match): bool =>
-                (float) $match['score']
-                >= self::STRONG_TOKEN_SCORE
+                fn (array $match): bool =>
+                    $this->isIdentityEvidence($match),
+            ),
+        );
+
+        if (
+            $this->hasExactIdentityMatch(
+                $identityMatches,
             )
+        ) {
+            $score = 100.0;
+        } elseif (
+            count($identityMatches) >= 2
+        ) {
+            $scores = array_map(
+                static fn(array $match): float =>
+                    (float) (
+                        $match['score'] ?? 0.0
+                    ),
+                $identityMatches,
+            );
+
+            /*
+             * Two independent ordered identity signals
+             * are stronger than one.
+             */
+            if (
+                count(
+                    array_filter(
+                        $scores,
+                        static fn(float $value): bool =>
+                            $value >= self::ORDERED_SCORE,
+                    ),
+                ) >= 2
+            ) {
+                $score = max(
+                    $score,
+                    85.0,
+                );
+            }
+        }
+
+        /*
+         * Clamp.
+         */
+        $score = round(
+            min(
+                100.0,
+                max(
+                    0.0,
+                    $score,
+                ),
+            ),
+            2,
+        );
+
+        $matched = $this->isConfirmed(
+            $score,
+            $bestIdentityMatch,
+        );
+
+        $level = $this->resolveLevel(
+            $score,
+            $matched,
+        );
+
+        $matchedTokenCount = count(
+            $identityMatches,
         );
 
         $usefulMatches = array_values(
             array_filter(
                 $matches,
                 static fn(array $match): bool =>
-                (float) $match['score']
-                >= self::USEFUL_TOKEN_SCORE
-            )
-        );
-
-        /*
-         * --------------------------------------------------------
-         * Full-name similarity.
-         * --------------------------------------------------------
-         */
-        $fullNameSimilarity =
-            $this->stringSimilarity(
-                $normalizedExpected,
-                $normalizedTelegram,
-            );
-
-        /*
-         * --------------------------------------------------------
-         * Weighted token similarity.
-         * --------------------------------------------------------
-         */
-        $weightedTokenScore =
-            $this->weightedTokenScore(
-                $matches
-            );
-
-        /*
-         * --------------------------------------------------------
-         * Coverage.
-         * --------------------------------------------------------
-         */
-        $expectedCount = count(
-            $expectedTokens
-        );
-
-        $strongCount = count(
-            $strongMatches
-        );
-
-        $coverage =
-            $expectedCount > 0
-            ? $strongCount / $expectedCount
-            : 0.0;
-
-        $coverageScore =
-            $coverage * 100.0;
-
-        /*
-         * --------------------------------------------------------
-         * Partial-name evidence.
-         * --------------------------------------------------------
-         */
-        $partialScore =
-            $this->partialNameScore(
-                $expectedTokens,
-                $telegramTokens,
-                $strongMatches,
-            );
-
-        /*
-         * --------------------------------------------------------
-         * Multi-token evidence.
-         * --------------------------------------------------------
-         */
-        $multiTokenScore =
-            $this->multiTokenScore(
-                $strongMatches
-            );
-
-        /*
-         * --------------------------------------------------------
-         * Identity-token evidence.
-         *
-         * Long exact tokens are much more informative
-         * than "ali", "bek", etc.
-         * --------------------------------------------------------
-         */
-        $identityScore =
-            $this->identityTokenScore(
-                $strongMatches
-            );
-
-        /*
-         * --------------------------------------------------------
-         * Initial final score.
-         * --------------------------------------------------------
-         */
-        $score =
-            ($weightedTokenScore * 0.45)
-            + ($fullNameSimilarity * 0.20)
-            + ($coverageScore * 0.15)
-            + ($partialScore * 0.10)
-            + ($multiTokenScore * 0.05)
-            + ($identityScore * 0.05);
-
-        /*
-         * --------------------------------------------------------
-         * Strong single-token rescue.
-         *
-         * Example:
-         *
-         * AKHMADJONOV ILYOSBEK KHUSANBOY UGLI
-         *                ↓
-         *             ILYOSBEK
-         *
-         * This is NOT "no data".
-         * It is strong partial evidence.
-         * --------------------------------------------------------
-         */
-        $bestMatch = $strongMatches[0] ?? null;
-
-        if ($bestMatch) {
-            $bestExpected = (string) (
-                $bestMatch['expected'] ?? ''
-            );
-
-            $bestTokenScore = (float) (
-                $bestMatch['score'] ?? 0
-            );
-
-            if (
-                mb_strlen($bestExpected) >=
-                self::SINGLE_TOKEN_CONFIRM_LENGTH
-                && $bestTokenScore >= 98
-            ) {
-                $score = max(
-                    $score,
-                    82.0
-                );
-            }
-        }
-
-        $score = round(
-            min(
-                100.0,
-                max(
-                    0.0,
-                    $score
-                )
+                    (float) (
+                        $match['score'] ?? 0.0
+                    ) >= self::FUZZY_MIN_SCORE,
             ),
-            2
-        );
-
-        /*
-         * --------------------------------------------------------
-         * Confidence level.
-         * --------------------------------------------------------
-         */
-        $level = $this->resolveLevel(
-            $score,
-            $strongMatches,
-            $expectedTokens,
-            $telegramTokens,
-        );
-
-        /*
-         * --------------------------------------------------------
-         * Final boolean.
-         * --------------------------------------------------------
-         */
-        $matched = $this->isConfirmed(
-            $score,
-            $strongMatches,
-        );
-
-        /*
-         * --------------------------------------------------------
-         * Explanation.
-         * --------------------------------------------------------
-         */
-        $reasons = $this->buildReasons(
-            $expectedTokens,
-            $telegramTokens,
-            $matches,
-            $score,
-            $matched,
         );
 
         return $this->result(
@@ -378,104 +345,95 @@ final class TelegramNameMatcher
             matches: $matches,
             expectedTokens: $expectedTokens,
             telegramTokens: $telegramTokens,
-            reasons: $reasons,
-            weightedTokenScore: $weightedTokenScore,
-            fullNameSimilarity: $fullNameSimilarity,
-            partialScore: $partialScore,
-            multiTokenScore: $multiTokenScore,
-            identityScore: $identityScore,
-            matchedTokenCount: count($strongMatches),
+            reasons: $this->buildReasons(
+                $matches,
+                $bestIdentityMatch,
+                $matched,
+            ),
+            weightedTokenScore: $score,
+            fullNameSimilarity: $score,
+            partialScore: $score,
+            multiTokenScore: count($identityMatches) >= 2
+                ? 85.0
+                : $score,
+            identityScore: $score,
+            matchedTokenCount: $matchedTokenCount,
             usefulTokenCount: count($usefulMatches),
         );
     }
 
-    /*
-     * ============================================================
-     * TOKEN MATCHING
-     * ============================================================
+    /**
+     * ------------------------------------------------------------
+     * BUILD BEST MATCH FOR EVERY TELEGRAM TOKEN
+     * ------------------------------------------------------------
      */
-
     private function buildTokenMatches(
         array $expectedTokens,
         array $telegramTokens,
     ): array {
-        $candidates = [];
+        $matches = [];
 
-        foreach ($expectedTokens as $expectedIndex => $expected) {
-            foreach ($telegramTokens as $telegramIndex => $actual) {
-                $comparison =
-                    $this->tokenSimilarity(
-                        $expected,
-                        $actual,
-                    );
+        foreach (
+            $telegramTokens as $actualIndex => $actualToken
+        ) {
+            $bestMatch = null;
 
-                $candidates[] = [
-                    'expected' => $expected,
-                    'actual' => $actual,
+            foreach (
+                $expectedTokens as $expectedIndex => $expectedToken
+            ) {
+                $comparison = $this->tokenSimilarity(
+                    $expectedToken,
+                    $actualToken,
+                );
+
+                $candidate = [
+                    'expected' => $expectedToken,
+                    'actual' => $actualToken,
                     'score' => $comparison['score'],
                     'reason' => $comparison['reason'],
                     'expected_index' => $expectedIndex,
-                    'actual_index' => $telegramIndex,
+                    'actual_index' => $actualIndex,
+                    'actual_is_weak_word' =>
+                        $this->isWeakStandaloneToken(
+                            $actualToken,
+                        ),
                 ];
+
+                if (
+                    $bestMatch === null
+                    || (
+                        (float) $candidate['score']
+                        > (float) $bestMatch['score']
+                    )
+                ) {
+                    $bestMatch = $candidate;
+                }
             }
-        }
 
-        usort(
-            $candidates,
-            static fn(
-            array $a,
-            array $b
-        ): int =>
-            $b['score'] <=> $a['score']
-        );
+            if ($bestMatch === null) {
+                continue;
+            }
 
-        /*
-         * One Telegram token may only be consumed once.
-         */
-        $usedExpected = [];
-        $usedActual = [];
-
-        $matches = [];
-
-        foreach ($candidates as $candidate) {
-            $expectedIndex =
-                $candidate['expected_index'];
-
-            $actualIndex =
-                $candidate['actual_index'];
-
+            /*
+             * Completely irrelevant token.
+             */
             if (
-                isset($usedExpected[$expectedIndex])
-                || isset($usedActual[$actualIndex])
+                (float) $bestMatch['score']
+                < self::FUZZY_MIN_SCORE
             ) {
                 continue;
             }
 
-            if (
-                $candidate['score']
-                < self::USEFUL_TOKEN_SCORE
-            ) {
-                continue;
-            }
-
-            $usedExpected[$expectedIndex] = true;
-            $usedActual[$actualIndex] = true;
-
-            unset(
-                $candidate['expected_index'],
-                $candidate['actual_index'],
-            );
-
-            $matches[] = $candidate;
+            $matches[] = $bestMatch;
         }
 
         usort(
             $matches,
             static fn(
-            array $a,
-            array $b
-        ): int =>
-            $b['score'] <=> $a['score']
+                array $a,
+                array $b,
+            ): int =>
+                $b['score'] <=> $a['score'],
         );
 
         return array_slice(
@@ -485,354 +443,223 @@ final class TelegramNameMatcher
         );
     }
 
+    /**
+     * ------------------------------------------------------------
+     * TOKEN SIMILARITY
+     * ------------------------------------------------------------
+     */
     private function tokenSimilarity(
         string $expected,
         string $actual,
     ): array {
+        $expected = $this->compactToken(
+            $expected,
+        );
+
+        $actual = $this->compactToken(
+            $actual,
+        );
+
+        /*
+         * ---------------------------------------------------------
+         * EXACT
+         * ---------------------------------------------------------
+         */
         if ($expected === $actual) {
             return [
-                'score' => 100.0,
+                'score' => self::EXACT_SCORE,
                 'reason' => 'exact',
             ];
         }
 
         /*
-         * Canonical comparison.
+         * ---------------------------------------------------------
+         * ORDERED CHARACTERS
+         * ---------------------------------------------------------
+         *
+         * This is the key rule.
+         *
+         * Examples:
+         *
+         * TEN
+         * TENISON
+         *
+         * TEN is inside TENISON in the same order.
+         *
+         * Result = 70.
+         *
+         * ROBERT
+         * ROBERTA
+         *
+         * Result = 70.
+         *
+         * NOZIM
+         * NOZIMJON
+         *
+         * Result = 70.
          */
-        $expectedCompact =
-            $this->compactToken($expected);
-
-        $actualCompact =
-            $this->compactToken($actual);
-
         if (
-            $expectedCompact !== ''
-            && $expectedCompact === $actualCompact
+            $this->isSubsequence(
+                $actual,
+                $expected,
+            )
         ) {
             return [
-                'score' => 99.5,
-                'reason' => 'canonical_equal',
+                'score' => self::ORDERED_SCORE,
+                'reason' => 'ordered_subsequence',
+            ];
+        }
+
+        if (
+            $this->isSubsequence(
+                $expected,
+                $actual,
+            )
+        ) {
+            return [
+                'score' => self::ORDERED_SCORE,
+                'reason' => 'ordered_contains',
             ];
         }
 
         /*
-         * Phonetic/orthographic form.
+         * ---------------------------------------------------------
+         * PHONETIC
+         * ---------------------------------------------------------
          */
-        $expectedPhonetic =
-            $this->phoneticForm($expected);
+        $expectedPhonetic = $this->phoneticForm(
+            $expected,
+        );
 
-        $actualPhonetic =
-            $this->phoneticForm($actual);
+        $actualPhonetic = $this->phoneticForm(
+            $actual,
+        );
 
         if (
             $expectedPhonetic !== ''
             && $expectedPhonetic === $actualPhonetic
         ) {
             return [
-                'score' => 97.0,
+                'score' => self::PHONETIC_SCORE,
                 'reason' => 'phonetic_equal',
             ];
         }
 
         /*
-         * Contains.
-         */
-        if (
-            mb_strlen($expected) >= 4
-            && mb_strlen($actual) >= 4
-            && (
-                mb_strpos(
-                    $expected,
-                    $actual
-                ) !== false
-                || mb_strpos(
-                    $actual,
-                    $expected
-                ) !== false
-            )
-        ) {
-            return [
-                'score' => 95.0,
-                'reason' => 'contains',
-            ];
-        }
-
-        /*
-         * Fuzzy.
+         * ---------------------------------------------------------
+         * FUZZY
+         * ---------------------------------------------------------
          */
         return [
-            'score' =>
-                $this->stringSimilarity(
-                    $expected,
-                    $actual,
-                ),
+            'score' => $this->stringSimilarity(
+                $expected,
+                $actual,
+            ),
             'reason' => 'fuzzy',
         ];
     }
 
-    /*
-     * ============================================================
-     * SCORING
-     * ============================================================
+    /**
+     * ------------------------------------------------------------
+     * BEST IDENTITY MATCH
+     * ------------------------------------------------------------
      */
-
-    private function weightedTokenScore(
+    private function bestIdentityMatch(
         array $matches,
-    ): float {
-        if ($matches === []) {
-            return 0.0;
-        }
-
-        $weightTotal = 0.0;
-        $scoreTotal = 0.0;
+    ): ?array {
+        $best = null;
 
         foreach ($matches as $match) {
-            $token = (string) (
-                $match['expected'] ?? ''
-            );
-
-            $length = mb_strlen(
-                $token
-            );
-
-            $weight = match (true) {
-                $length >= 10 => 1.30,
-                $length >= 8 => 1.20,
-                $length >= 6 => 1.10,
-                $length >= 4 => 1.00,
-                default => 0.70,
-            };
-
-            $weightTotal += $weight;
-
-            $scoreTotal +=
-                ((float) $match['score'])
-                * $weight;
-        }
-
-        return $weightTotal > 0
-            ? round(
-                $scoreTotal / $weightTotal,
-                2
-            )
-            : 0.0;
-    }
-
-    private function partialNameScore(
-        array $expectedTokens,
-        array $telegramTokens,
-        array $strongMatches,
-    ): float {
-        if (
-            $expectedTokens === []
-            || $telegramTokens === []
-            || $strongMatches === []
-        ) {
-            return 0.0;
-        }
-
-        $expectedCount =
-            count($expectedTokens);
-
-        $telegramCount =
-            count($telegramTokens);
-
-        $strongCount =
-            count($strongMatches);
-
-        /*
-         * Telegram contains only one strong token.
-         */
-        if (
-            $telegramCount === 1
-            && $strongCount >= 1
-        ) {
-            $token = (string) (
-                $strongMatches[0]['expected']
-                ?? ''
-            );
-
+            /*
+             * A standalone "bek", "jon", etc. should not
+             * be sufficient by itself to identify a person.
+             */
             if (
-                mb_strlen($token) >= 8
-                && $strongMatches[0]['score'] >= 98
+                $this->isWeakStandaloneToken(
+                    (string) (
+                        $match['actual'] ?? ''
+                    ),
+                )
+                && (float) (
+                    $match['score'] ?? 0.0
+                ) < self::EXACT_SCORE
             ) {
-                return 100.0;
+                continue;
             }
 
+            /*
+             * Identity evidence starts at 70.
+             */
             if (
-                mb_strlen($token) >= 6
-                && $strongMatches[0]['score'] >= 95
+                (float) (
+                    $match['score'] ?? 0.0
+                ) < self::ORDERED_SCORE
             ) {
-                return 90.0;
-            }
-
-            return 70.0;
-        }
-
-        /*
-         * Telegram has fewer tokens than expected.
-         */
-        if (
-            $telegramCount < $expectedCount
-            && $strongCount > 0
-        ) {
-            return 85.0;
-        }
-
-        /*
-         * Telegram has extra tokens.
-         */
-        if (
-            $telegramCount > $expectedCount
-            && $strongCount > 0
-        ) {
-            return 75.0;
-        }
-
-        return 0.0;
-    }
-
-    private function multiTokenScore(
-        array $strongMatches,
-    ): float {
-        return match (count($strongMatches)) {
-            0 => 0.0,
-            1 => 30.0,
-            2 => 75.0,
-            3 => 90.0,
-            default => 100.0,
-        };
-    }
-
-    private function identityTokenScore(
-        array $strongMatches,
-    ): float {
-        $best = 0.0;
-
-        foreach ($strongMatches as $match) {
-            $token = (string) (
-                $match['expected'] ?? ''
-            );
-
-            $length = mb_strlen(
-                $token
-            );
-
-            $score = (float) (
-                $match['score'] ?? 0
-            );
-
-            if (
-                $length >= 10
-                && $score >= 95
-            ) {
-                $best = max(
-                    $best,
-                    100.0
-                );
-
                 continue;
             }
 
             if (
-                $length >= 8
-                && $score >= 95
+                $best === null
+                || (
+                    (float) $match['score']
+                    > (float) $best['score']
+                )
             ) {
-                $best = max(
-                    $best,
-                    90.0
-                );
-
-                continue;
-            }
-
-            if (
-                $length >= 6
-                && $score >= 95
-            ) {
-                $best = max(
-                    $best,
-                    80.0
-                );
+                $best = $match;
             }
         }
 
         return $best;
     }
 
-    private function resolveLevel(
-        float $score,
-        array $strongMatches,
-        array $expectedTokens,
-        array $telegramTokens,
-    ): string {
-        if ($score >= 95) {
-            return 'exact';
-        }
-
-        if (
-            $score >= 88
-            && $strongMatches !== []
-        ) {
-            return 'very_high';
-        }
-
-        if (
-            $score >= 80
-            && $strongMatches !== []
-        ) {
-            return 'high';
-        }
-
-        if (
-            $score >= 70
-            && $strongMatches !== []
-        ) {
-            return 'medium';
-        }
-
-        if (
-            $score >= 55
-            && $strongMatches !== []
-        ) {
-            return 'low';
-        }
-
-        if (
-            $expectedTokens !== []
-            && $telegramTokens !== []
-        ) {
-            return 'very_low';
-        }
-
-        return 'no_data';
-    }
-
-    private function isConfirmed(
-        float $score,
-        array $strongMatches,
+    /**
+     * ------------------------------------------------------------
+     * IDENTITY HELPERS
+     * ------------------------------------------------------------
+     */
+    private function isIdentityEvidence(
+        array $match,
     ): bool {
-        if ($score >= self::CONFIRM_SCORE) {
-            return true;
+        $score = (float) (
+            $match['score'] ?? 0.0
+        );
+
+        if ($score < self::ORDERED_SCORE) {
+            return false;
         }
+
+        $actual = (string) (
+            $match['actual'] ?? ''
+        );
 
         /*
-         * A single long exact identity token can confirm
-         * a partial Telegram name.
+         * Weak standalone nick words are not identity evidence.
          */
-        foreach ($strongMatches as $match) {
-            $expected = (string) (
-                $match['expected'] ?? ''
-            );
+        if (
+            $this->isWeakStandaloneToken($actual)
+            && $score < self::EXACT_SCORE
+        ) {
+            return false;
+        }
 
-            $matchScore = (float) (
-                $match['score'] ?? 0
-            );
+        return true;
+    }
+
+    private function hasExactIdentityMatch(
+        array $matches,
+    ): bool {
+        foreach ($matches as $match) {
+            if (
+                !$this->isIdentityEvidence($match)
+            ) {
+                continue;
+            }
 
             if (
-                mb_strlen($expected)
-                >= self::SINGLE_TOKEN_CONFIRM_LENGTH
-                && $matchScore >= 98
+                (float) (
+                    $match['score'] ?? 0.0
+                )
+                >= self::EXACT_SCORE
             ) {
                 return true;
             }
@@ -841,14 +668,438 @@ final class TelegramNameMatcher
         return false;
     }
 
-    /*
-     * ============================================================
-     * NORMALIZATION
-     * ============================================================
+    /**
+     * ------------------------------------------------------------
+     * CONFIRMATION
+     * ------------------------------------------------------------
      */
+    private function isConfirmed(
+        float $score,
+        array $bestIdentityMatch,
+    ): bool {
+        if ($score >= self::EXACT_SCORE) {
+            return true;
+        }
 
+        if ($score >= self::CONFIRM_SCORE) {
+            return true;
+        }
+
+        return (
+            (float) (
+                $bestIdentityMatch['score'] ?? 0.0
+            )
+            >= self::ORDERED_SCORE
+        );
+    }
+
+    /**
+     * ------------------------------------------------------------
+     * LEVEL
+     * ------------------------------------------------------------
+     */
+    private function resolveLevel(
+        float $score,
+        bool $matched,
+    ): string {
+        if ($score >= 100.0) {
+            return 'exact';
+        }
+
+        if ($score >= 85.0) {
+            return 'very_high';
+        }
+
+        if ($score >= 70.0) {
+            return 'high';
+        }
+
+        if ($score >= 60.0) {
+            return 'medium';
+        }
+
+        if ($score >= 40.0) {
+            return 'low';
+        }
+
+        return $matched
+            ? 'low'
+            : 'very_low';
+    }
+
+    /**
+     * ------------------------------------------------------------
+     * WEAK NICKNAME TOKENS
+     * ------------------------------------------------------------
+     */
+    private function isWeakStandaloneToken(
+        string $token,
+    ): bool {
+        return in_array(
+            $this->compactToken($token),
+            self::WEAK_STANDALONE_TOKENS,
+            true,
+        );
+    }
+
+    /**
+     * ------------------------------------------------------------
+     * REASONS
+     * ------------------------------------------------------------
+     */
+    private function buildReasons(
+        array $matches,
+        ?array $bestIdentityMatch,
+        bool $matched,
+    ): array {
+        $reasons = [];
+
+        if ($matched) {
+            $reasons[] = 'identity_match';
+        }
+
+        if ($bestIdentityMatch !== null) {
+            $reason =
+                $bestIdentityMatch['reason']
+                ?? null;
+
+            if ($reason === 'exact') {
+                $reasons[] = 'exact_token_match';
+            }
+
+            if (
+                $reason === 'ordered_subsequence'
+                || $reason === 'ordered_contains'
+            ) {
+                $reasons[] = 'ordered_character_match';
+            }
+
+            if ($reason === 'phonetic_equal') {
+                $reasons[] = 'phonetic_match';
+            }
+
+            if ($reason === 'fuzzy') {
+                $reasons[] = 'fuzzy_match';
+            }
+        }
+
+        foreach ($matches as $match) {
+            if (
+                $this->isWeakStandaloneToken(
+                    (string) (
+                        $match['actual'] ?? ''
+                    ),
+                )
+            ) {
+                $reasons[] = 'nickname_suffix_or_extra_word';
+                break;
+            }
+        }
+
+        return array_values(
+            array_unique($reasons),
+        );
+    }
+
+    /**
+     * ------------------------------------------------------------
+     * SUBSEQUENCE
+     * ------------------------------------------------------------
+     *
+     * Every character in $needle must occur in $haystack
+     * in the same order.
+     *
+     * Length does not matter.
+     */
+    private function isSubsequence(
+        string $needle,
+        string $haystack,
+    ): bool {
+        if ($needle === '') {
+            return true;
+        }
+
+        if ($haystack === '') {
+            return false;
+        }
+
+        $needleChars = preg_split(
+            '//u',
+            $needle,
+            -1,
+            PREG_SPLIT_NO_EMPTY,
+        );
+
+        $haystackChars = preg_split(
+            '//u',
+            $haystack,
+            -1,
+            PREG_SPLIT_NO_EMPTY,
+        );
+
+        if (
+            !is_array($needleChars)
+            || !is_array($haystackChars)
+        ) {
+            return false;
+        }
+
+        $needleIndex = 0;
+        $needleCount = count(
+            $needleChars,
+        );
+
+        foreach ($haystackChars as $char) {
+            if (
+                isset(
+                    $needleChars[$needleIndex],
+                )
+                && $char
+                    === $needleChars[$needleIndex]
+            ) {
+                $needleIndex++;
+
+                if ($needleIndex >= $needleCount) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * ------------------------------------------------------------
+     * RESULT
+     * ------------------------------------------------------------
+     */
+    private function result(
+        string $expectedName,
+        string $telegramName,
+        string $normalizedExpected,
+        string $normalizedTelegram,
+        bool $matched,
+        float $score,
+        string $level,
+        array $matches,
+        array $expectedTokens,
+        array $telegramTokens,
+        array $reasons,
+        float $weightedTokenScore = 0.0,
+        float $fullNameSimilarity = 0.0,
+        float $partialScore = 0.0,
+        float $multiTokenScore = 0.0,
+        float $identityScore = 0.0,
+        ?int $matchedTokenCount = null,
+        ?int $usefulTokenCount = null,
+    ): array {
+        $identityMatches = array_values(
+            array_filter(
+                $matches,
+                fn(array $match): bool =>
+                    $this->isIdentityEvidence($match),
+            ),
+        );
+
+        return [
+            'matched' => $matched,
+
+            'score' => round(
+                $score,
+                2,
+            ),
+
+            'level' => $level,
+
+            'expected_name' =>
+                $expectedName,
+
+            'telegram_name' =>
+                $telegramName,
+
+            'normalized_expected' =>
+                $normalizedExpected,
+
+            'normalized_telegram' =>
+                $normalizedTelegram,
+
+            'matched_tokens' =>
+                array_values(
+                    array_slice(
+                        $identityMatches,
+                        0,
+                        self::MAX_MATCHES,
+                    ),
+                ),
+
+            'possible_tokens' =>
+                array_values(
+                    array_slice(
+                        $matches,
+                        0,
+                        self::MAX_MATCHES,
+                    ),
+                ),
+
+            'matched_token_count' =>
+                $matchedTokenCount
+                ?? count($identityMatches),
+
+            'useful_token_count' =>
+                $usefulTokenCount
+                ?? count($matches),
+
+            'expected_token_count' =>
+                count($expectedTokens),
+
+            'telegram_token_count' =>
+                count($telegramTokens),
+
+            /*
+             * IMPORTANT:
+             *
+             * Ratio is not used as the final score.
+             *
+             * It is only diagnostic.
+             */
+            'match_ratio' =>
+                count($telegramTokens) > 0
+                ? round(
+                    count($identityMatches)
+                    / count($telegramTokens),
+                    4,
+                )
+                : 0.0,
+
+            'best_token_score' =>
+                $matches !== []
+                ? round(
+                    max(
+                        array_map(
+                            static fn(
+                                array $match
+                            ): float =>
+                                (float) (
+                                    $match['score']
+                                    ?? 0.0
+                                ),
+                            $matches,
+                        ),
+                    ),
+                    2,
+                )
+                : 0.0,
+
+            'weighted_token_score' =>
+                round(
+                    $weightedTokenScore,
+                    2,
+                ),
+
+            'full_name_similarity' =>
+                round(
+                    $fullNameSimilarity,
+                    2,
+                ),
+
+            'partial_name_bonus' =>
+                round(
+                    $partialScore,
+                    2,
+                ),
+
+            'multi_token_bonus' =>
+                round(
+                    $multiTokenScore,
+                    2,
+                ),
+
+            'identity_token_bonus' =>
+                round(
+                    $identityScore,
+                    2,
+                ),
+
+            'reasons' =>
+                $reasons,
+        ];
+    }
+
+    /**
+     * ------------------------------------------------------------
+     * NO DATA
+     * ------------------------------------------------------------
+     */
+    private function noDataResult(
+        ?string $expectedName,
+        ?string $telegramName,
+    ): array {
+        return [
+            'matched' => false,
+
+            'score' => 0.0,
+
+            'level' => 'no_data',
+
+            'expected_name' =>
+                $expectedName,
+
+            'telegram_name' =>
+                $telegramName,
+
+            'normalized_expected' =>
+                $expectedName !== null
+                ? $this->normalizeName(
+                    $expectedName,
+                )
+                : null,
+
+            'normalized_telegram' =>
+                $telegramName !== null
+                ? $this->normalizeName(
+                    $telegramName,
+                )
+                : null,
+
+            'matched_tokens' => [],
+
+            'possible_tokens' => [],
+
+            'matched_token_count' => 0,
+
+            'useful_token_count' => 0,
+
+            'expected_token_count' => 0,
+
+            'telegram_token_count' => 0,
+
+            'match_ratio' => 0.0,
+
+            'best_token_score' => 0.0,
+
+            'weighted_token_score' => 0.0,
+
+            'full_name_similarity' => 0.0,
+
+            'partial_name_bonus' => 0.0,
+
+            'multi_token_bonus' => 0.0,
+
+            'identity_token_bonus' => 0.0,
+
+            'reasons' => [
+                'missing_name_data',
+            ],
+        ];
+    }
+
+    /**
+     * ------------------------------------------------------------
+     * NORMALIZATION
+     * ------------------------------------------------------------
+     */
     private function normalizeName(
-        string $name
+        string $name,
     ): string {
         $name = trim($name);
 
@@ -856,80 +1107,40 @@ final class TelegramNameMatcher
             return '';
         }
 
-        /*
-         * NFC/NFKC where intl is available.
-         */
-        if (
-            class_exists(\Normalizer::class)
-        ) {
-            $normalized =
-                \Normalizer::normalize(
-                    $name,
-                    \Normalizer::FORM_KC
-                );
+        if (class_exists(\Normalizer::class)) {
+            $normalized = \Normalizer::normalize(
+                $name,
+                \Normalizer::FORM_KC,
+            );
 
             if (is_string($normalized)) {
                 $name = $normalized;
             }
         }
 
-        /*
-         * Most important stage:
-         *
-         * 𝙄𝙇𝙔𝙊...
-         * 🅸🅻🆈...
-         * ＩＬＹ...
-         * ⒾⓁⓎ...
-         *
-         * become normal ASCII letters.
-         */
-        $name =
-            $this->decodeStyledCharacters(
-                $name
-            );
-
-        /*
-         * Remove zero-width / variation selectors.
-         */
-        $name = preg_replace(
-            '/['
-            . '\x{200B}-\x{200D}'
-            . '\x{2060}'
-            . '\x{FE0E}-\x{FE0F}'
-            . '\x{FEFF}'
-            . '\x{00AD}'
-            . ']/u',
-            '',
-            $name
-        ) ?? $name;
-
-        /*
-         * Lowercase.
-         */
-        $name = mb_strtolower(
+        $name = $this->decodeStyledCharacters(
             $name,
-            'UTF-8'
         );
 
-        /*
-         * Cyrillic -> Latin.
-         */
-        $name =
-            $this->transliterate(
-                $name
-            );
+        $name = preg_replace(
+            '/[\x{200B}-\x{200D}\x{2060}\x{FE0E}-\x{FE0F}\x{FEFF}\x{00AD}]/u',
+            '',
+            $name,
+        ) ?? $name;
 
-        /*
-         * Remove Unicode accents/combining marks.
-         */
-        $name =
-            $this->stripDiacritics(
-                $name
-            );
+        $name = mb_strtolower(
+            $name,
+            'UTF-8',
+        );
 
-        /*
-         * Normalize Uzbek apostrophe variants.
-         */
+        $name = $this->transliterate(
+            $name,
+        );
+
+        $name = $this->stripDiacritics(
+            $name,
+        );
+
         $name = str_replace(
             [
                 "'",
@@ -943,16 +1154,11 @@ final class TelegramNameMatcher
                 'ʺ',
             ],
             '',
-            $name
+            $name,
         );
 
         /*
          * Orthographic normalization.
-         *
-         * kh / h / x → h
-         * q / k → k
-         * w → v
-         * gh / gʻ / ғ → g
          */
         $name = str_replace(
             [
@@ -963,7 +1169,7 @@ final class TelegramNameMatcher
                 'h',
                 'h',
             ],
-            $name
+            $name,
         );
 
         $name = str_replace(
@@ -975,7 +1181,7 @@ final class TelegramNameMatcher
                 'ғ',
             ],
             'g',
-            $name
+            $name,
         );
 
         $name = str_replace(
@@ -983,7 +1189,7 @@ final class TelegramNameMatcher
                 'q',
             ],
             'k',
-            $name
+            $name,
         );
 
         $name = str_replace(
@@ -991,12 +1197,9 @@ final class TelegramNameMatcher
                 'w',
             ],
             'v',
-            $name
+            $name,
         );
 
-        /*
-         * Uzbek vowels.
-         */
         $name = str_replace(
             [
                 'oʻ',
@@ -1005,47 +1208,30 @@ final class TelegramNameMatcher
                 'ў',
             ],
             'u',
-            $name
+            $name,
         );
 
-        $name = str_replace(
-            [
-                'ў',
-            ],
-            'u',
-            $name
-        );
-
-        /*
-         * Remove all remaining decorative symbols.
-         *
-         * At this point letters extracted from styles remain.
-         */
         $name = preg_replace(
             '/[^a-z0-9\s]/u',
             ' ',
-            $name
+            $name,
         ) ?? $name;
 
-        /*
-         * Collapse spaces.
-         */
         $name = preg_replace(
             '/\s+/u',
             ' ',
-            $name
+            $name,
         ) ?? $name;
 
         return trim($name);
     }
 
     private function tokens(
-        string $name
+        string $name,
     ): array {
-        $normalized =
-            $this->normalizeName(
-                $name
-            );
+        $normalized = $this->normalizeName(
+            $name,
+        );
 
         if ($normalized === '') {
             return [];
@@ -1053,7 +1239,7 @@ final class TelegramNameMatcher
 
         $parts = preg_split(
             '/\s+/u',
-            $normalized
+            $normalized,
         );
 
         if (!is_array($parts)) {
@@ -1064,7 +1250,7 @@ final class TelegramNameMatcher
 
         foreach ($parts as $token) {
             $token = trim(
-                (string) $token
+                (string) $token,
             );
 
             if ($token === '') {
@@ -1082,335 +1268,21 @@ final class TelegramNameMatcher
         }
 
         return array_values(
-            array_unique($tokens)
+            array_unique($tokens),
         );
     }
 
-    /*
-     * ============================================================
-     * UNICODE STYLE DECODER
-     * ============================================================
+    /**
+     * ------------------------------------------------------------
+     * COMPACT TOKEN
+     * ------------------------------------------------------------
      */
-
-    private function decodeStyledCharacters(
-        string $value
-    ): string {
-        $characters = preg_split(
-            '//u',
-            $value,
-            -1,
-            PREG_SPLIT_NO_EMPTY
-        );
-
-        if (!is_array($characters)) {
-            return $value;
-        }
-
-        $result = '';
-
-        foreach ($characters as $character) {
-            $codePoint =
-                $this->codePoint(
-                    $character
-                );
-
-            if ($codePoint === null) {
-                $result .= $character;
-                continue;
-            }
-
-            /*
-             * ----------------------------------------------------
-             * Enclosed / squared Latin:
-             *
-             * 🅰 🅱 🅲 ...
-             * 🅸 🅻 🆈 ...
-             *
-             * U+1F170 - U+1F189
-             * ----------------------------------------------------
-             */
-            $mapped =
-                $this->mapNegativeSquaredLatin(
-                    $codePoint
-                );
-
-            if ($mapped !== null) {
-                $result .= $mapped;
-                continue;
-            }
-
-            /*
-             * ----------------------------------------------------
-             * Regional / fullwidth / circled variants.
-             * ----------------------------------------------------
-             */
-            $mapped =
-                $this->mapBasicStyledLatin(
-                    $codePoint
-                );
-
-            if ($mapped !== null) {
-                $result .= $mapped;
-                continue;
-            }
-
-            /*
-             * ----------------------------------------------------
-             * Mathematical alphanumeric symbols.
-             * ----------------------------------------------------
-             */
-            $mapped =
-                $this->mapMathematicalLatin(
-                    $codePoint
-                );
-
-            if ($mapped !== null) {
-                $result .= $mapped;
-                continue;
-            }
-
-            $result .= $character;
-        }
-
-        return $result;
-    }
-
-    private function mapNegativeSquaredLatin(
-        int $codePoint
-    ): ?string {
-        /*
-         * NEGATIVE SQUARED LATIN CAPITAL LETTERS
-         *
-         * 🅰 U+1F170
-         * 🅱 U+1F171
-         * ...
-         * 🆉 U+1F189
-         */
-        if (
-            $codePoint >= 0x1F170
-            && $codePoint <= 0x1F189
-        ) {
-            return chr(
-                0x41
-                + (
-                    $codePoint - 0x1F170
-                )
-            );
-        }
-
-        return null;
-    }
-
-    private function mapBasicStyledLatin(
-        int $codePoint
-    ): ?string {
-        /*
-         * Fullwidth uppercase.
-         */
-        if (
-            $codePoint >= 0xFF21
-            && $codePoint <= 0xFF3A
-        ) {
-            return chr(
-                0x41
-                + (
-                    $codePoint - 0xFF21
-                )
-            );
-        }
-
-        /*
-         * Fullwidth lowercase.
-         */
-        if (
-            $codePoint >= 0xFF41
-            && $codePoint <= 0xFF5A
-        ) {
-            return chr(
-                0x61
-                + (
-                    $codePoint - 0xFF41
-                )
-            );
-        }
-
-        /*
-         * Circled uppercase:
-         * Ⓐ Ⓑ ...
-         */
-        if (
-            $codePoint >= 0x24B6
-            && $codePoint <= 0x24CF
-        ) {
-            return chr(
-                0x41
-                + (
-                    $codePoint - 0x24B6
-                )
-            );
-        }
-
-        /*
-         * Circled lowercase:
-         * ⓐ ⓑ ...
-         */
-        if (
-            $codePoint >= 0x24D0
-            && $codePoint <= 0x24E9
-        ) {
-            return chr(
-                0x61
-                + (
-                    $codePoint - 0x24D0
-                )
-            );
-        }
-
-        /*
-         * Parenthesized lowercase.
-         */
-        if (
-            $codePoint >= 0x249C
-            && $codePoint <= 0x24B5
-        ) {
-            return chr(
-                0x61
-                + (
-                    $codePoint - 0x249C
-                )
-            );
-        }
-
-        return null;
-    }
-
-    private function mapMathematicalLatin(
-        int $codePoint
-    ): ?string {
-        /*
-         * Mathematical Latin ranges.
-         *
-         * A-Z / a-z variants:
-         *
-         * Bold
-         * Italic
-         * Bold Italic
-         * Script
-         * Bold Script
-         * Fraktur
-         * Double-Struck
-         * Bold Fraktur
-         * Sans
-         * Sans Bold
-         * Sans Italic
-         * Sans Bold Italic
-         * Monospace
-         */
-        $ranges = [
-            [0x1D400, 0x1D419, 'upper'],
-            [0x1D41A, 0x1D433, 'lower'],
-
-            [0x1D434, 0x1D44D, 'upper'],
-            [0x1D44E, 0x1D467, 'lower'],
-
-            [0x1D468, 0x1D481, 'upper'],
-            [0x1D482, 0x1D49B, 'lower'],
-
-            [0x1D49C, 0x1D4B5, 'upper'],
-            [0x1D4B6, 0x1D4CF, 'lower'],
-
-            [0x1D4D0, 0x1D4E9, 'upper'],
-            [0x1D4EA, 0x1D503, 'lower'],
-
-            [0x1D504, 0x1D51D, 'upper'],
-            [0x1D51E, 0x1D537, 'lower'],
-
-            [0x1D538, 0x1D551, 'upper'],
-            [0x1D552, 0x1D56B, 'lower'],
-
-            [0x1D56C, 0x1D585, 'upper'],
-            [0x1D586, 0x1D59F, 'lower'],
-
-            [0x1D5A0, 0x1D5B9, 'upper'],
-            [0x1D5BA, 0x1D5D3, 'lower'],
-
-            [0x1D5D4, 0x1D5ED, 'upper'],
-            [0x1D5EE, 0x1D607, 'lower'],
-
-            [0x1D608, 0x1D621, 'upper'],
-            [0x1D622, 0x1D63B, 'lower'],
-
-            [0x1D63C, 0x1D655, 'upper'],
-            [0x1D656, 0x1D66F, 'lower'],
-
-            [0x1D670, 0x1D689, 'upper'],
-            [0x1D68A, 0x1D6A3, 'lower'],
-        ];
-
-        foreach ($ranges as [
-            $start,
-            $end,
-            $type,
-        ]) {
-            if (
-                $codePoint < $start
-                || $codePoint > $end
-            ) {
-                continue;
-            }
-
-            $offset =
-                $codePoint - $start;
-
-            return $type === 'upper'
-                ? chr(0x41 + $offset)
-                : chr(0x61 + $offset);
-        }
-
-        /*
-         * Mathematical digits.
-         */
-        $digitRanges = [
-            [0x1D7CE, 0x1D7D7],
-            [0x1D7D8, 0x1D7E1],
-            [0x1D7E2, 0x1D7EB],
-            [0x1D7EC, 0x1D7F5],
-            [0x1D7F6, 0x1D7FF],
-        ];
-
-        foreach ($digitRanges as [
-            $start,
-            $end,
-        ]) {
-            if (
-                $codePoint >= $start
-                && $codePoint <= $end
-            ) {
-                return chr(
-                    0x30
-                    + (
-                        $codePoint - $start
-                    )
-                );
-            }
-        }
-
-        return null;
-    }
-
-    /*
-     * ============================================================
-     * ORTHOGRAPHIC NORMALIZATION
-     * ============================================================
-     */
-
     private function compactToken(
-        string $token
+        string $token,
     ): string {
-        $token =
-            $this->normalizeName(
-                $token
-            );
+        $token = $this->normalizeName(
+            $token,
+        );
 
         return str_replace(
             [
@@ -1427,17 +1299,21 @@ final class TelegramNameMatcher
                 'o',
                 'u',
             ],
-            $token
+            $token,
         );
     }
 
+    /**
+     * ------------------------------------------------------------
+     * PHONETIC
+     * ------------------------------------------------------------
+     */
     private function phoneticForm(
-        string $token
+        string $token,
     ): string {
-        $token =
-            $this->compactToken(
-                $token
-            );
+        $token = $this->compactToken(
+            $token,
+        );
 
         return str_replace(
             [
@@ -1464,16 +1340,15 @@ final class TelegramNameMatcher
                 'k',
                 'v',
             ],
-            $token
+            $token,
         );
     }
 
-    /*
-     * ============================================================
-     * STRING SIMILARITY
-     * ============================================================
+    /**
+     * ------------------------------------------------------------
+     * FUZZY
+     * ------------------------------------------------------------
      */
-
     private function stringSimilarity(
         string $expected,
         string $actual,
@@ -1492,38 +1367,38 @@ final class TelegramNameMatcher
         similar_text(
             $expected,
             $actual,
-            $similarTextPercent
+            $similarTextPercent,
         );
 
         $maxLength = max(
             strlen($expected),
-            strlen($actual)
+            strlen($actual),
         );
 
         $distance = levenshtein(
             $expected,
-            $actual
+            $actual,
         );
 
         $levenshteinScore =
             $maxLength > 0
-            ? max(
-                0.0,
-                100.0
-                * (
-                    1.0
-                    - (
-                        $distance
-                        / $maxLength
-                    )
+                ? max(
+                    0.0,
+                    100.0
+                    * (
+                        1.0
+                        - (
+                            $distance
+                            / $maxLength
+                        )
+                    ),
                 )
-            )
-            : 0.0;
+                : 0.0;
 
         $prefixScore =
             $this->commonPrefixScore(
                 $expected,
-                $actual
+                $actual,
             );
 
         return round(
@@ -1532,17 +1407,17 @@ final class TelegramNameMatcher
                 + ($levenshteinScore * 0.40)
                 + ($prefixScore * 0.15)
             ),
-            2
+            2,
         );
     }
 
     private function commonPrefixScore(
         string $a,
-        string $b
+        string $b,
     ): float {
         $length = min(
             strlen($a),
-            strlen($b)
+            strlen($b),
         );
 
         if ($length === 0) {
@@ -1564,344 +1439,259 @@ final class TelegramNameMatcher
                 $prefix
                 / max(
                     strlen($a),
-                    strlen($b)
+                    strlen($b),
                 )
             ) * 100,
-            2
+            2,
         );
     }
 
-    /*
-     * ============================================================
-     * REASONS / OUTPUT
-     * ============================================================
+    /**
+     * ------------------------------------------------------------
+     * UNICODE STYLE DECODER
+     * ------------------------------------------------------------
      */
-
-    private function buildReasons(
-        array $expectedTokens,
-        array $telegramTokens,
-        array $matches,
-        float $score,
-        bool $matched,
-    ): array {
-        $reasons = [];
-
-        if ($matched) {
-            $reasons[] =
-                'strong_name_match';
-        }
-
-        foreach ($matches as $match) {
-            $reason = $match['reason'] ?? null;
-
-            if (
-                $reason === 'exact'
-                || $reason === 'canonical_equal'
-            ) {
-                $reasons[] =
-                    'exact_token_match';
-
-                break;
-            }
-        }
-
-        foreach ($matches as $match) {
-            if (
-                ($match['reason'] ?? null)
-                === 'phonetic_equal'
-            ) {
-                $reasons[] =
-                    'phonetic_match';
-
-                break;
-            }
-        }
-
-        foreach ($matches as $match) {
-            if (
-                ($match['reason'] ?? null)
-                === 'contains'
-            ) {
-                $reasons[] =
-                    'partial_token_match';
-
-                break;
-            }
-        }
-
-        if (
-            count($telegramTokens)
-            < count($expectedTokens)
-        ) {
-            $reasons[] =
-                'telegram_name_is_shorter';
-        }
-
-        if (
-            count($telegramTokens)
-            > count($expectedTokens)
-        ) {
-            $reasons[] =
-                'telegram_name_contains_extra_tokens';
-        }
-
-        if (
-            $score < 55
-            && $matches !== []
-        ) {
-            $reasons[] =
-                'insufficient_similarity';
-        }
-
-        return array_values(
-            array_unique($reasons)
-        );
-    }
-
-    private function result(
-        string $expectedName,
-        string $telegramName,
-        string $normalizedExpected,
-        string $normalizedTelegram,
-        bool $matched,
-        float $score,
-        string $level,
-        array $matches,
-        array $expectedTokens,
-        array $telegramTokens,
-        array $reasons,
-        float $weightedTokenScore = 0.0,
-        float $fullNameSimilarity = 0.0,
-        float $partialScore = 0.0,
-        float $multiTokenScore = 0.0,
-        float $identityScore = 0.0,
-        ?int $matchedTokenCount = null,
-        ?int $usefulTokenCount = null,
-    ): array {
-        $strongMatches = array_values(
-            array_filter(
-                $matches,
-                static fn(array $match): bool =>
-                (float) $match['score']
-                >= self::STRONG_TOKEN_SCORE
-            )
-        );
-
-        $usefulMatches = array_values(
-            array_filter(
-                $matches,
-                static fn(array $match): bool =>
-                (float) $match['score']
-                >= self::USEFUL_TOKEN_SCORE
-            )
-        );
-
-        return [
-            'matched' => $matched,
-
-            'score' => round(
-                $score,
-                2
-            ),
-
-            'level' => $level,
-
-            'expected_name' =>
-                $expectedName,
-
-            'telegram_name' =>
-                $telegramName,
-
-            /*
-             * These fields are useful for debugging.
-             */
-            'normalized_expected' =>
-                $normalizedExpected,
-
-            'normalized_telegram' =>
-                $normalizedTelegram,
-
-            'matched_tokens' =>
-                array_values(
-                    array_slice(
-                        $strongMatches,
-                        0,
-                        self::MAX_MATCHES
-                    )
-                ),
-
-            'possible_tokens' =>
-                array_values(
-                    array_slice(
-                        $matches,
-                        0,
-                        self::MAX_MATCHES
-                    )
-                ),
-
-            'matched_token_count' =>
-                $matchedTokenCount
-                ?? count($strongMatches),
-
-            'useful_token_count' =>
-                $usefulTokenCount
-                ?? count($usefulMatches),
-
-            'expected_token_count' =>
-                count($expectedTokens),
-
-            'telegram_token_count' =>
-                count($telegramTokens),
-
-            'match_ratio' =>
-                count($expectedTokens) > 0
-                ? round(
-                    count($strongMatches)
-                    / count($expectedTokens),
-                    4
-                )
-                : 0.0,
-
-            'best_token_score' =>
-                $matches !== []
-                ? round(
-                    max(
-                        array_map(
-                            static fn(
-                            array $match
-                        ): float =>
-                            (float) $match['score'],
-                            $matches
-                        )
-                    ),
-                    2
-                )
-                : 0.0,
-
-            'weighted_token_score' =>
-                round(
-                    $weightedTokenScore,
-                    2
-                ),
-
-            'full_name_similarity' =>
-                round(
-                    $fullNameSimilarity,
-                    2
-                ),
-
-            'partial_name_bonus' =>
-                round(
-                    $partialScore,
-                    2
-                ),
-
-            'multi_token_bonus' =>
-                round(
-                    $multiTokenScore,
-                    2
-                ),
-
-            'identity_token_bonus' =>
-                round(
-                    $identityScore,
-                    2
-                ),
-
-            'reasons' =>
-                $reasons,
-        ];
-    }
-
-    private function noDataResult(
-        ?string $expectedName,
-        ?string $telegramName,
-    ): array {
-        return [
-            'matched' => false,
-            'score' => 0.0,
-            'level' => 'no_data',
-
-            'expected_name' => $expectedName,
-            'telegram_name' => $telegramName,
-
-            'normalized_expected' =>
-                $expectedName !== null
-                ? $this->normalizeName(
-                    $expectedName
-                )
-                : null,
-
-            'normalized_telegram' =>
-                $telegramName !== null
-                ? $this->normalizeName(
-                    $telegramName
-                )
-                : null,
-
-            'matched_tokens' => [],
-            'possible_tokens' => [],
-
-            'matched_token_count' => 0,
-            'useful_token_count' => 0,
-
-            'expected_token_count' => 0,
-            'telegram_token_count' => 0,
-
-            'match_ratio' => 0.0,
-
-            'best_token_score' => 0.0,
-            'weighted_token_score' => 0.0,
-            'full_name_similarity' => 0.0,
-            'partial_name_bonus' => 0.0,
-            'multi_token_bonus' => 0.0,
-            'identity_token_bonus' => 0.0,
-
-            'reasons' => [
-                'missing_name_data',
-            ],
-        ];
-    }
-
-    /*
-     * ============================================================
-     * UTILS
-     * ============================================================
-     */
-
-    private function isBlank(
-        ?string $value
-    ): bool {
-        return $value === null
-            || trim($value) === '';
-    }
-
-    private function stripDiacritics(
-        string $value
+    private function decodeStyledCharacters(
+        string $value,
     ): string {
-        if (
-            class_exists(\Normalizer::class)
-        ) {
-            $normalized =
-                \Normalizer::normalize(
-                    $value,
-                    \Normalizer::FORM_D
+        $characters = preg_split(
+            '//u',
+            $value,
+            -1,
+            PREG_SPLIT_NO_EMPTY,
+        );
+
+        if (!is_array($characters)) {
+            return $value;
+        }
+
+        $result = '';
+
+        foreach ($characters as $character) {
+            $codePoint = $this->codePoint(
+                $character,
+            );
+
+            if ($codePoint === null) {
+                $result .= $character;
+                continue;
+            }
+
+            $mapped =
+                $this->mapNegativeSquaredLatin(
+                    $codePoint,
                 );
 
-            if (is_string($normalized)) {
-                $value = $normalized;
+            if ($mapped !== null) {
+                $result .= $mapped;
+                continue;
+            }
+
+            $mapped =
+                $this->mapBasicStyledLatin(
+                    $codePoint,
+                );
+
+            if ($mapped !== null) {
+                $result .= $mapped;
+                continue;
+            }
+
+            $mapped =
+                $this->mapMathematicalLatin(
+                    $codePoint,
+                );
+
+            if ($mapped !== null) {
+                $result .= $mapped;
+                continue;
+            }
+
+            $result .= $character;
+        }
+
+        return $result;
+    }
+
+    private function mapNegativeSquaredLatin(
+        int $codePoint,
+    ): ?string {
+        if (
+            $codePoint >= 0x1F170
+            && $codePoint <= 0x1F189
+        ) {
+            return chr(
+                0x41
+                + (
+                    $codePoint
+                    - 0x1F170
+                )
+            );
+        }
+
+        return null;
+    }
+
+    private function mapBasicStyledLatin(
+        int $codePoint,
+    ): ?string {
+        if (
+            $codePoint >= 0xFF21
+            && $codePoint <= 0xFF3A
+        ) {
+            return chr(
+                0x41
+                + (
+                    $codePoint
+                    - 0xFF21
+                )
+            );
+        }
+
+        if (
+            $codePoint >= 0xFF41
+            && $codePoint <= 0xFF5A
+        ) {
+            return chr(
+                0x61
+                + (
+                    $codePoint
+                    - 0xFF41
+                )
+            );
+        }
+
+        if (
+            $codePoint >= 0x24B6
+            && $codePoint <= 0x24CF
+        ) {
+            return chr(
+                0x41
+                + (
+                    $codePoint
+                    - 0x24B6
+                )
+            );
+        }
+
+        if (
+            $codePoint >= 0x24D0
+            && $codePoint <= 0x24E9
+        ) {
+            return chr(
+                0x61
+                + (
+                    $codePoint
+                    - 0x24D0
+                )
+            );
+        }
+
+        if (
+            $codePoint >= 0x249C
+            && $codePoint <= 0x24B5
+        ) {
+            return chr(
+                0x61
+                + (
+                    $codePoint
+                    - 0x249C
+                )
+            );
+        }
+
+        return null;
+    }
+
+    private function mapMathematicalLatin(
+        int $codePoint,
+    ): ?string {
+        $ranges = [
+            [0x1D400, 0x1D419, 'upper'],
+            [0x1D41A, 0x1D433, 'lower'],
+            [0x1D434, 0x1D44D, 'upper'],
+            [0x1D44E, 0x1D467, 'lower'],
+            [0x1D468, 0x1D481, 'upper'],
+            [0x1D482, 0x1D49B, 'lower'],
+            [0x1D49C, 0x1D4B5, 'upper'],
+            [0x1D4B6, 0x1D4CF, 'lower'],
+            [0x1D4D0, 0x1D4E9, 'upper'],
+            [0x1D4EA, 0x1D503, 'lower'],
+            [0x1D504, 0x1D51D, 'upper'],
+            [0x1D51E, 0x1D537, 'lower'],
+            [0x1D538, 0x1D551, 'upper'],
+            [0x1D552, 0x1D56B, 'lower'],
+            [0x1D56C, 0x1D585, 'upper'],
+            [0x1D586, 0x1D59F, 'lower'],
+            [0x1D5A0, 0x1D5B9, 'upper'],
+            [0x1D5BA, 0x1D5D3, 'lower'],
+            [0x1D5D4, 0x1D5ED, 'upper'],
+            [0x1D5EE, 0x1D607, 'lower'],
+            [0x1D608, 0x1D621, 'upper'],
+            [0x1D622, 0x1D63B, 'lower'],
+            [0x1D63C, 0x1D655, 'upper'],
+            [0x1D656, 0x1D66F, 'lower'],
+            [0x1D670, 0x1D689, 'upper'],
+            [0x1D68A, 0x1D6A3, 'lower'],
+        ];
+
+        foreach ($ranges as [
+            $start,
+            $end,
+            $type,
+        ]) {
+            if (
+                $codePoint < $start
+                || $codePoint > $end
+            ) {
+                continue;
+            }
+
+            $offset =
+                $codePoint
+                - $start;
+
+            return $type === 'upper'
+                ? chr(0x41 + $offset)
+                : chr(0x61 + $offset);
+        }
+
+        $digitRanges = [
+            [0x1D7CE, 0x1D7D7],
+            [0x1D7D8, 0x1D7E1],
+            [0x1D7E2, 0x1D7EB],
+            [0x1D7EC, 0x1D7F5],
+            [0x1D7F6, 0x1D7FF],
+        ];
+
+        foreach ($digitRanges as [
+            $start,
+            $end,
+        ]) {
+            if (
+                $codePoint >= $start
+                && $codePoint <= $end
+            ) {
+                return chr(
+                    0x30
+                    + (
+                        $codePoint
+                        - $start
+                    )
+                );
             }
         }
 
-        return preg_replace(
-            '/\p{Mn}+/u',
-            '',
-            $value
-        ) ?? $value;
+        return null;
     }
 
+    /**
+     * ------------------------------------------------------------
+     * CYRILLIC -> LATIN
+     * ------------------------------------------------------------
+     */
     private function transliterate(
-        string $value
+        string $value,
     ): string {
         return strtr(
             $value,
@@ -1942,16 +1732,48 @@ final class TelegramNameMatcher
                 'қ' => 'q',
                 'ғ' => 'g',
                 'ҳ' => 'h',
-            ]
+            ],
         );
     }
 
+    /**
+     * ------------------------------------------------------------
+     * DIACRITICS
+     * ------------------------------------------------------------
+     */
+    private function stripDiacritics(
+        string $value,
+    ): string {
+        if (class_exists(\Normalizer::class)) {
+            $normalized =
+                \Normalizer::normalize(
+                    $value,
+                    \Normalizer::FORM_D,
+                );
+
+            if (is_string($normalized)) {
+                $value = $normalized;
+            }
+        }
+
+        return preg_replace(
+            '/\p{Mn}+/u',
+            '',
+            $value,
+        ) ?? $value;
+    }
+
+    /**
+     * ------------------------------------------------------------
+     * CODEPOINT
+     * ------------------------------------------------------------
+     */
     private function codePoint(
-        string $character
+        string $character,
     ): ?int {
         $bytes = unpack(
             'C*',
-            $character
+            $character,
         );
 
         if (!is_array($bytes)) {
@@ -1966,16 +1788,10 @@ final class TelegramNameMatcher
             return null;
         }
 
-        /*
-         * ASCII
-         */
         if ($first <= 0x7F) {
             return $first;
         }
 
-        /*
-         * 2-byte UTF-8.
-         */
         if (
             ($first & 0xE0) === 0xC0
             && isset($bytes[1])
@@ -1986,15 +1802,12 @@ final class TelegramNameMatcher
             );
         }
 
-        /*
-         * 3-byte UTF-8.
-         */
         if (
             ($first & 0xF0) === 0xE0
             && isset(
-            $bytes[1],
-            $bytes[2]
-        )
+                $bytes[1],
+                $bytes[2],
+            )
         ) {
             return (
                 (($first & 0x0F) << 12)
@@ -2003,16 +1816,13 @@ final class TelegramNameMatcher
             );
         }
 
-        /*
-         * 4-byte UTF-8.
-         */
         if (
             ($first & 0xF8) === 0xF0
             && isset(
-            $bytes[1],
-            $bytes[2],
-            $bytes[3]
-        )
+                $bytes[1],
+                $bytes[2],
+                $bytes[3],
+            )
         ) {
             return (
                 (($first & 0x07) << 18)
@@ -2023,5 +1833,12 @@ final class TelegramNameMatcher
         }
 
         return null;
+    }
+
+    private function isBlank(
+        ?string $value,
+    ): bool {
+        return $value === null
+            || trim($value) === '';
     }
 }
