@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Console\Commands\Telegram;
 
 use App\Application\Telegram\Services\MadelineService;
@@ -11,6 +13,7 @@ use App\Enums\Telegram\TelegramAccountProcess as TelegramAccountProcessEnum;
 use App\Jobs\Telegram\ResolveTelegramPhoneJob;
 use App\Models\Driver\TelegramDriverCheck;
 use App\Models\Telegram\TelegramAccount;
+use App\Models\Telegram\TelegramResolvedPhone;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -72,12 +75,14 @@ class ResolveTelegramPhoneCommand extends Command
         }
 
         /*
-         * Атомарно:
+         * ============================================================
+         * 1. АТОМАРНО ЗАБИРАЕМ CHECK
+         * ============================================================
          *
-         * pending -> processing
-         * attempts + 1
+         * Здесь attempts НЕ увеличиваем.
          *
-         * Только один процесс сможет успешно обновить строку.
+         * Мы только запрещаем другому worker одновременно
+         * обрабатывать тот же check.
          */
         $updated = TelegramDriverCheck::query()
             ->whereKey($check->id)
@@ -85,14 +90,8 @@ class ResolveTelegramPhoneCommand extends Command
                 'status',
                 TelegramDriverCheckStatus::Pending
             )
-            ->where(
-                'attempts',
-                '<',
-                3
-            )
             ->update([
                 'status' => TelegramDriverCheckStatus::Processing,
-                'attempts' => $check->attempts + 1,
                 'error_message' => null,
             ]);
 
@@ -102,18 +101,60 @@ class ResolveTelegramPhoneCommand extends Command
 
         $check->refresh();
 
-        $this->info(
-            "Resolving check #{$check->id}, attempt {$check->attempts}/3"
-        );
-
         $account = null;
 
         try {
             /*
-             * Ищем и СРАЗУ резервируем аккаунт.
+             * ========================================================
+             * 2. ИЩЕМ УЖЕ RESOLVED PHONE
+             * ========================================================
              *
-             * Основной listener account автоматически исключён
-             * внутри TelegramAccountProcessService.
+             * Если номер уже был успешно открыт Telegram,
+             * Telegram API больше НЕ вызываем.
+             */
+            $resolvedPhone = TelegramResolvedPhone::query()
+                ->where(
+                    'phone_normalized',
+                    $check->phone_normalized
+                )
+                ->first();
+
+            if ($resolvedPhone) {
+                $this->info(
+                    "Using cached Telegram resolve for check #{$check->id}"
+                );
+
+                Log::info(
+                    'Telegram resolved phone found in cache',
+                    [
+                        'check_id' => $check->id,
+                        'phone' => $check->phone_normalized,
+                        'resolved_phone_id' => $resolvedPhone->id,
+                        'telegram_user_id' =>
+                            $resolvedPhone->telegram_user_id,
+                    ]
+                );
+
+                $this->applyResolvedPhone(
+                    $check,
+                    $resolvedPhone,
+                    $nameMatcher,
+                );
+
+                return self::SUCCESS;
+            }
+
+            /*
+             * ========================================================
+             * 3. ACQUIRE RESOLVER ACCOUNT
+             * ========================================================
+             *
+             * Handler уже проверял наличие аккаунта.
+             *
+             * Но между Handler и Worker мог произойти race:
+             * другой worker мог забрать последний аккаунт.
+             *
+             * Поэтому здесь обязательно делаем настоящий acquire.
              */
             $account = $processService->findAvailableAccount(
                 TelegramAccountProcessEnum::ResolverPhone
@@ -121,29 +162,68 @@ class ResolveTelegramPhoneCommand extends Command
 
             if (!$account) {
                 /*
-                 * Нет свободного аккаунта.
+                 * Это НЕ ошибка check.
                  *
-                 * Это не ошибка номера.
-                 * Возвращаем check в pending.
+                 * Возвращаем его в pending.
+                 * attempts не увеличиваем.
+                 *
+                 * Следующая обработка произойдёт,
+                 * когда появится доступный account.
                  */
                 $check->update([
                     'status' => TelegramDriverCheckStatus::Pending,
-                    'error_message' => 'No resolver account available.',
+                    'error_message' => null,
                 ]);
 
                 Log::warning(
-                    'No resolver account available',
+                    'No resolver account available during command execution',
                     [
                         'check_id' => $check->id,
-                        'attempt' => $check->attempts,
+                        'phone' => $check->phone_normalized,
                     ]
                 );
 
                 return self::SUCCESS;
             }
 
+            /*
+             * ========================================================
+             * 4. НАСТОЯЩАЯ ПОПЫТКА RESOLVE
+             * ========================================================
+             *
+             * Только сейчас увеличиваем attempts.
+             */
+            $updated = TelegramDriverCheck::query()
+                ->whereKey($check->id)
+                ->where(
+                    'status',
+                    TelegramDriverCheckStatus::Processing
+                )
+                ->where(
+                    'attempts',
+                    '<',
+                    3
+                )
+                ->update([
+                    'attempts' => $check->attempts + 1,
+                ]);
+
+            if ($updated === 0) {
+                /*
+                 * На всякий случай.
+                 *
+                 * Не оставляем account занятым.
+                 */
+                $check->refresh();
+
+                return self::SUCCESS;
+            }
+
+            $check->refresh();
+
             $this->info(
-                "Using account #{$account->id} ({$account->phone})"
+                "Resolving check #{$check->id}, "
+                . "attempt {$check->attempts}/3"
             );
 
             Log::info(
@@ -157,7 +237,9 @@ class ResolveTelegramPhoneCommand extends Command
             );
 
             /*
-             * Запускаем MadelineProto для выбранного аккаунта.
+             * ========================================================
+             * 5. START MADELINEPROTO
+             * ========================================================
              */
             $api = $madelineService->for($account);
 
@@ -176,7 +258,9 @@ class ResolveTelegramPhoneCommand extends Command
             }
 
             /*
-             * Resolve phone.
+             * ========================================================
+             * 6. RESOLVE PHONE
+             * ========================================================
              */
             $result = $resolver->resolve(
                 $api,
@@ -195,10 +279,14 @@ class ResolveTelegramPhoneCommand extends Command
             );
 
             /*
-             * Номер НЕ зарегистрирован в Telegram.
+             * ========================================================
+             * 7. TELEGRAM USER НЕ НАЙДЕН
+             * ========================================================
              *
-             * Telegram штатно ответил.
-             * Это НЕ failure аккаунта.
+             * Номер не зарегистрирован в Telegram.
+             *
+             * Это нормальный ответ Telegram.
+             * Resolver account не штрафуем.
              */
             if (
                 !($result['success'] ?? false)
@@ -206,9 +294,14 @@ class ResolveTelegramPhoneCommand extends Command
                     === 'telegram_not_registered'
             ) {
                 $check->update([
-                    'status' => TelegramDriverCheckStatus::NotConfirmed,
+                    'status' =>
+                        TelegramDriverCheckStatus::NotConfirmed,
+
                     'error_message' => null,
-                    'telegram_raw' => $result['raw'] ?? null,
+
+                    'telegram_raw' =>
+                        $result['raw'] ?? null,
+
                     'checked_at' => now(),
                 ]);
 
@@ -216,7 +309,9 @@ class ResolveTelegramPhoneCommand extends Command
             }
 
             /*
-             * Ошибка Telegram / аккаунта.
+             * ========================================================
+             * 8. TELEGRAM / ACCOUNT ERROR
+             * ========================================================
              */
             if (!($result['success'] ?? false)) {
                 $reason = (string) (
@@ -229,9 +324,6 @@ class ResolveTelegramPhoneCommand extends Command
                     ?? $reason
                 );
 
-                /*
-                 * Этот аккаунт получил ошибку.
-                 */
                 $processService->registerFailure(
                     $account,
                     TelegramAccountProcessEnum::ResolverPhone,
@@ -246,7 +338,9 @@ class ResolveTelegramPhoneCommand extends Command
             }
 
             /*
-             * Telegram user найден.
+             * ========================================================
+             * 9. TELEGRAM USER
+             * ========================================================
              */
             $user = $result['user'] ?? null;
 
@@ -265,78 +359,89 @@ class ResolveTelegramPhoneCommand extends Command
             }
 
             /*
-             * Успешный resolve.
+             * Данные пользователя.
+             */
+            $telegramUserId = isset($user['id'])
+                ? (int) $user['id']
+                : null;
+
+            $telegramUsername =
+                $user['username'] ?? null;
+
+            $telegramFirstName =
+                $user['first_name'] ?? null;
+
+            $telegramLastName =
+                $user['last_name'] ?? null;
+
+            /*
+             * ========================================================
+             * 10. Сохраняем RESOLVED PHONE
+             * ========================================================
+             *
+             * Это наш постоянный cache успешного resolve.
+             */
+            $resolvedPhone = TelegramResolvedPhone::query()
+                ->updateOrCreate(
+                    [
+                        'phone_normalized' =>
+                            $check->phone_normalized,
+                    ],
+                    [
+                        'telegram_user_id' =>
+                            $telegramUserId,
+
+                        'telegram_username' =>
+                            $telegramUsername,
+
+                        'telegram_first_name' =>
+                            $telegramFirstName,
+
+                        'telegram_last_name' =>
+                            $telegramLastName,
+
+                        'telegram_raw' =>
+                            $result['raw'] ?? null,
+
+                        'telegram_account_id' =>
+                            $account->id,
+
+                        'resolved_at' => now(),
+                    ]
+                );
+
+            /*
+             * Успешный resolve для resolver account.
              */
             $processService->registerSuccess(
                 $account,
                 TelegramAccountProcessEnum::ResolverPhone
             );
 
-            $telegramUserId = isset($user['id'])
-                ? (int) $user['id']
-                : null;
-
-            $telegramUsername = $user['username'] ?? null;
-            $telegramFirstName = $user['first_name'] ?? null;
-            $telegramLastName = $user['last_name'] ?? null;
-
-            $check->update([
-                'telegram_user_id' => $telegramUserId,
-                'telegram_username' => $telegramUsername,
-                'telegram_first_name' => $telegramFirstName,
-                'telegram_last_name' => $telegramLastName,
-                'telegram_raw' => $result['raw'] ?? null,
-                'error_message' => null,
-            ]);
-
-            /*
-             * Проверяем имя водителя.
-             */
-            $match = $nameMatcher->match(
-                $check->driver_name,
-                $telegramFirstName,
-                $telegramLastName,
-            );
-
             Log::info(
-                'Telegram driver name matching completed',
+                'Telegram resolved phone saved',
                 [
                     'check_id' => $check->id,
+                    'resolved_phone_id' =>
+                        $resolvedPhone->id,
+                    'phone' =>
+                        $resolvedPhone->phone_normalized,
+                    'telegram_user_id' =>
+                        $resolvedPhone->telegram_user_id,
                     'account_id' => $account->id,
-                    'matched' => $match['matched'] ?? false,
-                    'score' => $match['score'] ?? 0,
-                    'level' => $match['level'] ?? null,
                 ]
             );
 
             /*
-             * Добавляем информацию о match в raw.
+             * ========================================================
+             * 11. APPLY TELEGRAM DATA TO CHECK
+             * ========================================================
              */
-            $check->refresh();
-
-            $telegramRaw = $check->telegram_raw ?? [];
-
-            $telegramRaw['name_match'] = $match;
-
-            $check->update([
-                'telegram_raw' => $telegramRaw,
-
-                'status' => ($match['matched'] ?? false)
-                    ? TelegramDriverCheckStatus::Confirmed
-                    : TelegramDriverCheckStatus::NotConfirmed,
-
-                'checked_at' => now(),
-            ]);
-
-            if ($match['matched'] ?? false) {
-                $this->info(
-                    "✅ Check #{$check->id} confirmed."
-                );
-            } else {
-                $this->warn(
-                    "❌ Check #{$check->id} not confirmed."
-                );
-            }
+            $this->applyResolvedPhone(
+                $check,
+                $resolvedPhone,
+                $nameMatcher,
+            );
 
             return self::SUCCESS;
         } catch (Throwable $e) {
@@ -372,7 +477,12 @@ class ResolveTelegramPhoneCommand extends Command
             );
         } finally {
             /*
-             * В любом случае освобождаем resolver account.
+             * ========================================================
+             * 12. RELEASE
+             * ========================================================
+             *
+             * Освобождаем resolver account независимо
+             * от результата выполнения.
              */
             if ($account) {
                 $processService->release(
@@ -384,7 +494,95 @@ class ResolveTelegramPhoneCommand extends Command
     }
 
     /**
-     * Повторить обработку, если ещё есть попытки.
+     * Apply already resolved Telegram data to the check
+     * and perform name matching.
+     */
+    private function applyResolvedPhone(
+        TelegramDriverCheck $check,
+        TelegramResolvedPhone $resolvedPhone,
+        TelegramNameMatcher $nameMatcher,
+    ): void {
+        $telegramRaw =
+            $resolvedPhone->telegram_raw ?? [];
+
+        $telegramRaw['resolved_from_cache'] = true;
+
+        $telegramRaw['resolved_phone_id'] =
+            $resolvedPhone->id;
+
+        /*
+         * Копируем Telegram user данные.
+         */
+        $check->update([
+            'telegram_user_id' =>
+                $resolvedPhone->telegram_user_id,
+
+            'telegram_username' =>
+                $resolvedPhone->telegram_username,
+
+            'telegram_first_name' =>
+                $resolvedPhone->telegram_first_name,
+
+            'telegram_last_name' =>
+                $resolvedPhone->telegram_last_name,
+
+            'telegram_raw' => $telegramRaw,
+
+            'error_message' => null,
+        ]);
+
+        /*
+         * ============================================================
+         * NameMatcher
+         * ============================================================
+         */
+        $match = $nameMatcher->match(
+            $check->driver_name,
+            $resolvedPhone->telegram_first_name,
+            $resolvedPhone->telegram_last_name,
+        );
+
+        $telegramRaw['name_match'] = $match;
+
+        $check->update([
+            'telegram_raw' => $telegramRaw,
+
+            'status' =>
+                ($match['matched'] ?? false)
+                    ? TelegramDriverCheckStatus::Confirmed
+                    : TelegramDriverCheckStatus::NotConfirmed,
+
+            'checked_at' => now(),
+        ]);
+
+        Log::info(
+            'Telegram driver name matching completed',
+            [
+                'check_id' => $check->id,
+                'phone' => $check->phone_normalized,
+                'resolved_phone_id' =>
+                    $resolvedPhone->id,
+                'matched' => $match['matched'] ?? false,
+                'score' => $match['score'] ?? 0,
+                'level' => $match['level'] ?? null,
+                'resolved_from_cache' =>
+                    $telegramRaw['resolved_from_cache'] ?? false,
+            ]
+        );
+
+        if ($match['matched'] ?? false) {
+            $this->info(
+                "✅ Check #{$check->id} confirmed."
+            );
+        } else {
+            $this->warn(
+                "❌ Check #{$check->id} not confirmed."
+            );
+        }
+    }
+
+    /**
+     * Retry processing if attempts remain.
      */
     private function retryOrFail(
         TelegramDriverCheck $check,
@@ -397,7 +595,9 @@ class ResolveTelegramPhoneCommand extends Command
          */
         if ($check->attempts < 3) {
             $check->update([
-                'status' => TelegramDriverCheckStatus::Pending,
+                'status' =>
+                    TelegramDriverCheckStatus::Pending,
+
                 'error_message' => $error,
             ]);
 
@@ -405,15 +605,27 @@ class ResolveTelegramPhoneCommand extends Command
                 $check->id
             )->onQueue('telegram');
 
+            Log::warning(
+                'Telegram driver check scheduled for retry',
+                [
+                    'check_id' => $check->id,
+                    'attempts' => $check->attempts,
+                    'error' => $error,
+                ]
+            );
+
             return self::SUCCESS;
         }
 
         /*
-         * Три попытки исчерпаны.
+         * Три реальные попытки исчерпаны.
          */
         $check->update([
-            'status' => TelegramDriverCheckStatus::NotConfirmed,
+            'status' =>
+                TelegramDriverCheckStatus::NotConfirmed,
+
             'error_message' => $error,
+
             'checked_at' => now(),
         ]);
 

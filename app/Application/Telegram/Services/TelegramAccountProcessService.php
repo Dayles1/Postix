@@ -7,234 +7,374 @@ namespace App\Application\Telegram\Services;
 use App\Enums\Telegram\TelegramAccountProcess as TelegramAccountProcessEnum;
 use App\Models\Telegram\TelegramAccount;
 use App\Models\Telegram\TelegramAccountProcess;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class TelegramAccountProcessService
 {
+    /**
+     * Get existing process state or create a new one.
+     */
     public function getOrCreate(
         TelegramAccount $account,
-        TelegramAccountProcessEnum $process
+        TelegramAccountProcessEnum $process,
     ): TelegramAccountProcess {
-        return TelegramAccountProcess::firstOrCreate(
+        return TelegramAccountProcess::query()->firstOrCreate(
             [
                 'telegram_account_id' => $account->id,
-                'process' => $process,
+                'process' => $process->value,
             ],
             [
                 'is_available' => true,
                 'is_busy' => false,
-            ]
+                'busy_at' => null,
+            ],
         );
     }
 
+    /**
+     * Register successful process execution.
+     */
     public function registerSuccess(
         TelegramAccount $account,
-        TelegramAccountProcessEnum $process
+        TelegramAccountProcessEnum $process,
     ): TelegramAccountProcess {
-        return DB::transaction(function () use ($account, $process): TelegramAccountProcess {
-            $state = TelegramAccountProcess::query()
-                ->where('telegram_account_id', $account->id)
-                ->where('process', $process)
-                ->lockForUpdate()
-                ->first();
+        return DB::transaction(
+            function () use (
+                $account,
+                $process,
+            ): TelegramAccountProcess {
+                $state = $this->lockOrCreateState(
+                    $account,
+                    $process,
+                );
 
-            if (!$state) {
-                $state = TelegramAccountProcess::create([
-                    'telegram_account_id' => $account->id,
-                    'process' => $process,
-                    'successes' => 0,
-                    'failures' => 0,
-                    'consecutive_failures' => 0,
-                    'is_available' => true,
-                    'is_busy' => false,
-                ]);
+                $state->registerSuccess();
+
+                return $state->fresh();
             }
-
-            $state->registerSuccess();
-
-            return $state->fresh();
-        });
+        );
     }
 
+    /**
+     * Register failed process execution.
+     */
     public function registerFailure(
         TelegramAccount $account,
         TelegramAccountProcessEnum $process,
         ?string $reason = null,
-        int $maxConsecutiveFailures = 3
+        int $maxConsecutiveFailures = 3,
     ): TelegramAccountProcess {
-        return DB::transaction(function () use (
-            $account,
-            $process,
-            $reason,
-            $maxConsecutiveFailures
-        ): TelegramAccountProcess {
-            $state = TelegramAccountProcess::query()
-                ->where('telegram_account_id', $account->id)
-                ->where('process', $process)
-                ->lockForUpdate()
-                ->first();
-
-            if (!$state) {
-                $state = TelegramAccountProcess::create([
-                    'telegram_account_id' => $account->id,
-                    'process' => $process,
-                    'successes' => 0,
-                    'failures' => 0,
-                    'consecutive_failures' => 0,
-                    'is_available' => true,
-                    'is_busy' => false,
-                ]);
-            }
-
-            $state->registerFailure(
+        return DB::transaction(
+            function () use (
+                $account,
+                $process,
                 $reason,
-                $maxConsecutiveFailures
-            );
+                $maxConsecutiveFailures,
+            ): TelegramAccountProcess {
+                $state = $this->lockOrCreateState(
+                    $account,
+                    $process,
+                );
 
-            return $state->fresh();
-        });
+                $state->registerFailure(
+                    $reason,
+                    $maxConsecutiveFailures,
+                );
+
+                return $state->fresh();
+            }
+        );
     }
 
+    /**
+     * Acquire is intentionally disabled for resolver selection.
+     *
+     * We do NOT use is_busy as an availability condition.
+     */
     public function acquire(
         TelegramAccount $account,
-        TelegramAccountProcessEnum $process
+        TelegramAccountProcessEnum $process,
     ): bool {
-        return DB::transaction(function () use (
-            $account,
-            $process
-        ): bool {
-            $state = TelegramAccountProcess::query()
-                ->where('telegram_account_id', $account->id)
-                ->where('process', $process)
-                ->lockForUpdate()
-                ->first();
+        return DB::transaction(
+            function () use (
+                $account,
+                $process,
+            ): bool {
+                $state = $this->lockOrCreateState(
+                    $account,
+                    $process,
+                );
 
-            if (!$state) {
-                $state = TelegramAccountProcess::create([
-                    'telegram_account_id' => $account->id,
-                    'process' => $process,
-                    'successes' => 0,
-                    'failures' => 0,
-                    'consecutive_failures' => 0,
-                    'is_available' => true,
-                    'is_busy' => false,
-                ]);
+                /*
+                 * Only is_available matters.
+                 */
+                if (!$state->is_available) {
+                    return false;
+                }
+
+                /*
+                 * We deliberately DO NOT set is_busy.
+                 */
+                return true;
             }
-
-            if (!$state->is_available) {
-                return false;
-            }
-
-            if ($state->is_busy) {
-                return false;
-            }
-
-            $state->update([
-                'is_busy' => true,
-                'busy_at' => now(),
-            ]);
-
-            return true;
-        });
+        );
     }
 
+    /**
+     * Release is kept for compatibility.
+     *
+     * is_busy is not used to determine availability anymore.
+     */
     public function release(
         TelegramAccount $account,
-        TelegramAccountProcessEnum $process
+        TelegramAccountProcessEnum $process,
     ): void {
         TelegramAccountProcess::query()
-            ->where('telegram_account_id', $account->id)
-            ->where('process', $process)
+            ->where(
+                'telegram_account_id',
+                $account->id,
+            )
+            ->where(
+                'process',
+                $process->value,
+            )
             ->update([
                 'is_busy' => false,
                 'busy_at' => null,
             ]);
     }
 
+    /**
+     * Return available resolver accounts.
+     *
+     * IMPORTANT:
+     * is_busy is completely ignored.
+     */
     public function availableAccounts(
-        TelegramAccountProcessEnum $process
+        TelegramAccountProcessEnum $process,
+    ): Collection {
+        return $this->candidateAccounts($process);
+    }
+
+    /**
+     * Find first available resolver account.
+     *
+     * IMPORTANT:
+     * This method does NOT acquire or modify the account.
+     */
+    public function findAvailableAccount(
+        TelegramAccountProcessEnum $process,
+    ): ?TelegramAccount {
+        $primaryAccountId = $this->primaryAccountId();
+
+        $accounts = $this->candidateAccounts($process);
+
+        foreach ($accounts as $account) {
+            if (
+                $primaryAccountId !== null
+                && (int) $account->id === $primaryAccountId
+            ) {
+                continue;
+            }
+
+            Log::info(
+                'Resolver account selected',
+                [
+                    'process' => $process->value,
+                    'account_id' => $account->id,
+                    'phone' => $account->phone,
+                    'is_busy_ignored' => true,
+                ]
+            );
+
+            return $account;
+        }
+
+        Log::warning(
+            'No available resolver account',
+            [
+                'process' => $process->value,
+                'primary_account_id' => $primaryAccountId,
+                'candidate_account_ids' =>
+                    $accounts
+                        ->pluck('id')
+                        ->values()
+                        ->all(),
+            ]
+        );
+
+        return null;
+    }
+
+    /**
+     * Check whether at least one resolver account exists.
+     *
+     * is_busy is ignored.
+     */
+    public function hasAvailableAccount(
+        TelegramAccountProcessEnum $process,
+    ): bool {
+        return $this->candidateAccounts(
+            $process
+        )->isNotEmpty();
+    }
+
+    /**
+     * Return candidate resolver accounts.
+     *
+     * IMPORTANT:
+     * - is_authorized must be true;
+     * - session_path must exist;
+     * - primary listener account is excluded;
+     * - process must either not exist or be available;
+     * - is_busy is COMPLETELY IGNORED.
+     */
+    private function candidateAccounts(
+        TelegramAccountProcessEnum $process,
     ): Collection {
         $primaryAccountId = $this->primaryAccountId();
 
         $accounts = TelegramAccount::query()
             ->where('is_authorized', true)
             ->whereNotNull('session_path')
+            ->where('session_path', '!=', '')
             ->when(
                 $primaryAccountId !== null,
-                fn ($query) => $query->where(
-                    'id',
-                    '!=',
+                function (Builder $query) use (
                     $primaryAccountId
-                )
+                ): void {
+                    $query->where(
+                        'id',
+                        '!=',
+                        $primaryAccountId,
+                    );
+                }
             )
+            ->where(function (Builder $query) use (
+                $process
+            ): void {
+                /*
+                 * No process row yet -> available.
+                 */
+                $query
+                    ->whereNotExists(
+                        TelegramAccountProcess::query()
+                            ->selectRaw('1')
+                            ->whereColumn(
+                                'telegram_account_processes.telegram_account_id',
+                                'telegram_accounts.id',
+                            )
+                            ->where(
+                                'telegram_account_processes.process',
+                                $process->value,
+                            )
+                    )
+
+                    /*
+                     * Process exists and is_available=true.
+                     *
+                     * is_busy is intentionally ignored.
+                     */
+                    ->orWhereExists(
+                        TelegramAccountProcess::query()
+                            ->selectRaw('1')
+                            ->whereColumn(
+                                'telegram_account_processes.telegram_account_id',
+                                'telegram_accounts.id',
+                            )
+                            ->where(
+                                'telegram_account_processes.process',
+                                $process->value,
+                            )
+                            ->where(
+                                'telegram_account_processes.is_available',
+                                true,
+                            )
+                    );
+            })
             ->orderBy('id')
             ->get();
 
-        $available = $accounts
-            ->filter(function (TelegramAccount $account) use ($process): bool {
-                $state = TelegramAccountProcess::query()
-                    ->where('telegram_account_id', $account->id)
-                    ->where('process', $process)
-                    ->first();
+        Log::info(
+            'Resolver candidates checked',
+            [
+                'process' => $process->value,
+                'primary_account_id' => $primaryAccountId,
 
-                if (!$state) {
-                    return true;
-                }
+                'candidate_account_ids' =>
+                    $accounts
+                        ->pluck('id')
+                        ->values()
+                        ->all(),
 
-                return $state->is_available && !$state->is_busy;
-            })
-            ->values();
+                'is_busy_ignored' => true,
+            ]
+        );
 
-        Log::info('Resolver account candidates', [
-            'process' => $process->value,
-            'primary_account_id' => $primaryAccountId,
-            'all_authorized_account_ids' => $accounts
-                ->pluck('id')
-                ->values()
-                ->all(),
-            'available_account_ids' => $available
-                ->pluck('id')
-                ->values()
-                ->all(),
-        ]);
-
-        return $available;
+        return $accounts;
     }
 
-    public function findAvailableAccount(
-        TelegramAccountProcessEnum $process
-    ): ?TelegramAccount {
-        foreach (
-            $this->availableAccounts($process) as $account
-        ) {
-            if ($this->acquire($account, $process)) {
-                Log::info('Resolver account acquired', [
-                    'process' => $process->value,
-                    'account_id' => $account->id,
-                    'phone' => $account->phone,
-                ]);
+    /**
+     * Lock existing process state or create one.
+     */
+    private function lockOrCreateState(
+        TelegramAccount $account,
+        TelegramAccountProcessEnum $process,
+    ): TelegramAccountProcess {
+        $state = TelegramAccountProcess::query()
+            ->where(
+                'telegram_account_id',
+                $account->id,
+            )
+            ->where(
+                'process',
+                $process->value,
+            )
+            ->lockForUpdate()
+            ->first();
 
-                return $account;
-            }
+        if ($state) {
+            return $state;
         }
 
-        Log::warning('No available resolver account', [
+        return TelegramAccountProcess::query()->create([
+            'telegram_account_id' => $account->id,
             'process' => $process->value,
-            'primary_account_id' => $this->primaryAccountId(),
-        ]);
 
-        return null;
+            'successes' => 0,
+            'failures' => 0,
+            'consecutive_failures' => 0,
+
+            'is_available' => true,
+            'is_busy' => false,
+
+            'busy_at' => null,
+
+            'disabled_at' => null,
+            'disabled_reason' => null,
+
+            'meta' => null,
+        ]);
     }
 
+    /**
+     * Main listener account.
+     *
+     * This account must never be used for resolver work.
+     */
     private function primaryAccountId(): ?int
     {
         $accountId = config(
-            'services.telegram.driver_check_account_id'
+            'services.telegram.driver_check_account_id',
         );
 
-        if ($accountId === null || $accountId === '') {
+        if (
+            $accountId === null
+            || $accountId === ''
+        ) {
             return null;
         }
 

@@ -12,11 +12,16 @@ use Illuminate\Http\Request;
 class TelegramAccountController extends Controller
 {
     public function index()
-    {
-        return response()->json([
-            'data' => TelegramAccount::query()->get(),
-        ]);
-    }
+{
+    return response()->json([
+        'data' => TelegramAccount::query()
+            ->with(['processes' => function ($query) {
+                // можно добавить условия, сортировку и т.д.
+                $query->orderBy('created_at', 'desc');
+            }])
+            ->get(),
+    ]);
+}
 
     public function auth(Request $request)
     {

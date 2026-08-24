@@ -33,13 +33,13 @@ class TelegramDriverCheckCommand extends Command
             return self::FAILURE;
         }
 
-        // $chatLink = trim(
-        //     (string) config(
-        //         'services.telegram.driver_check_chat_link'
-        //     )
-        // );
+        $chatLink = trim(
+            (string) config(
+                'services.telegram.driver_check_chat_link'
+            )
+        );
 
-        $chatLink = 'https://t.me/+HFNjpKIyW-owYTJi'; 
+        // $chatLink = 'https://t.me/+HFNjpKIyW-owYTJi'; 
         if ($chatLink === '') {
             $this->error(
                 'TELEGRAM_DRIVER_CHECK_CHAT_LINK is not configured.'

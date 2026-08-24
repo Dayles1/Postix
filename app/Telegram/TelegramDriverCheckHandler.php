@@ -1,19 +1,25 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace App\Telegram;
 
+use App\Application\Telegram\Services\TelegramAccountProcessService;
 use App\Application\Telegram\Services\TelegramDriverMessageParser;
+use App\Application\Telegram\Services\TelegramNameMatcher;
 use App\Enums\Drivers\TelegramDriverCheckStatus;
+use App\Enums\Telegram\TelegramAccountProcess as TelegramAccountProcessEnum;
 use App\Jobs\Telegram\ResolveTelegramPhoneJob;
 use App\Models\Driver\TelegramDriverCheck;
 use App\Models\Telegram\TelegramAccount;
+use App\Models\Telegram\TelegramResolvedPhone;
 use danog\MadelineProto\EventHandler\Attributes\Cron;
 use danog\MadelineProto\EventHandler\Attributes\Handler;
 use danog\MadelineProto\EventHandler\Message as TelegramIncomingMessage;
 use danog\MadelineProto\EventHandler\SimpleFilter\Incoming;
 use danog\MadelineProto\ParseMode;
 use danog\MadelineProto\SimpleEventHandler;
-use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -60,12 +66,11 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
                 return;
             }
 
-            // $chatLink = trim(
-            //     (string) config(
-            //         'services.telegram.driver_check_chat_link'
-            //     )
-            // );
-            $chatLink = 'https://t.me/+HFNjpKIyW-owYTJi';
+            $chatLink = trim(
+                (string) config(
+                    'services.telegram.driver_check_chat_link'
+                )
+            );
 
             if ($chatLink === '') {
                 Log::critical(
@@ -75,9 +80,6 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
                 return;
             }
 
-            /*
-             * Один раз превращаем ссылку в Telegram peer ID.
-             */
             $this->targetChatId = (int) $this->getId($chatLink);
 
             if ($this->targetChatId === 0) {
@@ -98,6 +100,7 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
                 'last_error' => null,
                 'last_error_at' => null,
             ]);
+            $this->notifyListenerStarted($account, $chatLink);
 
             Log::info(
                 'TelegramDriverCheckHandler started',
@@ -120,7 +123,7 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
     }
 
     /**
-     * Получаем только сообщения из целевой группы.
+     * Обработка входящих сообщений.
      */
     #[Handler]
     public function handleIncomingMessage(
@@ -171,13 +174,10 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
             }
 
             /*
-             * Дополнительная защита от повторного update.
+             * Защита от повторной обработки одного Telegram message.
              */
             $exists = TelegramDriverCheck::query()
-                ->where(
-                    'telegram_chat_id',
-                    $chatId
-                )
+                ->where('telegram_chat_id', $chatId)
                 ->where(
                     'telegram_message_id',
                     $telegramMessageId
@@ -197,7 +197,7 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
             }
 
             /*
-             * Парсим номер и имя водителя.
+             * Parse.
              */
             $parsed = app(
                 TelegramDriverMessageParser::class
@@ -208,7 +208,9 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
             $driverName = $parsed['driver_name'] ?? null;
 
             /*
-             * Сохраняем сообщение.
+             * Создаём check сразу.
+             *
+             * Он является нашей очередью для pending/processing проверок.
              */
             $check = TelegramDriverCheck::create([
                 'telegram_chat_id' => $chatId,
@@ -235,22 +237,31 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
                 [
                     'check_id' => $check->id,
                     'telegram_chat_id' => $check->telegram_chat_id,
-                    'telegram_message_id' => $check->telegram_message_id,
+                    'telegram_message_id' =>
+                        $check->telegram_message_id,
                     'phone_raw' => $check->phone_raw,
-                    'phone_normalized' => $check->phone_normalized,
+                    'phone_normalized' =>
+                        $check->phone_normalized,
                     'driver_name' => $check->driver_name,
                 ]
             );
 
             /*
-             * Нет номера — просто сохраняем запись.
+             * Нет номера.
              */
             if (!$phoneNormalized) {
+                $check->update([
+                    'status' => TelegramDriverCheckStatus::NotConfirmed,
+                    'error_message' => 'Phone number is missing.',
+                    'checked_at' => now(),
+                ]);
+
                 Log::warning(
                     'Driver check has no phone',
                     [
                         'check_id' => $check->id,
-                        'telegram_message_id' => $telegramMessageId,
+                        'telegram_message_id' =>
+                            $telegramMessageId,
                     ]
                 );
 
@@ -258,7 +269,68 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
             }
 
             /*
-             * Запускаем resolver job.
+             * =========================================================
+             * 1. Ищем уже успешно resolved телефон в базе.
+             * =========================================================
+             */
+            $resolvedPhone = TelegramResolvedPhone::query()
+                ->where(
+                    'phone_normalized',
+                    $phoneNormalized
+                )
+                ->first();
+
+            if ($resolvedPhone) {
+                Log::info(
+                    'Telegram resolved phone found in cache',
+                    [
+                        'check_id' => $check->id,
+                        'phone' => $phoneNormalized,
+                        'resolved_phone_id' => $resolvedPhone->id,
+                        'telegram_user_id' =>
+                            $resolvedPhone->telegram_user_id,
+                    ]
+                );
+
+                $this->applyResolvedPhone(
+                    $check,
+                    $resolvedPhone
+                );
+
+                return;
+            }
+
+            /*
+             * =========================================================
+             * 2. Проверяем наличие resolver account.
+             * =========================================================
+             */
+            $processService = app(
+                TelegramAccountProcessService::class
+            );
+
+            $resolverAccount = $processService->findAvailableAccount(
+                TelegramAccountProcessEnum::ResolverPhone
+            );
+
+            if (!$resolverAccount) {
+                Log::warning(
+                    'No resolver account available for driver check',
+                    [
+                        'check_id' => $check->id,
+                        'phone' => $phoneNormalized,
+                    ]
+                );
+
+                $this->notifyResolverAccountsExhausted();
+
+                return;
+            }
+
+            /*
+             * =========================================================
+             * 3. Есть account → запускаем resolve job.
+             * =========================================================
              */
             ResolveTelegramPhoneJob::dispatch(
                 $check->id
@@ -268,6 +340,7 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
                 'ResolveTelegramPhoneJob dispatched',
                 [
                     'check_id' => $check->id,
+                    'phone' => $phoneNormalized,
                 ]
             );
         } catch (Throwable $e) {
@@ -284,8 +357,146 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
     }
 
     /**
+     * Apply cached Telegram resolve result to the current check.
+     *
+     * Telegram API is NOT called here.
+     */
+    private function applyResolvedPhone(
+        TelegramDriverCheck $check,
+        TelegramResolvedPhone $resolvedPhone,
+    ): void {
+        $telegramRaw = $resolvedPhone->telegram_raw ?? [];
+
+        /*
+         * Сохраняем name_match отдельно после matcher.
+         */
+        $telegramRaw['resolved_from_cache'] = true;
+        $telegramRaw['resolved_phone_id'] = $resolvedPhone->id;
+
+        $check->update([
+            'telegram_user_id' =>
+                $resolvedPhone->telegram_user_id,
+
+            'telegram_username' =>
+                $resolvedPhone->telegram_username,
+
+            'telegram_first_name' =>
+                $resolvedPhone->telegram_first_name,
+
+            'telegram_last_name' =>
+                $resolvedPhone->telegram_last_name,
+
+            'telegram_raw' => $telegramRaw,
+
+            'error_message' => null,
+        ]);
+
+        $match = app(
+            TelegramNameMatcher::class
+        )->match(
+                $check->driver_name,
+                $resolvedPhone->telegram_first_name,
+                $resolvedPhone->telegram_last_name,
+            );
+
+        $telegramRaw['name_match'] = $match;
+
+        $check->update([
+            'telegram_raw' => $telegramRaw,
+
+            'status' => ($match['matched'] ?? false)
+                ? TelegramDriverCheckStatus::Confirmed
+                : TelegramDriverCheckStatus::NotConfirmed,
+
+            'checked_at' => now(),
+        ]);
+
+        Log::info(
+            'Driver check completed from resolved phone cache',
+            [
+                'check_id' => $check->id,
+                'phone' => $check->phone_normalized,
+                'resolved_phone_id' => $resolvedPhone->id,
+                'matched' => $match['matched'] ?? false,
+                'score' => $match['score'] ?? 0,
+                'level' => $match['level'] ?? null,
+            ]
+        );
+    }
+
+    /**
+     * Send notification when resolver accounts are exhausted.
+     *
+     * Cooldown prevents notification spam when many driver messages
+     * arrive while no resolver account is available.
+     */
+    private function notifyResolverAccountsExhausted(): void
+    {
+        $chatId = config(
+            'services.telegram.driver_check_notification_chat_id'
+        );
+
+        if ($chatId === null || $chatId === '') {
+            Log::warning(
+                'Resolver account exhaustion notification chat is not configured'
+            );
+
+            return;
+        }
+
+        /*
+         * One notification per 10 minutes.
+         *
+         * The key is shared between all incoming driver messages.
+         */
+        $lock = Cache::add(
+            'telegram:driver-check:resolver-accounts-exhausted-notified',
+            true,
+            now()->addMinutes(10)
+        );
+
+        if (!$lock) {
+            return;
+        }
+
+        try {
+            $this->messages->sendMessage([
+                'peer' => (int) $chatId,
+                'message' =>
+                    "⚠️ <b>АККАУНТЫ ЗАКОНЧИЛИСЬ</b>\n\n"
+                    . "Нет доступных Telegram-аккаунтов "
+                    . "для проверки водителей.\n\n"
+                    . "Необходимо добавить новый "
+                    . "resolver-аккаунт.",
+                'parse_mode' => ParseMode::HTML,
+                'no_webpage' => true,
+            ]);
+
+            Log::warning(
+                'Resolver account exhaustion notification sent',
+                [
+                    'notification_chat_id' => $chatId,
+                ]
+            );
+        } catch (Throwable $e) {
+            /*
+             * Уведомление не должно ломать обработку входящего
+             * сообщения.
+             */
+            Log::error(
+                'Failed to send resolver account exhaustion notification',
+                [
+                    'notification_chat_id' => $chatId,
+                    'error' => $e->getMessage(),
+                    'exception' => $e::class,
+                ]
+            );
+        }
+    }
+
+    /**
      * Каждую секунду ищем завершённые проверки,
-     * которые ещё не отправили в Telegram.
+     * которые ещё не отправили результат в Telegram.
      */
     #[Cron(period: 1.0)]
     public function sendCompletedResults(): void
@@ -346,7 +557,8 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
 
                 'reply_to' => [
                     '_' => 'inputReplyToMessage',
-                    'reply_to_msg_id' => $check->telegram_message_id,
+                    'reply_to_msg_id' =>
+                        $check->telegram_message_id,
                 ],
 
                 'message' => $message,
@@ -356,10 +568,6 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
                 'no_webpage' => true,
             ]);
 
-            /*
-             * Отмечаем как отправленный только после
-             * успешной отправки Telegram API.
-             */
             $check->update([
                 'reported_at' => now(),
             ]);
@@ -375,12 +583,6 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
                 ]
             );
         } catch (Throwable $e) {
-            /*
-             * reported_at НЕ меняем.
-             *
-             * Значит следующий Cron попробует отправить
-             * этот результат ещё раз.
-             */
             Log::error(
                 'Telegram driver check result send failed',
                 [
@@ -424,23 +626,11 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
 
         $lines = [];
 
-        /*
-         * =================================================
-         * STATUS
-         * =================================================
-         */
-
         $lines[] = $isConfirmed
             ? '✅ <b>TAQQOSLASH TASDIQLANDI</b>'
             : '❌ <b>TAQQOSLASH TASDIQLANMADI</b>';
 
         $lines[] = '';
-
-        /*
-         * =================================================
-         * PHONE
-         * =================================================
-         */
 
         $lines[] =
             '<b>📱 Telefon:</b> '
@@ -450,12 +640,6 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
 
         $lines[] = '';
 
-        /*
-         * =================================================
-         * DRIVER
-         * =================================================
-         */
-
         $lines[] =
             '<b>👤 Haydovchi maʼlumoti:</b>';
 
@@ -464,12 +648,6 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
             . $this->escapeHtml(
                 $check->driver_name ?? '-'
             );
-
-        /*
-         * =================================================
-         * TELEGRAM
-         * =================================================
-         */
 
         $lines[] = '';
 
@@ -498,12 +676,6 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
                 'User ID: '
                 . $check->telegram_user_id;
         }
-
-        /*
-         * =================================================
-         * NAME MATCH
-         * =================================================
-         */
 
         if (is_array($match)) {
             $lines[] = '';
@@ -553,9 +725,6 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
                 ? $match['possible_tokens']
                 : [];
 
-            /*
-             * Совпавшие части.
-             */
             if ($matchedTokens !== []) {
                 $lines[] =
                     '<b>✅ Mos kelgan qismlar:</b>';
@@ -595,15 +764,12 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
                 $lines[] = '';
             }
 
-            /*
-             * Не совпавшие части ожидаемого имени.
-             */
             $matchedExpected = collect(
                 $matchedTokens
             )
                 ->pluck('expected')
                 ->map(
-                    fn ($value): string => mb_strtolower(
+                    fn($value): string => mb_strtolower(
                         trim((string) $value)
                     )
                 )
@@ -628,11 +794,13 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
                     $expected
                 );
 
-                if (!in_array(
-                    $normalized,
-                    $matchedExpected,
-                    true
-                )) {
+                if (
+                    !in_array(
+                        $normalized,
+                        $matchedExpected,
+                        true
+                    )
+                ) {
                     $unmatched[] = $expected;
                 }
             }
@@ -654,9 +822,6 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
                 $lines[] = '';
             }
 
-            /*
-             * Итог.
-             */
             $lines[] =
                 '<b>📊 Yakuniy moslik:</b> '
                 . $score
@@ -682,21 +847,12 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
                     . 'yetarli darajada mos kelmadi.';
             }
         } else {
-            /*
-             * Match maʼlumotlari yo‘q bo‘lsa.
-             */
             $lines[] = '';
 
             $lines[] =
                 'ℹ️ <b>Taqqoslash:</b> '
                 . 'ism bo‘yicha yetarli maʼlumot topilmadi.';
         }
-
-        /*
-         * =================================================
-         * ERROR
-         * =================================================
-         */
 
         if ($check->error_message) {
             $lines[] = '';
@@ -728,31 +884,31 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
     ): string {
         return match ($level) {
             'exact' =>
-                'aniq mos',
+            'aniq mos',
 
             'very_high' =>
-                'juda yuqori',
+            'juda yuqori',
 
             'high' =>
-                'yuqori',
+            'yuqori',
 
             'medium' =>
-                'o‘rtacha',
+            'o‘rtacha',
 
             'low' =>
-                'past',
+            'past',
 
             'very_low' =>
-                'juda past',
+            'juda past',
 
             'no_data' =>
-                'maʼlumot yetarli emas',
+            'maʼlumot yetarli emas',
 
             'none' =>
-                'moslik topilmadi',
+            'moslik topilmadi',
 
             default =>
-                $level,
+            $level,
         };
     }
 
@@ -816,5 +972,57 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
             ENT_QUOTES | ENT_SUBSTITUTE,
             'UTF-8'
         );
+    }
+    /**
+     * Уведомляет listener-аккаунт о успешном запуске.
+     */
+    private function notifyListenerStarted(
+        TelegramAccount $account,
+        string $chatLink
+    ): void {
+        try {
+            $this->messages->sendMessage([
+                'peer' => 'me',
+                'message' =>
+                    "✅ <b>Telegram Driver Check Listener запущен</b>\n\n"
+                    . "📱 Аккаунт: "
+                    . $this->escapeHtml(
+                        (string) $account->phone
+                    )
+                    . "\n"
+                    . "🆔 Account ID: "
+                    . $account->id
+                    . "\n"
+                    . "💬 Чат: "
+                    . $this->escapeHtml($chatLink)
+                    . "\n"
+                    . "📡 Статус: <b>RUNNING</b>\n"
+                    . "🕐 Время: "
+                    . now()->format('Y-m-d H:i:s'),
+                'parse_mode' => ParseMode::HTML,
+                'no_webpage' => true,
+            ]);
+
+            Log::info(
+                'TelegramDriverCheckHandler startup notification sent',
+                [
+                    'account_id' => $account->id,
+                    'phone' => $account->phone,
+                ]
+            );
+        } catch (Throwable $e) {
+            /*
+             * Ошибка уведомления не должна ломать listener.
+             */
+            Log::error(
+                'TelegramDriverCheckHandler startup notification failed',
+                [
+                    'account_id' => $account->id,
+                    'phone' => $account->phone,
+                    'error' => $e->getMessage(),
+                    'exception' => $e::class,
+                ]
+            );
+        }
     }
 }

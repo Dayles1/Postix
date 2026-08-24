@@ -45,7 +45,7 @@ return [
         'api_hash' => env('TELEGRAM_API_HASH'),
         'driver_check_chat_link' => env('TELEGRAM_DRIVER_CHECK_CHAT_LINK'),
         'driver_check_account_id' => env('TELEGRAM_DRIVER_CHECK_ACCOUNT_ID'),
-
+        'driver_check_notification_chat_id' => env('TELEGRAM_DRIVER_CHECK_NOTIFICATION_CHAT_ID'),
     ],
 
 ];
