@@ -1,7 +1,4 @@
 <?php
-
-declare(strict_types=1);
-
 namespace App\Models\Telegram;
 
 use App\Enums\Telegram\TelegramAccountProcess as TelegramAccountProcessEnum;
@@ -30,15 +27,23 @@ class TelegramAccountProcess extends Model
     ];
 
     protected $casts = [
-        'process' => TelegramAccountProcessEnum::class,
+        'process' =>
+            TelegramAccountProcessEnum::class,
 
-        'is_available' => 'boolean',
-        'is_busy' => 'boolean',
+        'is_available' =>
+            'boolean',
 
-        'busy_at' => 'datetime',
-        'disabled_at' => 'datetime',
+        'is_busy' =>
+            'boolean',
 
-        'meta' => 'array',
+        'busy_at' =>
+            'datetime',
+
+        'disabled_at' =>
+            'datetime',
+
+        'meta' =>
+            'array',
     ];
 
     public function account(): BelongsTo
@@ -49,33 +54,90 @@ class TelegramAccountProcess extends Model
         );
     }
 
+    /**
+     * Successful resolver operation.
+     */
     public function registerSuccess(): void
     {
-        $this->increment('successes');
+        $this->increment(
+            'successes',
+        );
 
         $this->update([
             'consecutive_failures' => 0,
         ]);
     }
 
+    /**
+     * Real account failure.
+     */
     public function registerFailure(
         ?string $reason = null,
-        int $maxConsecutiveFailures = 3,
+        int $maxConsecutiveFailures = 7,
     ): void {
-        $this->increment('failures');
-        $this->increment('consecutive_failures');
+        $this->increment(
+            'failures',
+        );
+
+        $this->increment(
+            'consecutive_failures',
+        );
 
         $this->refresh();
 
-        if ($this->consecutive_failures >= $maxConsecutiveFailures) {
-            $this->disable($reason);
+        if (
+            $this->consecutive_failures >=
+            $maxConsecutiveFailures
+        ) {
+            $this->disable(
+                $reason,
+            );
         }
     }
 
-    public function disable(?string $reason = null): void
-    {
+    /**
+     * Phone is simply not registered.
+     *
+     * This does NOT hurt the account.
+     */
+    public function registerNotFound(
+        ?string $reason = null,
+    ): void {
+        $this->increment(
+            'failures',
+        );
+
+        $this->refresh();
+
+        $meta = $this->meta;
+
+        if (!is_array($meta)) {
+            $meta = [];
+        }
+
+        $meta[
+            'last_not_found_reason'
+        ] = $reason;
+
+        $meta[
+            'last_not_found_at'
+        ] =
+            now()->toISOString();
+
+        $this->update([
+            'meta' => $meta,
+        ]);
+    }
+
+    public function disable(
+        ?string $reason = null,
+    ): void {
         $this->update([
             'is_available' => false,
+
+            'is_busy' => false,
+            'busy_at' => null,
+
             'disabled_at' => now(),
             'disabled_reason' => $reason,
         ]);
@@ -85,16 +147,21 @@ class TelegramAccountProcess extends Model
     {
         $this->update([
             'is_available' => true,
+
             'is_busy' => false,
             'busy_at' => null,
+
             'disabled_at' => null,
             'disabled_reason' => null,
+
             'consecutive_failures' => 0,
         ]);
     }
 
     public function isAvailable(): bool
     {
-        return $this->is_available && !$this->is_busy;
+        return $this->is_available
+            && !$this->is_busy
+            && $this->consecutive_failures < 7;
     }
 }

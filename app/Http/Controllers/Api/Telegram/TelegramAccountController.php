@@ -7,21 +7,24 @@ use App\Jobs\Telegram\AuthTelegramAccountJob;
 use App\Jobs\Telegram\LogoutTelegramAccountJob;
 use App\Jobs\Telegram\VerifyTelegramAccountCodeJob;
 use App\Models\Telegram\TelegramAccount;
+use App\Models\Telegram\TelegramAccountProcess;
 use Illuminate\Http\Request;
 
 class TelegramAccountController extends Controller
 {
     public function index()
-{
-    return response()->json([
-        'data' => TelegramAccount::query()
-            ->with(['processes' => function ($query) {
-                // можно добавить условия, сортировку и т.д.
-                $query->orderBy('created_at', 'desc');
-            }])
-            ->get(),
-    ]);
-}
+    {
+        return response()->json([
+            'data' => TelegramAccount::query()
+                ->with([
+                    'processes' => function ($query) {
+                        // можно добавить условия, сортировку и т.д.
+                        $query->orderBy('created_at', 'desc');
+                    }
+                ])
+                ->get(),
+        ]);
+    }
 
     public function auth(Request $request)
     {
@@ -90,4 +93,29 @@ class TelegramAccountController extends Controller
             'data' => $account,
         ]);
     }
+
+    public function manageFailures(Request $request)
+{
+    $request->validate([
+        'ids' => ['required', 'array', 'min:1'],
+        'ids.*' => ['required', 'integer'],
+        'action' => ['required', 'in:restart,set'],
+    ]);
+
+    $failures = $request->action === 'restart' ? 0 : 7;
+
+    $updated = TelegramAccountProcess::query()
+        ->whereIn('telegram_account_id', $request->ids)
+        ->update([
+            'failures' => $failures,
+            // 'is_available' => true,
+        ]);
+
+    return response()->json([
+        'message' => 'Failures updated successfully.',
+        'action' => $request->action,
+        'failures' => $failures,
+        'updated' => $updated,
+    ]);
+}
 }

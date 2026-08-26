@@ -21,6 +21,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/verify-code', [TelegramAccountController::class, 'verifyCode']);
         Route::post('/logout', [TelegramAccountController::class, 'logout']);
         Route::get('/{id}', [TelegramAccountController::class, 'show']);
+        Route::post('/manage-failures', [TelegramAccountController::class, 'manageFailures']);
     });
 Route::post(
     '/admin/telegram/driver-check/start',
