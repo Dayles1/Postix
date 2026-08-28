@@ -6,20 +6,26 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('telegram_drivers', function (Blueprint $table) {
             $table->id();
+
+            $table->string('name');
+            $table->string('name_normalized')->index();
+
+            $table->foreignId('operation_user_id')
+                ->nullable()
+                ->constrained('operation_users')
+                ->nullOnDelete();
+
+            $table->string('status')
+                    ->default('pending');
+
             $table->timestamps();
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('telegram_drivers');

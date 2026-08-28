@@ -9,6 +9,7 @@ use App\Application\Telegram\Services\TelegramAccountProcessService;
 use App\Application\Telegram\Services\TelegramContactResolver;
 use App\Application\Telegram\Services\TelegramNameMatcher;
 use App\Enums\Drivers\TelegramDriverCheckStatus;
+use App\Enums\Drivers\TelegramDriverMessageType;
 use App\Enums\Telegram\TelegramAccountProcess as TelegramAccountProcessEnum;
 use App\Models\Driver\TelegramDriverCheck;
 use App\Models\Telegram\TelegramResolvedPhone;
@@ -18,8 +19,7 @@ use Throwable;
 
 final class ResolveTelegramPhoneCommand extends Command
 {
-    protected $signature =
-        'telegram:resolve-phone {checkId}';
+    protected $signature = 'telegram:resolve-phone {checkId}';
 
     protected $description =
         'Resolve driver phone using five different random Telegram accounts';
@@ -32,16 +32,21 @@ final class ResolveTelegramPhoneCommand extends Command
         TelegramNameMatcher $nameMatcher,
         TelegramAccountProcessService $processService,
     ): int {
-        $checkId =
-            (int) $this->argument(
-                'checkId',
-            );
+        $checkId = (int) $this->argument('checkId');
 
-        $check =
-            TelegramDriverCheck::query()
-                ->find($checkId);
+        /*
+         * ============================================================
+         * 1. GET CHECK
+         * ============================================================
+         */
+        $check = TelegramDriverCheck::query()
+            ->with([
+                'driver',
+                'operationUser',
+            ])
+            ->find($checkId);
 
-        if (!$check) {
+        if (! $check) {
             $this->error(
                 "Check #{$checkId} not found.",
             );
@@ -49,8 +54,7 @@ final class ResolveTelegramPhoneCommand extends Command
             Log::warning(
                 'ResolveTelegramPhoneCommand check not found',
                 [
-                    'check_id' =>
-                        $checkId,
+                    'check_id' => $checkId,
                 ],
             );
 
@@ -58,7 +62,59 @@ final class ResolveTelegramPhoneCommand extends Command
         }
 
         /*
-         * Already finished.
+         * ============================================================
+         * 2. ONLY CREATED_DRIVER
+         * ============================================================
+         *
+         * Handler should already send only CREATED_DRIVER to Job,
+         * but command must protect itself too.
+         */
+        if (
+            $check->type !==
+            TelegramDriverMessageType::CREATED_DRIVER
+        ) {
+            Log::info(
+                'ResolveTelegramPhoneCommand skipped non-created-driver check',
+                [
+                    'check_id' => $check->id,
+                    'type' => $check->type?->value,
+                ],
+            );
+
+            return self::SUCCESS;
+        }
+
+        /*
+         * ============================================================
+         * 3. DRIVER MUST EXIST
+         * ============================================================
+         */
+        if (! $check->driver_id) {
+            $check->update([
+                'status' =>
+                    TelegramDriverCheckStatus::NotConfirmed,
+
+                'error_message' =>
+                    'Telegram driver is not assigned to check.',
+
+                'checked_at' =>
+                    now(),
+            ]);
+
+            Log::warning(
+                'Telegram driver is missing for check',
+                [
+                    'check_id' => $check->id,
+                ],
+            );
+
+            return self::SUCCESS;
+        }
+
+        /*
+         * ============================================================
+         * 4. ALREADY FINISHED
+         * ============================================================
          */
         if (
             $check->status ===
@@ -71,9 +127,13 @@ final class ResolveTelegramPhoneCommand extends Command
         }
 
         /*
-         * Phone is missing.
+         * ============================================================
+         * 5. PHONE IS REQUIRED
+         * ============================================================
          */
-        if (!$check->phone_normalized) {
+        if (
+            ! $check->phone_normalized
+        ) {
             $check->update([
                 'status' =>
                     TelegramDriverCheckStatus::NotConfirmed,
@@ -85,28 +145,32 @@ final class ResolveTelegramPhoneCommand extends Command
                     now(),
             ]);
 
+            $check->driver?->update([
+                'status' => 'not_confirmed',
+            ]);
+
             return self::SUCCESS;
         }
 
         /*
-         * ================================================================
-         * ATOMICALLY CLAIM CHECK
-         * ================================================================
+         * ============================================================
+         * 6. ATOMICALLY CLAIM CHECK
+         * ============================================================
+         *
+         * Prevent two workers from processing same check.
          */
-        $claimed =
-            TelegramDriverCheck::query()
-                ->whereKey($check->id)
-                ->where(
-                    'status',
-                    TelegramDriverCheckStatus::Pending,
-                )
-                ->update([
-                    'status' =>
-                        TelegramDriverCheckStatus::Processing,
+        $claimed = TelegramDriverCheck::query()
+            ->whereKey($check->id)
+            ->where(
+                'status',
+                TelegramDriverCheckStatus::Pending,
+            )
+            ->update([
+                'status' =>
+                    TelegramDriverCheckStatus::Processing,
 
-                    'error_message' =>
-                        null,
-                ]);
+                'error_message' => null,
+            ]);
 
         if ($claimed === 0) {
             return self::SUCCESS;
@@ -116,20 +180,19 @@ final class ResolveTelegramPhoneCommand extends Command
 
         try {
             /*
-             * ============================================================
-             * CACHE
-             * ============================================================
+             * ========================================================
+             * 7. CACHE FIRST
+             * ========================================================
              *
-             * If this phone was already resolved successfully,
+             * Existing successfully resolved phone:
              * do not call Telegram again.
              */
-            $resolvedPhone =
-                TelegramResolvedPhone::query()
-                    ->where(
-                        'phone_normalized',
-                        $check->phone_normalized,
-                    )
-                    ->first();
+            $resolvedPhone = TelegramResolvedPhone::query()
+                ->where(
+                    'phone_normalized',
+                    $check->phone_normalized,
+                )
+                ->first();
 
             if ($resolvedPhone) {
                 Log::info(
@@ -150,43 +213,26 @@ final class ResolveTelegramPhoneCommand extends Command
                 );
 
                 $this->applyResolvedPhone(
-                    $check,
-                    $resolvedPhone,
-                    $nameMatcher,
+                    check: $check,
+                    resolvedPhone: $resolvedPhone,
+                    nameMatcher: $nameMatcher,
                 );
 
                 return self::SUCCESS;
             }
 
             /*
-             * ============================================================
-             * ATTEMPT STATE
-             * ============================================================
+             * ========================================================
+             * 8. INITIALIZE RESOLVER STATE
+             * ========================================================
              */
-            $telegramRaw =
-                $this->getTelegramRaw(
-                    $check,
-                );
+            $telegramRaw = $this->getTelegramRaw($check);
 
-            $telegramRaw[
-                'resolver_attempts'
-            ] = [];
-
-            $telegramRaw[
-                'resolver_attempt_account_ids'
-            ] = [];
-
-            $telegramRaw[
-                'resolver_not_registered_count'
-            ] = 0;
-
-            $telegramRaw[
-                'resolver_real_error_count'
-            ] = 0;
-
-            $telegramRaw[
-                'resolver_result'
-            ] = null;
+            $telegramRaw['resolver_attempts'] = [];
+            $telegramRaw['resolver_attempt_account_ids'] = [];
+            $telegramRaw['resolver_not_registered_count'] = 0;
+            $telegramRaw['resolver_real_error_count'] = 0;
+            $telegramRaw['resolver_result'] = null;
 
             $check->update([
                 'attempts' => 0,
@@ -194,18 +240,17 @@ final class ResolveTelegramPhoneCommand extends Command
             ]);
 
             /*
-             * Accounts used only during THIS check.
+             * Accounts already used by this check.
              */
             $usedAccountIds = [];
 
             /*
-             * Number of attempts where target phone
-             * was not registered.
+             * Number of "phone not registered" responses.
              */
             $notRegisteredCount = 0;
 
             /*
-             * Actual resolver/account errors.
+             * Real Telegram / account errors.
              */
             $realErrorCount = 0;
 
@@ -213,9 +258,9 @@ final class ResolveTelegramPhoneCommand extends Command
                 'Telegram resolve failed.';
 
             /*
-             * ============================================================
-             * FIVE ATTEMPTS
-             * ============================================================
+             * ========================================================
+             * 9. FIVE ATTEMPTS
+             * ========================================================
              */
             for (
                 $attempt = 1;
@@ -223,60 +268,46 @@ final class ResolveTelegramPhoneCommand extends Command
                 $attempt++
             ) {
                 /*
-                 * ========================================================
+                 * ----------------------------------------------------
                  * CLAIM RANDOM ACCOUNT
-                 * ========================================================
+                 * ----------------------------------------------------
                  */
-                $account =
-                    $processService
-                        ->claimRandomAvailableAccount(
-                            TelegramAccountProcessEnum::ResolverPhone,
-                            $usedAccountIds,
-                        );
+                $account = $processService
+                    ->claimRandomAvailableAccount(
+                        TelegramAccountProcessEnum::ResolverPhone,
+                        $usedAccountIds,
+                    );
 
                 /*
-                 * ========================================================
-                 * NO ACCOUNT
-                 * ========================================================
-                 *
-                 * No notification.
-                 *
-                 * Just finish this check with an explicit
-                 * resolver_unavailable result.
+                 * ----------------------------------------------------
+                 * NO ACCOUNT AVAILABLE
+                 * ----------------------------------------------------
                  */
-                if (!$account) {
+                if (! $account) {
                     $message =
                         'Resolver accounts are unavailable.';
 
                     $telegramRaw =
-                        $this->getTelegramRaw(
-                            $check,
-                        );
+                        $this->getTelegramRaw($check);
 
-                    $telegramRaw[
-                        'resolver_result'
-                    ] =
+                    $telegramRaw['resolver_result'] =
                         'resolver_unavailable';
 
                     $telegramRaw[
                         'resolver_unavailable_at_attempt'
-                    ] =
-                        $attempt;
+                    ] = $attempt;
 
                     $telegramRaw[
                         'resolver_used_account_ids'
-                    ] =
-                        $usedAccountIds;
+                    ] = $usedAccountIds;
 
                     $telegramRaw[
                         'resolver_not_registered_count'
-                    ] =
-                        $notRegisteredCount;
+                    ] = $notRegisteredCount;
 
                     $telegramRaw[
                         'resolver_real_error_count'
-                    ] =
-                        $realErrorCount;
+                    ] = $realErrorCount;
 
                     $check->update([
                         'status' =>
@@ -290,6 +321,14 @@ final class ResolveTelegramPhoneCommand extends Command
 
                         'checked_at' =>
                             now(),
+                    ]);
+
+                    /*
+                     * Current driver state.
+                     */
+                    $check->driver?->update([
+                        'status' =>
+                            'not_confirmed',
                     ]);
 
                     Log::warning(
@@ -312,49 +351,40 @@ final class ResolveTelegramPhoneCommand extends Command
                     return self::SUCCESS;
                 }
 
-                $accountId =
-                    (int) $account->id;
+                $accountId = (int) $account->id;
 
                 /*
-                 * Account can never be reused in this check.
+                 * Account cannot be reused in this check.
                  */
-                $usedAccountIds[] =
-                    $accountId;
+                $usedAccountIds[] = $accountId;
 
-                $usedAccountIds =
-                    array_values(
-                        array_unique(
-                            $usedAccountIds,
-                        ),
-                    );
+                $usedAccountIds = array_values(
+                    array_unique(
+                        $usedAccountIds,
+                    ),
+                );
 
                 /*
-                 * Save current attempt information.
+                 * Save current attempt state.
                  */
                 $telegramRaw =
-                    $this->getTelegramRaw(
-                        $check,
-                    );
+                    $this->getTelegramRaw($check);
 
                 $telegramRaw[
                     'resolver_current_attempt'
-                ] =
-                    $attempt;
+                ] = $attempt;
 
                 $telegramRaw[
                     'resolver_last_account_id'
-                ] =
-                    $accountId;
+                ] = $accountId;
 
                 $telegramRaw[
                     'resolver_last_account_phone'
-                ] =
-                    $account->phone;
+                ] = $account->phone;
 
                 $telegramRaw[
                     'resolver_attempt_account_ids'
-                ] =
-                    $usedAccountIds;
+                ] = $usedAccountIds;
 
                 $check->update([
                     'attempts' =>
@@ -368,9 +398,9 @@ final class ResolveTelegramPhoneCommand extends Command
 
                 try {
                     /*
-                     * ====================================================
+                     * ------------------------------------------------
                      * START MADELINE
-                     * ====================================================
+                     * ------------------------------------------------
                      */
                     $this->info(
                         sprintf(
@@ -406,16 +436,16 @@ final class ResolveTelegramPhoneCommand extends Command
                             $account,
                         );
 
-                    if (!$api) {
+                    if (! $api) {
                         throw new \RuntimeException(
                             'Failed to start MadelineProto.',
                         );
                     }
 
                     /*
-                     * ====================================================
+                     * ------------------------------------------------
                      * RESOLVE PHONE
-                     * ====================================================
+                     * ------------------------------------------------
                      */
                     $result =
                         $resolver->resolve(
@@ -466,24 +496,19 @@ final class ResolveTelegramPhoneCommand extends Command
                     );
 
                     /*
-                     * ====================================================
+                     * ------------------------------------------------
                      * SAVE ATTEMPT HISTORY
-                     * ====================================================
+                     * ------------------------------------------------
                      */
                     $telegramRaw =
-                        $this->getTelegramRaw(
-                            $check,
-                        );
+                        $this->getTelegramRaw($check);
 
                     $attemptHistory =
                         $telegramRaw[
                             'resolver_attempts'
-                        ]
-                        ?? [];
+                        ] ?? [];
 
-                    if (!is_array(
-                        $attemptHistory,
-                    )) {
+                    if (! is_array($attemptHistory)) {
                         $attemptHistory = [];
                     }
 
@@ -512,8 +537,7 @@ final class ResolveTelegramPhoneCommand extends Command
 
                     $telegramRaw[
                         'resolver_attempts'
-                    ] =
-                        $attemptHistory;
+                    ] = $attemptHistory;
 
                     $check->update([
                         'telegram_raw' =>
@@ -521,38 +545,31 @@ final class ResolveTelegramPhoneCommand extends Command
                     ]);
 
                     /*
-                     * ====================================================
-                     * NOT REGISTERED
-                     * ====================================================
+                     * ------------------------------------------------
+                     * PHONE NOT REGISTERED
+                     * ------------------------------------------------
                      *
-                     * VERY IMPORTANT:
-                     *
-                     * This does NOT mean resolver account is broken.
+                     * This is NOT a broken account.
                      */
                     if (
-                        !$success
+                        ! $success
                         &&
-                        $reason ===
-                            'telegram_not_registered'
+                        $reason === 'telegram_not_registered'
                     ) {
                         $notRegisteredCount++;
 
-                        $processService
-                            ->registerNotFound(
-                                $account,
-                                TelegramAccountProcessEnum::ResolverPhone,
-                                $reason,
-                            );
+                        $processService->registerNotFound(
+                            $account,
+                            TelegramAccountProcessEnum::ResolverPhone,
+                            $reason,
+                        );
 
                         $telegramRaw =
-                            $this->getTelegramRaw(
-                                $check,
-                            );
+                            $this->getTelegramRaw($check);
 
                         $telegramRaw[
                             'resolver_not_registered_count'
-                        ] =
-                            $notRegisteredCount;
+                        ] = $notRegisteredCount;
 
                         $check->update([
                             'telegram_raw' =>
@@ -568,18 +585,15 @@ final class ResolveTelegramPhoneCommand extends Command
                             ),
                         );
 
-                        /*
-                         * Next random account.
-                         */
                         continue;
                     }
 
                     /*
-                     * ====================================================
-                     * REAL ACCOUNT / TELEGRAM ERROR
-                     * ====================================================
+                     * ------------------------------------------------
+                     * REAL TELEGRAM / ACCOUNT ERROR
+                     * ------------------------------------------------
                      */
-                    if (!$success) {
+                    if (! $success) {
                         $realErrorCount++;
 
                         $lastError =
@@ -589,12 +603,11 @@ final class ResolveTelegramPhoneCommand extends Command
                             );
 
                         $state =
-                            $processService
-                                ->registerFailure(
-                                    $account,
-                                    TelegramAccountProcessEnum::ResolverPhone,
-                                    $reason,
-                                );
+                            $processService->registerFailure(
+                                $account,
+                                TelegramAccountProcessEnum::ResolverPhone,
+                                $reason,
+                            );
 
                         Log::warning(
                             'Telegram resolver account failure',
@@ -632,27 +645,25 @@ final class ResolveTelegramPhoneCommand extends Command
                     }
 
                     /*
-                     * ====================================================
+                     * ------------------------------------------------
                      * SUCCESS BUT USER IS MISSING
-                     * ====================================================
+                     * ------------------------------------------------
                      */
                     $user =
-                        $result['user']
-                        ?? null;
+                        $result['user'] ?? null;
 
-                    if (!$user) {
+                    if (! $user) {
                         $realErrorCount++;
 
                         $lastError =
                             'Telegram returned no user.';
 
                         $state =
-                            $processService
-                                ->registerFailure(
-                                    $account,
-                                    TelegramAccountProcessEnum::ResolverPhone,
-                                    'telegram_user_missing',
-                                );
+                            $processService->registerFailure(
+                                $account,
+                                TelegramAccountProcessEnum::ResolverPhone,
+                                'telegram_user_missing',
+                            );
 
                         Log::warning(
                             'Telegram resolver returned no user',
@@ -678,9 +689,9 @@ final class ResolveTelegramPhoneCommand extends Command
                     }
 
                     /*
-                     * ====================================================
-                     * EXTRACT USER
-                     * ====================================================
+                     * ------------------------------------------------
+                     * EXTRACT TELEGRAM USER
+                     * ------------------------------------------------
                      */
                     $telegramUserId =
                         isset($user['id'])
@@ -700,9 +711,9 @@ final class ResolveTelegramPhoneCommand extends Command
                         ?? null;
 
                     /*
-                     * ====================================================
+                     * ------------------------------------------------
                      * SAVE RESOLVED PHONE
-                     * ====================================================
+                     * ------------------------------------------------
                      */
                     $resolvedPhone =
                         TelegramResolvedPhone::query()
@@ -731,67 +742,63 @@ final class ResolveTelegramPhoneCommand extends Command
                                     'telegram_account_id' =>
                                         $accountId,
 
+                                    /*
+                                     * NEW MODEL RELATION
+                                     */
+                                    'driver_id' =>
+                                        $check->driver_id,
+
                                     'resolved_at' =>
                                         now(),
                                 ],
                             );
 
                     /*
-                     * ====================================================
+                     * ------------------------------------------------
                      * ACCOUNT SUCCESS
-                     * ====================================================
+                     * ------------------------------------------------
                      */
                     $state =
-                        $processService
-                            ->registerSuccess(
-                                $account,
-                                TelegramAccountProcessEnum::ResolverPhone,
-                            );
+                        $processService->registerSuccess(
+                            $account,
+                            TelegramAccountProcessEnum::ResolverPhone,
+                        );
 
                     /*
-                     * ====================================================
-                     * SAVE RESULT
-                     * ====================================================
+                     * ------------------------------------------------
+                     * SAVE RESOLVER RESULT
+                     * ------------------------------------------------
                      */
                     $telegramRaw =
-                        $this->getTelegramRaw(
-                            $check,
-                        );
+                        $this->getTelegramRaw($check);
 
                     $telegramRaw[
                         'resolver_result'
-                    ] =
-                        'registered';
+                    ] = 'registered';
 
                     $telegramRaw[
                         'resolver_success_attempt'
-                    ] =
-                        $attempt;
+                    ] = $attempt;
 
                     $telegramRaw[
                         'resolver_success_account_id'
-                    ] =
-                        $accountId;
+                    ] = $accountId;
 
                     $telegramRaw[
                         'resolver_not_registered_count'
-                    ] =
-                        $notRegisteredCount;
+                    ] = $notRegisteredCount;
 
                     $telegramRaw[
                         'resolver_real_error_count'
-                    ] =
-                        $realErrorCount;
+                    ] = $realErrorCount;
 
                     $telegramRaw[
                         'resolver_success_account_failures'
-                    ] =
-                        $state->failures;
+                    ] = $state->failures;
 
                     $telegramRaw[
                         'resolver_success_account_consecutive_failures'
-                    ] =
-                        $state->consecutive_failures;
+                    ] = $state->consecutive_failures;
 
                     $check->update([
                         'telegram_raw' =>
@@ -822,21 +829,22 @@ final class ResolveTelegramPhoneCommand extends Command
                     );
 
                     /*
-                     * Name matching + final status.
+                     * ------------------------------------------------
+                     * NAME MATCH + FINAL STATUS
+                     * ------------------------------------------------
                      */
                     $this->applyResolvedPhone(
-                        $check,
-                        $resolvedPhone,
-                        $nameMatcher,
+                        check: $check,
+                        resolvedPhone: $resolvedPhone,
+                        nameMatcher: $nameMatcher,
                     );
 
                     return self::SUCCESS;
-
                 } catch (Throwable $e) {
                     /*
-                     * ====================================================
+                     * ------------------------------------------------
                      * ATTEMPT EXCEPTION
-                     * ====================================================
+                     * ------------------------------------------------
                      */
                     $realErrorCount++;
 
@@ -848,12 +856,11 @@ final class ResolveTelegramPhoneCommand extends Command
                         );
 
                     $state =
-                        $processService
-                            ->registerFailure(
-                                $account,
-                                TelegramAccountProcessEnum::ResolverPhone,
-                                'command_exception',
-                            );
+                        $processService->registerFailure(
+                            $account,
+                            TelegramAccountProcessEnum::ResolverPhone,
+                            'command_exception',
+                        );
 
                     Log::error(
                         'Telegram resolver attempt exception',
@@ -887,16 +894,12 @@ final class ResolveTelegramPhoneCommand extends Command
                         ],
                     );
 
-                    /*
-                     * Continue with another account.
-                     */
                     continue;
-
                 } finally {
                     /*
-                     * ====================================================
+                     * ------------------------------------------------
                      * STOP MADELINE
-                     * ====================================================
+                     * ------------------------------------------------
                      */
                     if ($api) {
                         try {
@@ -939,9 +942,9 @@ final class ResolveTelegramPhoneCommand extends Command
                     }
 
                     /*
-                     * ====================================================
+                     * ------------------------------------------------
                      * RELEASE ACCOUNT
-                     * ====================================================
+                     * ------------------------------------------------
                      */
                     $processService->release(
                         $account,
@@ -951,16 +954,14 @@ final class ResolveTelegramPhoneCommand extends Command
             }
 
             /*
-             * ============================================================
-             * FIVE ATTEMPTS FINISHED
-             * ============================================================
+             * ========================================================
+             * 10. ALL ATTEMPTS FINISHED
+             * ========================================================
              */
             $check->refresh();
 
             $telegramRaw =
-                $this->getTelegramRaw(
-                    $check,
-                );
+                $this->getTelegramRaw($check);
 
             $telegramRaw[
                 'resolver_finished'
@@ -968,23 +969,20 @@ final class ResolveTelegramPhoneCommand extends Command
 
             $telegramRaw[
                 'resolver_attempts_count'
-            ] =
-                self::MAX_ATTEMPTS;
+            ] = self::MAX_ATTEMPTS;
 
             $telegramRaw[
                 'resolver_not_registered_count'
-            ] =
-                $notRegisteredCount;
+            ] = $notRegisteredCount;
 
             $telegramRaw[
                 'resolver_real_error_count'
-            ] =
-                $realErrorCount;
+            ] = $realErrorCount;
 
             /*
-             * ============================================================
-             * ALL FIVE = NOT REGISTERED
-             * ============================================================
+             * ========================================================
+             * 11. ALL FIVE = PHONE NOT REGISTERED
+             * ========================================================
              */
             if (
                 $notRegisteredCount ===
@@ -992,8 +990,7 @@ final class ResolveTelegramPhoneCommand extends Command
             ) {
                 $telegramRaw[
                     'resolver_result'
-                ] =
-                    'phone_not_registered';
+                ] = 'phone_not_registered';
 
                 $check->update([
                     'status' =>
@@ -1009,6 +1006,14 @@ final class ResolveTelegramPhoneCommand extends Command
                         now(),
                 ]);
 
+                /*
+                 * Current driver state.
+                 */
+                $check->driver?->update([
+                    'status' =>
+                        'not_confirmed',
+                ]);
+
                 $this->warn(
                     "❌ {$check->phone_normalized} "
                     . 'is NOT REGISTERED on Telegram.',
@@ -1018,19 +1023,17 @@ final class ResolveTelegramPhoneCommand extends Command
             }
 
             /*
-             * ============================================================
-             * SOME REAL ERRORS
-             * ============================================================
+             * ========================================================
+             * 12. RESOLVER FAILED
+             * ========================================================
              */
             $telegramRaw[
                 'resolver_result'
-            ] =
-                'resolver_failed_without_match';
+            ] = 'resolver_failed_without_match';
 
             $telegramRaw[
                 'resolver_error'
-            ] =
-                $lastError;
+            ] = $lastError;
 
             $check->update([
                 'status' =>
@@ -1044,6 +1047,14 @@ final class ResolveTelegramPhoneCommand extends Command
 
                 'checked_at' =>
                     now(),
+            ]);
+
+            /*
+             * Current driver state.
+             */
+            $check->driver?->update([
+                'status' =>
+                    'not_confirmed',
             ]);
 
             Log::warning(
@@ -1073,12 +1084,11 @@ final class ResolveTelegramPhoneCommand extends Command
             );
 
             return self::FAILURE;
-
         } catch (Throwable $e) {
             /*
-             * ============================================================
-             * GLOBAL ERROR
-             * ============================================================
+             * ========================================================
+             * 13. GLOBAL ERROR
+             * ========================================================
              */
             $error =
                 mb_substr(
@@ -1110,14 +1120,11 @@ final class ResolveTelegramPhoneCommand extends Command
             $check->refresh();
 
             $telegramRaw =
-                $this->getTelegramRaw(
-                    $check,
-                );
+                $this->getTelegramRaw($check);
 
             $telegramRaw[
                 'resolver_result'
-            ] =
-                'command_failed';
+            ] = 'command_failed';
 
             $check->update([
                 'status' =>
@@ -1133,6 +1140,14 @@ final class ResolveTelegramPhoneCommand extends Command
                     now(),
             ]);
 
+            /*
+             * Current driver state.
+             */
+            $check->driver?->update([
+                'status' =>
+                    'not_confirmed',
+            ]);
+
             return self::FAILURE;
         }
     }
@@ -1143,8 +1158,7 @@ final class ResolveTelegramPhoneCommand extends Command
     private function getTelegramRaw(
         TelegramDriverCheck $check,
     ): array {
-        $raw =
-            $check->telegram_raw;
+        $raw = $check->telegram_raw;
 
         if (is_array($raw)) {
             return $raw;
@@ -1154,11 +1168,10 @@ final class ResolveTelegramPhoneCommand extends Command
             is_string($raw)
             && $raw !== ''
         ) {
-            $decoded =
-                json_decode(
-                    $raw,
-                    true,
-                );
+            $decoded = json_decode(
+                $raw,
+                true,
+            );
 
             if (is_array($decoded)) {
                 return $decoded;
@@ -1171,7 +1184,7 @@ final class ResolveTelegramPhoneCommand extends Command
     /**
      * Apply resolved Telegram user to check.
      *
-     * Then run name matching.
+     * Also updates current TelegramDriver status.
      */
     private function applyResolvedPhone(
         TelegramDriverCheck $check,
@@ -1179,26 +1192,27 @@ final class ResolveTelegramPhoneCommand extends Command
         TelegramNameMatcher $nameMatcher,
     ): void {
         $telegramRaw =
-            $resolvedPhone->telegram_raw
-            ?? [];
-
-        if (!is_array(
-            $telegramRaw,
-        )) {
-            $telegramRaw = [];
-        }
+            $this->getTelegramRaw(
+                $check,
+            );
 
         $telegramRaw[
             'resolved_from_cache'
-        ] =
-            false;
+        ] = false;
 
         $telegramRaw[
             'resolved_phone_id'
-        ] =
-            $resolvedPhone->id;
+        ] = $resolvedPhone->id;
 
+        /*
+         * ------------------------------------------------------------
+         * Telegram data → Check
+         * ------------------------------------------------------------
+         */
         $check->update([
+            'telegram_resolved_phone_id' =>
+                $resolvedPhone->id,
+
             'telegram_user_id' =>
                 $resolvedPhone->telegram_user_id,
 
@@ -1219,26 +1233,34 @@ final class ResolveTelegramPhoneCommand extends Command
         ]);
 
         /*
-         * Name matching.
+         * ------------------------------------------------------------
+         * Name matching
+         * ------------------------------------------------------------
          */
-        $match =
-            $nameMatcher->match(
-                $check->driver_name,
-                $resolvedPhone->telegram_first_name,
-                $resolvedPhone->telegram_last_name,
-            );
+        $match = $nameMatcher->match(
+            $check->driver_name,
+            $resolvedPhone->telegram_first_name,
+            $resolvedPhone->telegram_last_name,
+        );
 
         $telegramRaw[
             'name_match'
-        ] =
-            $match;
+        ] = $match;
 
+        $matched =
+            (bool) ($match['matched'] ?? false);
+
+        /*
+         * ------------------------------------------------------------
+         * Check = history/result
+         * ------------------------------------------------------------
+         */
         $check->update([
             'telegram_raw' =>
                 $telegramRaw,
 
             'status' =>
-                ($match['matched'] ?? false)
+                $matched
                     ? TelegramDriverCheckStatus::Confirmed
                     : TelegramDriverCheckStatus::NotConfirmed,
 
@@ -1246,9 +1268,19 @@ final class ResolveTelegramPhoneCommand extends Command
                 now(),
         ]);
 
-        if (
-            $match['matched'] ?? false
-        ) {
+        /*
+         * ------------------------------------------------------------
+         * Driver = CURRENT STATE
+         * ------------------------------------------------------------
+         */
+        $check->driver?->update([
+            'status' =>
+                $matched
+                    ? 'confirmed'
+                    : 'not_confirmed',
+        ]);
+
+        if ($matched) {
             $this->info(
                 "✅ Check #{$check->id} confirmed.",
             );
