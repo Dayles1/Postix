@@ -7,91 +7,181 @@ use Illuminate\Support\Facades\Auth;
 
 class MenuHelper
 {
-    public static function getDepartmentItems(int $deptId, ?string $userRole = null, bool $isBanned = false): array
-{
-    $isSuperAdmin = $userRole === 'superadmin';
-    $department = Department::with('users')->find($deptId);
+    public static function getDepartmentItems(
+        int $deptId,
+        ?string $userRole = null,
+        bool $isBanned = false
+    ): array {
+        $isSuperAdmin = $userRole === 'superadmin';
 
-    $base = $isSuperAdmin ? "/departments/{$deptId}" : '';
+        $department = Department::with('users')
+            ->find($deptId);
 
-    $items = [
-        [
-            'icon' => 'department',
-            'name' => __('messages.admin.main'),
-            'path' => $isSuperAdmin ? $base : '/',
-        ],
-    ];
+        $base = $isSuperAdmin
+            ? "/departments/{$deptId}"
+            : '';
 
-    if ($isBanned || !$department) {
+        $items = [
+            [
+                'icon' => 'department',
+                'name' => __('messages.admin.main'),
+                'path' => $isSuperAdmin
+                    ? $base
+                    : '/',
+            ],
+        ];
+
+        if ($isBanned || !$department) {
+            return $items;
+        }
+
+        $items[] = [
+            'icon' => 'catalog',
+            'name' => __('messages.catalogs.title'),
+            'path' => $base . '/catalogs',
+        ];
+
+        if ($userRole === 'user') {
+            $items[] = [
+                'icon' => 'send',
+                'name' => __('messages.sendm'),
+                'path' => $base . '/send-messages',
+            ];
+        } else {
+            if ($department->type === 'user') {
+                $user = $department->users->first();
+
+                if ($user) {
+                    $items[] = [
+                        'icon' => 'user-profile',
+                        'name' => $user->name,
+                        'path' => "/profile/{$user->id}",
+                    ];
+                }
+            } else {
+                $items[] = [
+                    'icon' => 'user-profile',
+                    'name' => __('messages.admin.users'),
+                    'path' => $base . '/users',
+                ];
+            }
+        }
+
+        $items[] = [
+            'icon' => 'statistics',
+            'name' => __('messages.statistics'),
+            'path' => $base . '/history',
+        ];
+
         return $items;
     }
 
-    $items[] = [
-        'icon' => 'catalog',
-        'name' => __('messages.catalogs.title'),
-        'path' => $base . '/catalogs',
-    ];
-
-    if ($userRole === 'user') {
-        $items[] = [
-            'icon' => 'send',
-            'name' => __('messages.sendm'),
-            'path' => $base . '/send-messages',
-        ];
-    } else {
-        if ($department->type === 'user') {
-            $user = $department->users->first();
-
-            if ($user) {
-                $items[] = [
-                    'icon' => 'user-profile',
-                    'name' => $user->name,
-                    'path' => "/profile/{$user->id}",
-                ];
-            }
-        } else {
-            $items[] = [
+    /**
+     * Menu for driverCheck role.
+     *
+     * This role works independently from departments.
+     */
+    public static function getDriverCheckItems(): array
+    {
+        return [
+            [
+                'icon' => 'dashboard',
+                'name' => 'Главная',
+                'path' => '/driver-check',
+            ],
+            [
+                'icon' => 'operation',
+                'name' => 'Операторы',
+                'path' => '/driver-check/operation-users',
+            ],
+            [
                 'icon' => 'user-profile',
-                'name' => __('messages.admin.users'),
-                'path' => $base . '/users',
-            ];
-        }
+                'name' => 'Водители',
+                'path' => '/driver-check/drivers',
+            ],
+            [
+                'icon' => 'chat',
+                'name' => 'Telegram',
+                'path' => '/driver-check/resolved-phones',
+            ],
+        ];
     }
 
-    $items[] = [
-        'icon' => 'statistics',
-        'name' => __('messages.statistics'),
-        'path' => $base . '/history',
-    ];
-
-    return $items;
-}
-    public static function getMenuGroups($department = null): array
-    {
+    public static function getMenuGroups(
+        $department = null
+    ): array {
         $user = Auth::user();
+
+        if (!$user) {
+            return [];
+        }
+
+        /*
+         * =============================================================
+         * DRIVER CHECK
+         * =============================================================
+         *
+         * Completely independent from department.
+         *
+         * IMPORTANT:
+         * This branch is only for driverCheck role.
+         * All existing roles continue below unchanged.
+         */
+        if (
+            ($user->role->name ?? null)
+            === 'driverCheck'
+        ) {
+            return [
+                [
+                    'title' => 'Проверка водителей',
+                    'items' => self::getDriverCheckItems(),
+                ],
+            ];
+        }
+
+        /*
+         * =============================================================
+         * EXISTING MENU
+         * =============================================================
+         */
+
         $menu = [];
         $dept = null;
+
         if ($department) {
             $dept = is_numeric($department)
-                ? (object)['id' => (int)$department, 'name' => null, 'isActiveBanned' => fn() => false]
+                ? (object) [
+                    'id' => (int) $department,
+                    'name' => null,
+                    'isActiveBanned' => fn () => false,
+                ]
                 : $department;
         } elseif (isset($user->department)) {
             $dept = $user->department;
         }
 
         if ($dept) {
+            $isSuperAdmin =
+                ($user->role->name ?? null)
+                === 'superadmin';
 
-            $isSuperAdmin = ($user->role->name ?? null) === 'superadmin';
+            $hideSend =
+                (
+                    !$isSuperAdmin
+                    && method_exists(
+                        $dept,
+                        'isActiveBanned'
+                    )
+                )
+                    ? $dept->isActiveBanned()
+                    : false;
 
-            $hideSend = (!$isSuperAdmin && method_exists($dept, 'isActiveBanned'))
-                ? $dept->isActiveBanned()
-                : false;
-
-            $deptItems = self::getDepartmentItems(
-                $dept->id,
-                $user->role->name ?? null,
-                $hideSend
-            );
+            $deptItems =
+                self::getDepartmentItems(
+                    $dept->id,
+                    $user->role->name ?? null,
+                    $hideSend
+                );
 
             $menu[] = [
                 'title' => 'Others',
@@ -101,13 +191,23 @@ class MenuHelper
 
         return $menu;
     }
-    public static function hasSidebar($department = null): bool
-    {
-        return !empty(self::getMenuGroups($department));
+
+    public static function hasSidebar(
+        $department = null
+    ): bool {
+        return !empty(
+            self::getMenuGroups(
+                $department
+            )
+        );
     }
-    public static function isActive($path)
-    {
-        return request()->is(ltrim($path, '/'));
+
+    public static function isActive(
+        $path
+    ): bool {
+        return request()->is(
+            ltrim($path, '/')
+        );
     }
 
     public static function getIconSvg($iconName)
@@ -119,7 +219,6 @@ class MenuHelper
             'statistics' => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13V19C3 19.5523 3.44772 20 4 20H8C8.55228 20 9 19.5523 9 19V13C9 12.4477 8.55228 12 8 12H4C3.44772 12 3 12.4477 3 13Z" /><path d="M15 9V19C15 19.5523 15.4477 20 16 20H20C20.5523 20 21 19.5523 21 19V9C21 8.44772 20.5523 8 20 8H16C15.4477 8 15 8.44772 15 9Z" /><path d="M9 5V19C9 19.5523 9.44772 20 10 20H14C14.5523 20 15 19.5523 15 19V5C15 4.44772 14.5523 4 14 4H10C9.44772 4 9 4.44772 9 5Z" /></svg>',
             'history' => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 8V12L14.5 14.5M12 4C7.03125 4 3 8.03125 3 13C3 17.9688 7.03125 22 12 22C16.9688 22 21 17.9688 21 13H19C19 17.4183 15.4183 21 12 21C8.58172 21 5 17.4183 5 13C5 8.58172 8.58172 5 12 5V4Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
             'operation' => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 6H20M4 12H20M4 18H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-            'department' => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="7" width="18" height="14" stroke="currentColor" stroke-width="1.5"/><path d="M3 11H21M3 15H21" stroke="currentColor" stroke-width="1.5"/><rect x="10" y="16" width="4" height="5" fill="currentColor"/></svg>',
             'department' => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="8" width="18" height="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 8V5H11V8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 8V5H17V8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 16H8V12H12V16Z" fill="currentColor"/></svg>',
             'import' => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3V15M12 15L8 11M12 15L16 11M4 21H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
             'export' => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 21V9M12 9L8 13M12 9L16 13M4 3H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',

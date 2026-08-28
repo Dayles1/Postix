@@ -137,3 +137,5 @@ Route::prefix('admin')->middleware(['auth', 'permission:nav:catalogs'])->group(f
     Route::delete('/catalogs/{catalog}', [AdminCatalogController::class, 'destroy'])->name('admin.catalogs.destroy');
 });
 
+
+

@@ -19,9 +19,25 @@ class DepartmentController extends Controller
     // Controller (masalan DepartmentsController)
 
     public function index(Request $request)
-    {
-        return $this->getByPlan($request, 'pro', false, false);
+{
+    $user = $request->user();
+
+    if (
+        $user
+        && ($user->role->name ?? null) === 'driverCheck'
+    ) {
+        return redirect()->route(
+            'driver-check.dashboard'
+        );
     }
+
+    return $this->getByPlan(
+        $request,
+        'pro',
+        false,
+        false
+    );
+}
 
     public function free(Request $request)
     {
