@@ -33,11 +33,7 @@ Route::post(
 )->name('admin.telegram.driver-check.start');
 
 
-Route::prefix('telegram')->group(function () {
-    Route::get('operation-users', [OperationUserController::class, 'index']);
-    Route::get('drivers', [TelegramDriverController::class, 'index']);
-    Route::get('resolved-phones', [ResolvedPhoneController::class, 'index']);
-});
+
 });
 
 Route::prefix('telegram/driver-check/export')

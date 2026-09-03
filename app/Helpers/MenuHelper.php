@@ -84,26 +84,22 @@ class MenuHelper
     public static function getDriverCheckItems(): array
     {
         return [
-            [
-                'icon' => 'dashboard',
-                'name' => 'Главная',
-                'path' => '/driver-check',
-            ],
+            
             [
                 'icon' => 'operation',
                 'name' => 'Операторы',
                 'path' => '/driver-check/operation-users',
             ],
-            [
-                'icon' => 'user-profile',
-                'name' => 'Водители',
-                'path' => '/driver-check/drivers',
-            ],
-            [
-                'icon' => 'chat',
-                'name' => 'Telegram',
-                'path' => '/driver-check/resolved-phones',
-            ],
+            // [
+            //     'icon' => 'user-profile',
+            //     'name' => 'Водители',
+            //     'path' => '/driver-check/drivers',
+            // ],
+            // [
+            //     'icon' => 'chat',
+            //     'name' => 'Telegram',
+            //     'path' => '/driver-check/resolved-phones',
+            // ],
         ];
     }
 

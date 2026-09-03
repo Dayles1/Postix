@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Controllers\Api\Telegram\OperationUserController;
+use App\Http\Controllers\Api\Telegram\ResolvedPhoneController;
+use App\Http\Controllers\Api\Telegram\TelegramDriverController;
 use App\Http\Controllers\ExternalApi\WareHouseController;
 use App\Http\Controllers\LogController;
 use App\Http\Controllers\View\Admin\CatalogController as AdminCatalogController;
@@ -11,6 +14,7 @@ use App\Http\Controllers\View\CatalogController;
 use App\Http\Controllers\View\Department\DepartmentController;
 use App\Http\Controllers\View\Department\UserDepartmenIndexController;
 use App\Http\Controllers\View\Department\UserDepartmentController;
+use App\Http\Controllers\View\DriverCheck\DriverCheckController;
 use App\Http\Controllers\View\MessageGroupController;
 use App\Http\Controllers\View\Messages\ShowController;
 use App\Http\Controllers\View\ProfileController;
@@ -138,4 +142,93 @@ Route::prefix('admin')->middleware(['auth', 'permission:nav:catalogs'])->group(f
 });
 
 
+Route::middleware(['auth'])
+    ->prefix('driver-check')
+    ->group(function () {
 
+        /*
+         * /driver-check
+         * Redirect to the first page.
+         */
+        Route::get('/', function () {
+            return redirect()->route(
+                'driver-check.operation-users'
+            );
+        })->name('driver-check.dashboard');
+
+        /*
+         * Operation Users
+         */
+        Route::get(
+            '/operation-users',
+            [DriverCheckController::class, 'operationUsers']
+        )->name('driver-check.operation-users');
+
+        Route::get(
+            '/operation-users/{operationUser}',
+            [DriverCheckController::class, 'operationUser']
+        )->name('driver-check.operation-user');
+        /*
+         * Drivers
+         */
+        Route::get(
+            '/drivers',
+            [DriverCheckController::class, 'drivers']
+        )->name('driver-check.drivers');
+
+        /*
+         * Resolved Phones
+         */
+        Route::get(
+            '/resolved-phones',
+            [DriverCheckController::class, 'resolvedPhones']
+        )->name('driver-check.resolved-phones');
+    });
+
+
+/*
+|--------------------------------------------------------------------------
+| Driver Check Data API
+|--------------------------------------------------------------------------
+|
+| Pages fetch data from these endpoints.
+|
+*/
+
+Route::middleware(['auth'])
+    ->prefix('api/telegram')
+    ->group(function () {
+
+        /*
+         * Operation Users
+         */
+        Route::get(
+            '/operation-users',
+            [OperationUserController::class, 'index']
+        )->name('api.telegram.operation-users');
+
+        Route::get(
+            '/operation-users/{operationUser}',
+            [OperationUserController::class, 'show']
+        )->name('api.telegram.operation-users.show');
+        Route::get(
+    '/operation-users/{operationUser}/drivers',
+    [OperationUserController::class, 'drivers']
+)->name('api.telegram.operation-users.drivers');
+        /*
+         * Drivers
+         */
+        Route::get(
+            '/drivers',
+            [TelegramDriverController::class, 'index']
+        )->name('api.telegram.drivers');
+
+        /*
+         * Resolved Phones
+         */
+        Route::get(
+            '/resolved-phones',
+            [ResolvedPhoneController::class, 'index']
+        )->name('api.telegram.resolved-phones');
+    });
+    

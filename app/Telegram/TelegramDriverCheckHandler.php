@@ -184,9 +184,7 @@ public function cron(): void
             $this->targetChatId,
         );
 
-        Log::info(
-            'TelegramDriverCheckHandler: ProcessTelegramDriverCheckResults done',
-        );
+        
 
         app(
             NotifyTelegramResolverExhaustion::class,

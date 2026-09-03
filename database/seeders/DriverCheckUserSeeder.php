@@ -21,7 +21,7 @@ class DriverCheckUserSeeder extends Seeder
             'name' => 'driverCheck',
         ]);
 
-        User::firstOrCreate(
+        User::updateOrCreate(
             [
                 'email' => 'driverCheck@gmail.com',
             ],
