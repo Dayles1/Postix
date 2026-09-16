@@ -11,7 +11,7 @@ class TelegramWatchdogCommand extends Command
 {
     protected $signature = 'telegram:watchdog
                             {--delay=10 : Delay before restart in seconds}
-                            {--max-restarts=5 : Maximum restarts, 0 = unlimited}';
+                            {--max-restarts=500 : Maximum restarts, 0 = unlimited}';
 
     protected $description = 'Watch Telegram driver check listener and restart it when stopped';
 
@@ -115,7 +115,7 @@ class TelegramWatchdogCommand extends Command
 
             $this->warn(
                 "⚠️ telegram:start-loop stopped. Exit code: "
-                . ($exitCode ?? 'null')
+                    . ($exitCode ?? 'null')
             );
 
             Log::warning(

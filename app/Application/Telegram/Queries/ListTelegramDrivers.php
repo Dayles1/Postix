@@ -89,7 +89,7 @@ final class ListTelegramDrivers
             'confirmed' => 'confirmed_count',
             'not_confirmed' => 'not_confirmed_count',
             'pending' => 'pending_count',
-            'avg_match_score' => 'avg_match_score',
+            // 'avg_match_score' => 'avg_match_score',
             'best_match_score' => 'best_match_score',
             'last_check_at' => 'last_check_at',
         ];
