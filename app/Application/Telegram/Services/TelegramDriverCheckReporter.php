@@ -451,20 +451,14 @@ final class TelegramDriverCheckReporter
         string $level,
     ): string {
         return match ($level) {
-            'exact' =>
-                'точное совпадение',
-
-            'exact_identity' =>
+            'very_strong' =>
                 'очень сильное совпадение',
 
-            'very_high' =>
-                'очень высокая',
+            'strong' =>
+                'сильное совпадение',
 
-            'high' =>
-                'высокая',
-
-            'confirmed' =>
-                'подтверждено',
+            'likely' =>
+                'вероятное совпадение',
 
             'possible' =>
                 'возможное совпадение',
@@ -472,10 +466,7 @@ final class TelegramDriverCheckReporter
             'weak' =>
                 'слабое совпадение',
 
-            'low' =>
-                'низкое совпадение',
-
-            'none' =>
+            'no_match' =>
                 'совпадений нет',
 
             'no_data' =>
