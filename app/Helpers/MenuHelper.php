@@ -31,21 +31,21 @@ class MenuHelper
             ],
         ];
 
-        if ($isBanned || !$department) {
+        if ($isBanned || ! $department) {
             return $items;
         }
 
         $items[] = [
             'icon' => 'catalog',
             'name' => __('messages.catalogs.title'),
-            'path' => $base . '/catalogs',
+            'path' => $base.'/catalogs',
         ];
 
         if ($userRole === 'user') {
             $items[] = [
                 'icon' => 'send',
                 'name' => __('messages.sendm'),
-                'path' => $base . '/send-messages',
+                'path' => $base.'/send-messages',
             ];
         } else {
             if ($department->type === 'user') {
@@ -62,7 +62,7 @@ class MenuHelper
                 $items[] = [
                     'icon' => 'user-profile',
                     'name' => __('messages.admin.users'),
-                    'path' => $base . '/users',
+                    'path' => $base.'/users',
                 ];
             }
         }
@@ -70,7 +70,7 @@ class MenuHelper
         $items[] = [
             'icon' => 'statistics',
             'name' => __('messages.statistics'),
-            'path' => $base . '/history',
+            'path' => $base.'/history',
         ];
 
         return $items;
@@ -84,22 +84,21 @@ class MenuHelper
     public static function getDriverCheckItems(): array
     {
         return [
-            
             [
                 'icon' => 'operation',
                 'name' => 'Операторы',
                 'path' => '/driver-check/operation-users',
             ],
-            // [
-            //     'icon' => 'user-profile',
-            //     'name' => 'Водители',
-            //     'path' => '/driver-check/drivers',
-            // ],
-            // [
-            //     'icon' => 'chat',
-            //     'name' => 'Telegram',
-            //     'path' => '/driver-check/resolved-phones',
-            // ],
+            [
+                'icon' => 'user-profile',
+                'name' => 'Водители',
+                'path' => '/driver-check/drivers',
+            ],
+            [
+                'icon' => 'chat',
+                'name' => 'Telegram номера',
+                'path' => '/driver-check/resolved-phones',
+            ],
         ];
     }
 
@@ -108,7 +107,7 @@ class MenuHelper
     ): array {
         $user = Auth::user();
 
-        if (!$user) {
+        if (! $user) {
             return [];
         }
 
@@ -163,7 +162,7 @@ class MenuHelper
 
             $hideSend =
                 (
-                    !$isSuperAdmin
+                    ! $isSuperAdmin
                     && method_exists(
                         $dept,
                         'isActiveBanned'
@@ -191,7 +190,7 @@ class MenuHelper
     public static function hasSidebar(
         $department = null
     ): bool {
-        return !empty(
+        return ! empty(
             self::getMenuGroups(
                 $department
             )

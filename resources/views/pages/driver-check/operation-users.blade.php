@@ -61,35 +61,81 @@
                 </div>
             </div>
 
-            <button
-                type="button"
-                @click="load()"
-                :disabled="loading"
-                class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl
-                       border border-gray-200 bg-white px-4 text-sm font-medium text-gray-700
-                       shadow-sm transition hover:-translate-y-0.5 hover:border-gray-300
-                       hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60
-                       sm:w-auto dark:border-gray-800 dark:bg-gray-900/80
-                       dark:text-gray-200 dark:hover:border-gray-700 dark:hover:bg-white/[0.05]"
-            >
-                <svg
-                    class="h-4 w-4"
-                    :class="{ 'animate-spin': loading }"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.8"
-                    aria-hidden="true"
+            <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                <button
+                    type="button"
+                    @click="load()"
+                    :disabled="loading"
+                    class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl
+                           border border-gray-200 bg-white px-4 text-sm font-medium text-gray-700
+                           shadow-sm transition hover:-translate-y-0.5 hover:border-gray-300
+                           hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60
+                           sm:w-auto dark:border-gray-800 dark:bg-gray-900/80
+                           dark:text-gray-200 dark:hover:border-gray-700 dark:hover:bg-white/[0.05]"
                 >
-                    <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9M4.582 9H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2M19.419 15H15"
-                    />
-                </svg>
+                    <svg
+                        class="h-4 w-4"
+                        :class="{ 'animate-spin': loading }"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                        aria-hidden="true"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9M4.582 9H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2M19.419 15H15"
+                        />
+                    </svg>
 
-                <span x-text="loading ? translations.loading : translations.refresh"></span>
-            </button>
+                    <span x-text="loading ? translations.loading : translations.refresh"></span>
+                </button>
+
+                {{-- Export --}}
+                <div class="relative" x-data="{ exportOpen: false }" @click.outside="exportOpen = false">
+                    <button
+                        type="button"
+                        @click="exportOpen = !exportOpen"
+                        class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl
+                               bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm
+                               shadow-emerald-600/20 transition hover:-translate-y-0.5 hover:bg-emerald-700
+                               sm:w-auto dark:bg-emerald-500 dark:hover:bg-emerald-400"
+                    >
+                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+                        </svg>
+                        {{ __('telegram.operation_users.export.title') }}
+                    </button>
+
+                    <div
+                        x-show="exportOpen"
+                        x-cloak
+                        x-transition
+                        class="absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-xl border
+                               border-gray-200 bg-white shadow-lg dark:border-gray-800 dark:bg-gray-900"
+                    >
+                        <a
+                            :href="exportUrl('operators')"
+                            class="block px-4 py-3 text-sm font-medium text-gray-700 transition
+                                   hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/[0.05]"
+                        >
+                            {{ __('telegram.operation_users.export.operators') }}
+                        </a>
+                        <a
+                            :href="exportUrl('details')"
+                            class="block border-t border-gray-100 px-4 py-3 text-sm font-medium
+                                   text-gray-700 transition hover:bg-gray-50
+                                   dark:border-gray-800 dark:text-gray-200 dark:hover:bg-white/[0.05]"
+                        >
+                            {{ __('telegram.operation_users.export.details') }}
+                        </a>
+                        <p class="border-t border-gray-100 px-4 py-2 text-[11px] text-gray-400 dark:border-gray-800 dark:text-gray-500">
+                            {{ __('telegram.operation_users.export.hint') }}
+                        </p>
+                    </div>
+                </div>
+            </div>
         </header>
 
         {{-- Summary --}}
@@ -381,6 +427,120 @@
                                    dark:border-gray-700 dark:bg-white/[0.03] dark:text-white
                                    dark:focus:border-blue-500 dark:focus:bg-white/[0.05]"
                         >
+                    </div>
+                </div>
+
+                {{-- Extra filters --}}
+                <div class="mt-4 grid grid-cols-1 gap-3 border-t border-gray-100 pt-4 sm:grid-cols-2 xl:grid-cols-4 dark:border-gray-800">
+
+                    {{-- Status --}}
+                    <div>
+                        <label class="mb-1.5 block text-xs font-medium text-gray-700 dark:text-gray-300">
+                            {{ __('telegram.operation_users.filters.status') }}
+                        </label>
+                        <select
+                            x-model="filters.status"
+                            @change="applyFilters()"
+                            class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/80 px-3
+                                   text-sm text-gray-950 outline-none transition focus:border-blue-500
+                                   dark:border-gray-700 dark:bg-white/[0.03] dark:text-white"
+                        >
+                            <option value="">{{ __('telegram.operation_users.filters.status_all') }}</option>
+                            <option value="confirmed">{{ __('telegram.operation_users.filters.confirmed') }}</option>
+                            <option value="not_confirmed">{{ __('telegram.operation_users.filters.not_confirmed') }}</option>
+                            <option value="pending">{{ __('telegram.operation_users.filters.pending') }}</option>
+                            <option value="processing">{{ __('telegram.operation_users.filters.processing') }}</option>
+                        </select>
+                    </div>
+
+                    {{-- Has telegram / driver --}}
+                    <div>
+                        <label class="mb-1.5 block text-xs font-medium text-gray-700 dark:text-gray-300">
+                            {{ __('telegram.operation_users.filters.has_driver') }}
+                        </label>
+                        <select
+                            x-model="filters.has_driver"
+                            @change="applyFilters()"
+                            class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/80 px-3
+                                   text-sm text-gray-950 outline-none transition focus:border-blue-500
+                                   dark:border-gray-700 dark:bg-white/[0.03] dark:text-white"
+                        >
+                            <option value="">{{ __('telegram.operation_users.filters.any') }}</option>
+                            <option value="1">{{ __('telegram.operation_users.filters.yes') }}</option>
+                            <option value="0">{{ __('telegram.operation_users.filters.no') }}</option>
+                        </select>
+                    </div>
+
+                    {{-- Score range --}}
+                    <div>
+                        <label class="mb-1.5 block text-xs font-medium text-gray-700 dark:text-gray-300">
+                            {{ __('telegram.operation_users.filters.score_range') }}
+                        </label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <input
+                                type="number" min="0" max="100" step="1"
+                                x-model="filters.min_match_score"
+                                @keydown.enter="applyFilters()"
+                                placeholder="{{ __('telegram.operation_users.filters.score_from') }}"
+                                class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/80 px-3
+                                       text-sm text-gray-950 outline-none transition focus:border-blue-500
+                                       dark:border-gray-700 dark:bg-white/[0.03] dark:text-white"
+                            >
+                            <input
+                                type="number" min="0" max="100" step="1"
+                                x-model="filters.max_match_score"
+                                @keydown.enter="applyFilters()"
+                                placeholder="{{ __('telegram.operation_users.filters.score_to') }}"
+                                class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/80 px-3
+                                       text-sm text-gray-950 outline-none transition focus:border-blue-500
+                                       dark:border-gray-700 dark:bg-white/[0.03] dark:text-white"
+                            >
+                        </div>
+                    </div>
+
+                    {{-- Period --}}
+                    <div>
+                        <label class="mb-1.5 block text-xs font-medium text-gray-700 dark:text-gray-300">
+                            {{ __('telegram.operation_users.filters.period') }}
+                        </label>
+                        <div class="flex flex-wrap items-center gap-1.5">
+                            <template x-for="preset in periodPresets" :key="preset.value">
+                                <button
+                                    type="button"
+                                    @click="setPeriod(preset.value)"
+                                    class="h-9 rounded-lg px-2.5 text-xs font-medium transition"
+                                    :class="periodPreset === preset.value
+                                        ? 'bg-blue-600 text-white'
+                                        : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300 dark:hover:bg-white/[0.04]'"
+                                    x-text="preset.label"
+                                ></button>
+                            </template>
+                        </div>
+                    </div>
+
+                    {{-- Custom period range (shown when preset = custom) --}}
+                    <div class="sm:col-span-2 xl:col-span-2" x-show="periodPreset === 'custom'" x-cloak>
+                        <label class="mb-1.5 block text-xs font-medium text-gray-700 dark:text-gray-300">
+                            {{ __('telegram.operation_users.filters.period_from') }} — {{ __('telegram.operation_users.filters.period_to') }}
+                        </label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <input
+                                type="date"
+                                x-model="filters.period_from"
+                                @change="applyFilters()"
+                                class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/80 px-3
+                                       text-sm text-gray-950 outline-none transition focus:border-blue-500
+                                       dark:border-gray-700 dark:bg-white/[0.03] dark:text-white"
+                            >
+                            <input
+                                type="date"
+                                x-model="filters.period_to"
+                                @change="applyFilters()"
+                                class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/80 px-3
+                                       text-sm text-gray-950 outline-none transition focus:border-blue-500
+                                       dark:border-gray-700 dark:bg-white/[0.03] dark:text-white"
+                            >
+                        </div>
                     </div>
                 </div>
 
@@ -1131,6 +1291,18 @@
 
                 telegram_username: '',
 
+                status: '',
+
+                has_driver: '',
+
+                min_match_score: '',
+
+                max_match_score: '',
+
+                period_from: '',
+
+                period_to: '',
+
                 sort: 'created_at',
 
                 direction: 'desc',
@@ -1138,6 +1310,21 @@
                 per_page: 10,
 
                 page: 1,
+            },
+
+            periodPreset: 'all',
+
+            periodPresets: [
+                { value: 'all', label: @json(__('telegram.operation_users.filters.period_all')) },
+                { value: 'today', label: @json(__('telegram.operation_users.filters.period_today')) },
+                { value: 'week', label: @json(__('telegram.operation_users.filters.period_week')) },
+                { value: 'month', label: @json(__('telegram.operation_users.filters.period_month')) },
+                { value: 'custom', label: @json(__('telegram.operation_users.filters.period_custom')) },
+            ],
+
+            exportUrls: {
+                operators: @json(route('driver-check.export.operators')),
+                details: @json(route('driver-check.export.details')),
             },
 
             pagination: {
@@ -1179,53 +1366,101 @@
              * LOAD
              * =====================================================
              */
+            /*
+             * =====================================================
+             * PERIOD PRESETS
+             * =====================================================
+             */
+            setPeriod(preset) {
+                this.periodPreset = preset;
+
+                const today = new Date();
+                const iso = (d) => d.toISOString().slice(0, 10);
+
+                if (preset === 'all') {
+                    this.filters.period_from = '';
+                    this.filters.period_to = '';
+                } else if (preset === 'today') {
+                    this.filters.period_from = iso(today);
+                    this.filters.period_to = iso(today);
+                } else if (preset === 'week') {
+                    const from = new Date(today);
+                    from.setDate(from.getDate() - 6);
+                    this.filters.period_from = iso(from);
+                    this.filters.period_to = iso(today);
+                } else if (preset === 'month') {
+                    const from = new Date(today);
+                    from.setDate(from.getDate() - 29);
+                    this.filters.period_from = iso(from);
+                    this.filters.period_to = iso(today);
+                } else {
+                    // 'custom' -- leave whatever the user typed, just switch mode.
+                    return;
+                }
+
+                this.applyFilters();
+            },
+
+            /*
+             * =====================================================
+             * BUILD QUERY PARAMS
+             * =====================================================
+             *
+             * Shared by load(), syncUrl() and exportUrl() so the three
+             * never drift apart on which filters are sent.
+             */
+            buildParams(includePage = true) {
+                const params = new URLSearchParams();
+
+                const stringFields = [
+                    'search', 'telegram_id', 'telegram_username',
+                    'status', 'has_driver',
+                    'min_match_score', 'max_match_score',
+                    'period_from', 'period_to',
+                ];
+
+                stringFields.forEach((field) => {
+                    const value = this.filters[field];
+
+                    if (value !== '' && value !== null && value !== undefined) {
+                        params.set(field, value);
+                    }
+                });
+
+                params.set('sort', this.filters.sort);
+                params.set('direction', this.filters.direction);
+                params.set('per_page', this.filters.per_page);
+
+                if (includePage) {
+                    params.set('page', this.filters.page);
+                }
+
+                return params;
+            },
+
+            exportUrl(kind) {
+                const params = this.buildParams(false);
+
+                // The export endpoint uses from/to (it also controls the
+                // export file name), the list API uses period_from/period_to.
+                if (params.has('period_from')) {
+                    params.set('from', params.get('period_from'));
+                    params.delete('period_from');
+                }
+                if (params.has('period_to')) {
+                    params.set('to', params.get('period_to'));
+                    params.delete('period_to');
+                }
+
+                return this.exportUrls[kind] + '?' + params.toString();
+            },
+
             async load() {
                 this.loading = true;
 
                 this.error = null;
 
-                const params = new URLSearchParams();
-
-                if (this.filters.search) {
-                    params.set(
-                        'search',
-                        this.filters.search,
-                    );
-                }
-
-                if (this.filters.telegram_id) {
-                    params.set(
-                        'telegram_id',
-                        this.filters.telegram_id,
-                    );
-                }
-
-                if (this.filters.telegram_username) {
-                    params.set(
-                        'telegram_username',
-                        this.filters.telegram_username,
-                    );
-                }
-
-                params.set(
-                    'sort',
-                    this.filters.sort,
-                );
-
-                params.set(
-                    'direction',
-                    this.filters.direction,
-                );
-
-                params.set(
-                    'per_page',
-                    this.filters.per_page,
-                );
-
-                params.set(
-                    'page',
-                    this.filters.page,
-                );
+                const params = this.buildParams();
 
                 try {
                     const response = await fetch(
@@ -1460,19 +1695,21 @@
             resetFilters() {
                 this.filters = {
                     search: '',
-
                     telegram_id: '',
-
                     telegram_username: '',
-
+                    status: '',
+                    has_driver: '',
+                    min_match_score: '',
+                    max_match_score: '',
+                    period_from: '',
+                    period_to: '',
                     sort: 'created_at',
-
                     direction: 'desc',
-
                     per_page: 10,
-
                     page: 1,
                 };
+
+                this.periodPreset = 'all';
 
                 this.load();
             },
@@ -1510,17 +1747,19 @@
                         window.location.search,
                     );
 
-                this.filters.search =
-                    params.get('search')
-                    || '';
+                this.filters.search = params.get('search') || '';
+                this.filters.telegram_id = params.get('telegram_id') || '';
+                this.filters.telegram_username = params.get('telegram_username') || '';
+                this.filters.status = params.get('status') || '';
+                this.filters.has_driver = params.get('has_driver') || '';
+                this.filters.min_match_score = params.get('min_match_score') || '';
+                this.filters.max_match_score = params.get('max_match_score') || '';
+                this.filters.period_from = params.get('period_from') || '';
+                this.filters.period_to = params.get('period_to') || '';
 
-                this.filters.telegram_id =
-                    params.get('telegram_id')
-                    || '';
-
-                this.filters.telegram_username =
-                    params.get('telegram_username')
-                    || '';
+                this.periodPreset = (this.filters.period_from || this.filters.period_to)
+                    ? 'custom'
+                    : 'all';
 
                 this.filters.sort =
                     params.get('sort')
@@ -1550,51 +1789,7 @@
              * =====================================================
              */
             syncUrl() {
-                const params =
-                    new URLSearchParams();
-
-                if (this.filters.search) {
-                    params.set(
-                        'search',
-                        this.filters.search,
-                    );
-                }
-
-                if (this.filters.telegram_id) {
-                    params.set(
-                        'telegram_id',
-                        this.filters.telegram_id,
-                    );
-                }
-
-                if (this.filters.telegram_username) {
-                    params.set(
-                        'telegram_username',
-                        this.filters.telegram_username,
-                    );
-                }
-
-                params.set(
-                    'sort',
-                    this.filters.sort,
-                );
-
-                params.set(
-                    'direction',
-                    this.filters.direction,
-                );
-
-                params.set(
-                    'per_page',
-                    this.filters.per_page,
-                );
-
-                if (this.filters.page > 1) {
-                    params.set(
-                        'page',
-                        this.filters.page,
-                    );
-                }
+                const params = this.buildParams();
 
                 const query =
                     params.toString();

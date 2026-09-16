@@ -182,49 +182,68 @@
                             </div>
 
 
-                            {{-- Refresh --}}
-                            <button
-                                type="button"
-                                @click="refreshAll()"
-                                :disabled="operatorLoading || driversLoading"
-                                class="inline-flex h-10 w-full items-center justify-center
-                                       gap-2 rounded-xl border border-gray-200 bg-white
-                                       px-4 text-sm font-medium text-gray-700 transition
-                                       hover:bg-gray-50 disabled:cursor-not-allowed
-                                       disabled:opacity-60 sm:w-auto
-                                       dark:border-gray-800 dark:bg-gray-950
-                                       dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                            >
+                            <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
 
-                                <svg
-                                    class="h-4 w-4"
-                                    :class="{
-                                        'animate-spin':
-                                            operatorLoading || driversLoading
-                                    }"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    stroke-width="2"
+                                {{-- Refresh --}}
+                                <button
+                                    type="button"
+                                    @click="refreshAll()"
+                                    :disabled="operatorLoading || driversLoading"
+                                    class="inline-flex h-10 w-full items-center justify-center
+                                           gap-2 rounded-xl border border-gray-200 bg-white
+                                           px-4 text-sm font-medium text-gray-700 transition
+                                           hover:bg-gray-50 disabled:cursor-not-allowed
+                                           disabled:opacity-60 sm:w-auto
+                                           dark:border-gray-800 dark:bg-gray-950
+                                           dark:text-gray-300 dark:hover:bg-white/[0.04]"
                                 >
-                                    <path
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        d="M4 4v5h.582m15.356 2A8.001 8.001 0
-                                           004.582 9M4.582 9H9m11 11v-5h-.581
-                                           a8.003 8.003 0 01-15.357-2M19.419 15H15"
-                                    />
-                                </svg>
 
-                                <span
-                                    x-text="
-                                        operatorLoading || driversLoading
-                                            ? translations.loading
-                                            : translations.refresh
-                                    "
-                                ></span>
+                                    <svg
+                                        class="h-4 w-4"
+                                        :class="{
+                                            'animate-spin':
+                                                operatorLoading || driversLoading
+                                        }"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                    >
+                                        <path
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                            d="M4 4v5h.582m15.356 2A8.001 8.001 0
+                                               004.582 9M4.582 9H9m11 11v-5h-.581
+                                               a8.003 8.003 0 01-15.357-2M19.419 15H15"
+                                        />
+                                    </svg>
 
-                            </button>
+                                    <span
+                                        x-text="
+                                            operatorLoading || driversLoading
+                                                ? translations.loading
+                                                : translations.refresh
+                                        "
+                                    ></span>
+
+                                </button>
+
+                                {{-- Export --}}
+                                <a
+                                    :href="exportUrl()"
+                                    class="inline-flex h-10 w-full items-center justify-center
+                                           gap-2 rounded-xl bg-emerald-600 px-4 text-sm
+                                           font-semibold text-white shadow-sm shadow-emerald-600/20
+                                           transition hover:-translate-y-0.5 hover:bg-emerald-700
+                                           sm:w-auto dark:bg-emerald-500 dark:hover:bg-emerald-400"
+                                >
+                                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+                                    </svg>
+                                    <span x-text="translations.export.button"></span>
+                                </a>
+
+                            </div>
 
                         </div>
 
@@ -698,6 +717,31 @@
                                     {{ __('telegram.operation_user.filters.clear') }}
                                 </button>
 
+
+                                {{-- Status --}}
+                                <div class="flex items-center gap-2">
+
+                                    <span class="text-xs text-gray-500 dark:text-gray-400">
+                                        {{ __('telegram.operation_user.filters.status') }}
+                                    </span>
+
+                                    <select
+                                        x-model="statusFilter"
+                                        @change="applyStatusFilter()"
+                                        class="h-10 rounded-xl border border-gray-200
+                                               bg-gray-50 px-2.5 text-sm text-gray-700
+                                               outline-none focus:border-blue-500
+                                               dark:border-gray-800 dark:bg-white/[0.03]
+                                               dark:text-gray-300"
+                                    >
+                                        <option value="">{{ __('telegram.operation_user.filters.status_all') }}</option>
+                                        <option value="confirmed">{{ __('telegram.operation_user.filters.confirmed') }}</option>
+                                        <option value="not_confirmed">{{ __('telegram.operation_user.filters.not_confirmed') }}</option>
+                                        <option value="pending">{{ __('telegram.operation_user.filters.pending') }}</option>
+                                        <option value="processing">{{ __('telegram.operation_user.filters.processing') }}</option>
+                                    </select>
+
+                                </div>
 
                                 {{-- Per page --}}
                                 <div class="flex items-center gap-2">
@@ -1502,7 +1546,12 @@
 
                                     <div
                                         x-show="phonesOpen"
-                                        x-collapse
+                                        x-transition:enter="transition ease-out duration-200"
+                                        x-transition:enter-start="opacity-0 -translate-y-1"
+                                        x-transition:enter-end="opacity-100 translate-y-0"
+                                        x-transition:leave="transition ease-in duration-150"
+                                        x-transition:leave-start="opacity-100 translate-y-0"
+                                        x-transition:leave-end="opacity-0 -translate-y-1"
                                         class="mt-3"
                                     >
 
@@ -2003,6 +2052,10 @@
 
             toDate: '',
 
+            statusFilter: '',
+
+            exportBaseUrl: @json(route('driver-check.export.details')),
+
 
             /*
             |--------------------------------------------------------------------------
@@ -2321,16 +2374,18 @@
             |--------------------------------------------------------------------------
             */
 
-            buildDriverParams() {
+            buildDriverParams(includePage = true) {
 
                 const params =
                     new URLSearchParams();
 
 
-                params.set(
-                    'page',
-                    String(this.page)
-                );
+                if (includePage) {
+                    params.set(
+                        'page',
+                        String(this.page)
+                    );
+                }
 
 
                 params.set(
@@ -2340,29 +2395,15 @@
 
 
                 /*
-                 * Preset filters.
-                 */
-                if (
-                    this.dateFilter === 'last_week'
-                    ||
-                    this.dateFilter === 'last_month'
-                ) {
-
-                    params.set(
-                        'date_filter',
-                        this.dateFilter
-                    );
-
-                }
-
-
-                /*
-                 * Custom range.
+                 * Period range -- computed as concrete dates by
+                 * setDateFilter()/applyCustomDateFilter(), sent using
+                 * the same period_from/period_to params every other
+                 * driver-check list page uses.
                  */
                 if (this.fromDate) {
 
                     params.set(
-                        'from_date',
+                        'period_from',
                         this.fromDate
                     );
 
@@ -2372,14 +2413,72 @@
                 if (this.toDate) {
 
                     params.set(
-                        'to_date',
+                        'period_to',
                         this.toDate
                     );
 
                 }
 
 
+                if (this.statusFilter) {
+
+                    params.set(
+                        'status',
+                        this.statusFilter
+                    );
+
+                }
+
+
                 return params;
+
+            },
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | STATUS FILTER
+            |--------------------------------------------------------------------------
+            */
+
+            applyStatusFilter() {
+
+                this.page = 1;
+
+                this.loadDrivers();
+
+            },
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | EXPORT
+            |--------------------------------------------------------------------------
+            */
+
+            exportUrl() {
+
+                const params =
+                    this.buildDriverParams(false);
+
+                params.set(
+                    'operation_user_id',
+                    String(this.operationUserId)
+                );
+
+                if (params.has('period_from')) {
+                    params.set('from', params.get('period_from'));
+                    params.delete('period_from');
+                }
+
+                if (params.has('period_to')) {
+                    params.set('to', params.get('period_to'));
+                    params.delete('period_to');
+                }
+
+                params.delete('per_page');
+
+                return this.exportBaseUrl + '?' + params.toString();
 
             },
 
@@ -2539,11 +2638,34 @@
 
                 this.page = 1;
 
-                this.fromDate = '';
-
-                this.toDate = '';
-
                 this.dateFilter = filter;
+
+
+                const iso = (d) => d.toISOString().slice(0, 10);
+                const today = new Date();
+
+                if (filter === 'last_week') {
+
+                    const from = new Date(today);
+                    from.setDate(from.getDate() - 6);
+
+                    this.fromDate = iso(from);
+                    this.toDate = iso(today);
+
+                } else if (filter === 'last_month') {
+
+                    const from = new Date(today);
+                    from.setDate(from.getDate() - 29);
+
+                    this.fromDate = iso(from);
+                    this.toDate = iso(today);
+
+                } else {
+
+                    this.fromDate = '';
+                    this.toDate = '';
+
+                }
 
 
                 this.loadDrivers();
@@ -2920,6 +3042,18 @@
                 }
 
 
+                if (
+                    this.statusFilter
+                ) {
+
+                    params.set(
+                        'status',
+                        this.statusFilter
+                    );
+
+                }
+
+
                 const query =
                     params.toString();
 
@@ -3055,6 +3189,13 @@
                         'custom';
 
                 }
+
+
+                this.statusFilter =
+                    params.get(
+                        'status'
+                    )
+                    || '';
 
             },
 

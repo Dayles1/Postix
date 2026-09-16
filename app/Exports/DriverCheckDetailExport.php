@@ -13,39 +13,49 @@ use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-final class DriverCheckDetailExport implements
-    FromQuery,
-    WithHeadings,
-    WithMapping,
-    WithStyles,
-    ShouldAutoSize
+final class DriverCheckDetailExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMapping, WithStyles
 {
     public function __construct(
         private readonly array $filters,
-    ) {
-    }
+    ) {}
 
     public function query(): Builder
     {
         $from = $this->filters['from'];
         $to = $this->filters['to'];
         $operationUserId = $this->filters['operation_user_id'] ?? null;
+        $driverId = $this->filters['driver_id'] ?? null;
         $status = $this->filters['status'] ?? null;
         $search = $this->filters['search'] ?? null;
+        $telegramUsername = $this->filters['telegram_username'] ?? null;
+        $minMatchScore = $this->filters['min_match_score'] ?? null;
+        $maxMatchScore = $this->filters['max_match_score'] ?? null;
 
         return DB::table('telegram_driver_checks as c')
             ->leftJoin('operation_users as ou', 'ou.id', '=', 'c.operation_user_id')
             ->leftJoin('telegram_drivers as d', 'd.id', '=', 'c.driver_id')
             ->leftJoin('telegram_resolved_phones as rp', 'rp.id', '=', 'c.telegram_resolved_phone_id')
             ->whereBetween('c.created_at', [$from, $to])
-            ->when($operationUserId, fn ($q) =>
-                $q->where('c.operation_user_id', $operationUserId)
+            ->when($operationUserId, fn ($q) => $q->where('c.operation_user_id', $operationUserId)
             )
-            ->when($status, fn ($q) =>
-                $q->where('c.status', $status)
+            ->when($driverId, fn ($q) => $q->where('c.driver_id', $driverId)
+            )
+            ->when($status, fn ($q) => $q->where('c.status', $status)
+            )
+            ->when($telegramUsername, fn ($q) => $q->where('c.telegram_username', 'like', '%'.$telegramUsername.'%')
+            )
+            ->when($minMatchScore !== null, fn ($q) => $q->whereRaw(
+                "CAST(JSON_UNQUOTE(JSON_EXTRACT(c.telegram_raw, '$.name_match.score')) AS DECIMAL(10,2)) >= ?",
+                [$minMatchScore],
+            )
+            )
+            ->when($maxMatchScore !== null, fn ($q) => $q->whereRaw(
+                "CAST(JSON_UNQUOTE(JSON_EXTRACT(c.telegram_raw, '$.name_match.score')) AS DECIMAL(10,2)) <= ?",
+                [$maxMatchScore],
+            )
             )
             ->when($search, function ($q) use ($search) {
-                $like = '%' . $search . '%';
+                $like = '%'.$search.'%';
 
                 $q->where(function ($sub) use ($like) {
                     $sub->where('ou.name', 'like', $like)
@@ -115,12 +125,12 @@ final class DriverCheckDetailExport implements
             ? json_decode($row->telegram_raw, true)
             : $row->telegram_raw;
 
-        if (!is_array($raw)) {
+        if (! is_array($raw)) {
             $raw = [];
         }
 
         $match = $raw['name_match'] ?? [];
-        if (!is_array($match)) {
+        if (! is_array($match)) {
             $match = [];
         }
 
@@ -132,7 +142,7 @@ final class DriverCheckDetailExport implements
             $row->operation_user_id,
             $row->operation_user_name,
             $row->operation_user_telegram_username
-                ? '@' . ltrim($row->operation_user_telegram_username, '@')
+                ? '@'.ltrim($row->operation_user_telegram_username, '@')
                 : null,
             $row->driver_id,
             $row->driver_name ?: $row->driver_db_name,
@@ -140,7 +150,7 @@ final class DriverCheckDetailExport implements
             $row->phone_normalized,
             $row->telegram_user_id,
             $row->telegram_username
-                ? '@' . ltrim($row->telegram_username, '@')
+                ? '@'.ltrim($row->telegram_username, '@')
                 : null,
             $row->telegram_first_name,
             $row->telegram_last_name,

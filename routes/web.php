@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\Telegram\DriverCheckExportController;
 use App\Http\Controllers\Api\Telegram\OperationUserController;
 use App\Http\Controllers\Api\Telegram\ResolvedPhoneController;
 use App\Http\Controllers\Api\Telegram\TelegramDriverController;
@@ -22,7 +23,7 @@ use App\Http\Controllers\View\TelegramController;
 use App\Http\Controllers\View\UserController;
 use Illuminate\Support\Facades\Route;
 
-require __DIR__ . '/methods/web.php';
+require __DIR__.'/methods/web.php';
 
 Route::get('/login', [AuthController::class, 'login'])->name('login');
 Route::post('/login', [AuthController::class, 'authenticate']);
@@ -30,7 +31,7 @@ Route::post('/login', [AuthController::class, 'authenticate']);
 Route::middleware(['auth', 'check.ban'])->group(function () {
 
     Route::middleware('role:superadmin')->group(function () {
-        Route::get('/export', [WareHouseController::class, 'checkedQozoqPage'])->name('warehouse.checkedQozoqPage')->middleware('permission:nav:export'); //export
+        Route::get('/export', [WareHouseController::class, 'checkedQozoqPage'])->name('warehouse.checkedQozoqPage')->middleware('permission:nav:export'); // export
         Route::get('/checked-qozoq/export', [WareHouseController::class, 'chekedQozoqExport'])->name('warehouse.chekedQozoqExport');
         Route::get('/import', [WareHouseController::class, 'importQozoqPage'])->name('warehouse.importQozoqPage')->middleware('permission:nav:import');
         Route::get('/import-qozoq/export', [WareHouseController::class, 'importQozoqExport'])->name('warehouse.importQozoqExport');
@@ -51,7 +52,7 @@ Route::middleware(['auth', 'check.ban'])->group(function () {
 
         // Route::get('/pro-users', [DepartmentController::class, 'proUsers'])->name('departments.pro-users');
         Route::get('/pro-users', [UserDepartmenIndexController::class, 'proUsers'])->name('departments.pro-users');
-        
+
         Route::get('departments/create', [DepartmentController::class, 'create'])->name('departments.create');
 
         Route::get('/free-users', [UserDepartmenIndexController::class, 'freeUsers'])->name('departments.free-users');
@@ -75,7 +76,6 @@ Route::middleware(['auth', 'check.ban'])->group(function () {
     Route::get('/departments/{id}/send-messages', [MessageGroupController::class, 'sendForm'])->name('telegram.send-form');
     Route::post('/send-messages', [MessageGroupController::class, 'sendMassMessage'])->name('telegram.send-messages');
     Route::put('/message-groups/{id}/update', [MessageGroupController::class, 'update'])->name('message-groups.update');
-
 
     // Route::get('/operations/{MessageGroup}', [MessageGroupController::class, 'show'])->name('operations.show');
 
@@ -141,8 +141,7 @@ Route::prefix('admin')->middleware(['auth', 'permission:nav:catalogs'])->group(f
     Route::delete('/catalogs/{catalog}', [AdminCatalogController::class, 'destroy'])->name('admin.catalogs.destroy');
 });
 
-
-Route::middleware(['auth'])
+Route::middleware(['auth', 'role:driverCheck,superadmin'])
     ->prefix('driver-check')
     ->group(function () {
 
@@ -183,8 +182,24 @@ Route::middleware(['auth'])
             '/resolved-phones',
             [DriverCheckController::class, 'resolvedPhones']
         )->name('driver-check.resolved-phones');
-    });
 
+        /*
+         * Excel export.
+         *
+         * Session-authenticated (not the sanctum API) because these
+         * links are opened directly from the browser (plain <a href>
+         * downloads), not called via fetch() with a bearer token.
+         */
+        Route::get(
+            '/export/operators',
+            [DriverCheckExportController::class, 'operators']
+        )->name('driver-check.export.operators');
+
+        Route::get(
+            '/export/details',
+            [DriverCheckExportController::class, 'details']
+        )->name('driver-check.export.details');
+    });
 
 /*
 |--------------------------------------------------------------------------
@@ -195,7 +210,7 @@ Route::middleware(['auth'])
 |
 */
 
-Route::middleware(['auth'])
+Route::middleware(['auth', 'role:driverCheck,superadmin'])
     ->prefix('api/telegram')
     ->group(function () {
 
@@ -212,9 +227,9 @@ Route::middleware(['auth'])
             [OperationUserController::class, 'show']
         )->name('api.telegram.operation-users.show');
         Route::get(
-    '/operation-users/{operationUser}/drivers',
-    [OperationUserController::class, 'drivers']
-)->name('api.telegram.operation-users.drivers');
+            '/operation-users/{operationUser}/drivers',
+            [OperationUserController::class, 'drivers']
+        )->name('api.telegram.operation-users.drivers');
         /*
          * Drivers
          */
@@ -231,4 +246,3 @@ Route::middleware(['auth'])
             [ResolvedPhoneController::class, 'index']
         )->name('api.telegram.resolved-phones');
     });
-    

@@ -6,58 +6,40 @@ namespace App\Http\Controllers\View\DriverCheck;
 
 use App\Http\Controllers\Controller;
 use App\Models\Telegram\OperationUser;
-use Illuminate\Http\Request;
 
+/**
+ * Access to this whole controller is enforced by the `role:driverCheck,
+ * superadmin` middleware on the route group (see routes/web.php), so no
+ * per-method authorization check is needed here.
+ */
 final class DriverCheckController extends Controller
 {
-    public function operationUsers(Request $request)
+    public function operationUsers()
     {
-        $this->authorizeDriverCheck($request);
-
         return view(
             'pages.driver-check.operation-users'
         );
     }
 
-    public function drivers(Request $request)
+    public function operationUser(OperationUser $operationUser)
     {
-        $this->authorizeDriverCheck($request);
+        return view(
+            'pages.driver-check.operation-user',
+            compact('operationUser'),
+        );
+    }
 
+    public function drivers()
+    {
         return view(
             'pages.driver-check.drivers'
         );
     }
 
-    public function resolvedPhones(Request $request)
+    public function resolvedPhones()
     {
-        $this->authorizeDriverCheck($request);
-
         return view(
             'pages.driver-check.resolved-phones'
-        );
-    }
-
-    private function authorizeDriverCheck(
-        Request $request
-    ): void {
-        $user = $request->user();
-
-        if (
-            !$user
-            || ($user->role->name ?? null) !== 'driverCheck'
-        ) {
-            abort(403);
-        }
-    }
-    public function operationUser(
-        Request $request,
-        OperationUser $operationUser,
-    ) {
-        $this->authorizeDriverCheck($request);
-
-        return view(
-            'pages.driver-check.operation-user',
-            compact('operationUser'),
         );
     }
 }

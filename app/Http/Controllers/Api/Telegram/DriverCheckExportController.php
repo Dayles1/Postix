@@ -9,7 +9,6 @@ use App\Exports\DriverCheckOperatorsExport;
 use App\Http\Controllers\Controller;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
@@ -32,17 +31,7 @@ final class DriverCheckExportController extends Controller
     {
         [$from, $to] = $this->resolvePeriod($request);
 
-        $filters = [
-            'operation_user_id' => $request->integer('operation_user_id') ?: null,
-            'status' => $request->filled('status')
-                ? (string) $request->string('status')
-                : null,
-            'search' => $request->filled('search')
-                ? trim((string) $request->string('search'))
-                : null,
-            'from' => $from->copy(),
-            'to' => $to->copy(),
-        ];
+        $filters = $this->resolveFilters($request, $from, $to);
 
         if ($request->boolean('detail')) {
             $fileName = sprintf(
@@ -78,17 +67,7 @@ final class DriverCheckExportController extends Controller
     {
         [$from, $to] = $this->resolvePeriod($request);
 
-        $filters = [
-            'operation_user_id' => $request->integer('operation_user_id') ?: null,
-            'status' => $request->filled('status')
-                ? (string) $request->string('status')
-                : null,
-            'search' => $request->filled('search')
-                ? trim((string) $request->string('search'))
-                : null,
-            'from' => $from->copy(),
-            'to' => $to->copy(),
-        ];
+        $filters = $this->resolveFilters($request, $from, $to);
 
         $fileName = sprintf(
             'driver-check-details_%s_%s.xlsx',
@@ -123,5 +102,36 @@ final class DriverCheckExportController extends Controller
         }
 
         return [$from, $to];
+    }
+
+    /**
+     * Filters shared by both the operators and the details export.
+     * These mirror the filter set the driver-check list pages already
+     * expose in the UI, so "Export to Excel" respects whatever the
+     * operator currently has filtered/searched on screen.
+     */
+    private function resolveFilters(Request $request, Carbon $from, Carbon $to): array
+    {
+        return [
+            'operation_user_id' => $request->integer('operation_user_id') ?: null,
+            'driver_id' => $request->integer('driver_id') ?: null,
+            'status' => $request->filled('status')
+                ? (string) $request->string('status')
+                : null,
+            'search' => $request->filled('search')
+                ? trim((string) $request->string('search'))
+                : null,
+            'telegram_username' => $request->filled('telegram_username')
+                ? trim((string) $request->string('telegram_username'))
+                : null,
+            'min_match_score' => $request->filled('min_match_score')
+                ? (float) $request->input('min_match_score')
+                : null,
+            'max_match_score' => $request->filled('max_match_score')
+                ? (float) $request->input('max_match_score')
+                : null,
+            'from' => $from->copy(),
+            'to' => $to->copy(),
+        ];
     }
 }

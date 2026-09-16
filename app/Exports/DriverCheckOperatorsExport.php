@@ -13,17 +13,11 @@ use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-final class DriverCheckOperatorsExport implements
-    FromCollection,
-    WithHeadings,
-    WithMapping,
-    WithStyles,
-    ShouldAutoSize
+final class DriverCheckOperatorsExport implements FromCollection, ShouldAutoSize, WithHeadings, WithMapping, WithStyles
 {
     public function __construct(
         private readonly array $filters,
-    ) {
-    }
+    ) {}
 
     public function collection(): Enumerable
     {
@@ -32,15 +26,16 @@ final class DriverCheckOperatorsExport implements
         $operationUserId = $this->filters['operation_user_id'] ?? null;
         $status = $this->filters['status'] ?? null;
         $search = $this->filters['search'] ?? null;
+        $telegramUsername = $this->filters['telegram_username'] ?? null;
+        $minMatchScore = $this->filters['min_match_score'] ?? null;
+        $maxMatchScore = $this->filters['max_match_score'] ?? null;
 
         $checks = DB::table('telegram_driver_checks as c')
             ->whereBetween('c.created_at', [$from, $to])
             ->whereNotNull('c.operation_user_id')
-            ->when($operationUserId, fn ($q) =>
-                $q->where('c.operation_user_id', $operationUserId)
+            ->when($operationUserId, fn ($q) => $q->where('c.operation_user_id', $operationUserId)
             )
-            ->when($status, fn ($q) =>
-                $q->where('c.status', $status)
+            ->when($status, fn ($q) => $q->where('c.status', $status)
             );
 
         $operatorQuery = DB::table('operation_users as ou')
@@ -94,7 +89,7 @@ final class DriverCheckOperatorsExport implements
                 'stats.last_check_at',
             ])
             ->when($search, function ($q) use ($search) {
-                $like = '%' . $search . '%';
+                $like = '%'.$search.'%';
 
                 $q->where(function ($sub) use ($like) {
                     $sub->where('ou.name', 'like', $like)
@@ -103,6 +98,12 @@ final class DriverCheckOperatorsExport implements
                         ->orWhere('ou.telegram_id', 'like', $like);
                 });
             })
+            ->when($telegramUsername, fn ($q) => $q->where('ou.telegram_username', 'like', '%'.$telegramUsername.'%')
+            )
+            ->when($minMatchScore !== null, fn ($q) => $q->where('stats.best_score', '>=', $minMatchScore)
+            )
+            ->when($maxMatchScore !== null, fn ($q) => $q->where('stats.best_score', '<=', $maxMatchScore)
+            )
             ->orderByDesc('confirmed_count')
             ->orderByDesc('checks_count')
             ->orderBy('ou.name');
@@ -143,7 +144,7 @@ final class DriverCheckOperatorsExport implements
             $row->id,
             $row->name,
             $row->name_normalized,
-            $row->telegram_username ? '@' . ltrim($row->telegram_username, '@') : null,
+            $row->telegram_username ? '@'.ltrim($row->telegram_username, '@') : null,
             $row->telegram_id,
             (int) $row->drivers_count,
             $checks,

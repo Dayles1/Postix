@@ -1,12 +1,8 @@
 <?php
 
 use App\Http\Controllers\Api\Auth\AuthController;
-use App\Http\Controllers\Api\Telegram\DriverCheckExportController;
-use App\Http\Controllers\Api\Telegram\OperationUserController;
-use App\Http\Controllers\Api\Telegram\ResolvedPhoneController;
 use App\Http\Controllers\Api\Telegram\TelegramAccountController;
 use App\Http\Controllers\Api\Telegram\TelegramDriverCheckController;
-use App\Http\Controllers\Api\Telegram\TelegramDriverController;
 use App\Http\Controllers\TestController;
 use Illuminate\Support\Facades\Route;
 
@@ -27,24 +23,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/{id}', [TelegramAccountController::class, 'show']);
         Route::post('/manage-failures', [TelegramAccountController::class, 'manageFailures']);
     });
-Route::post(
-    '/admin/telegram/driver-check/start',
-    [TelegramDriverCheckController::class, 'start']
-)->name('admin.telegram.driver-check.start');
-
-
+    Route::post(
+        '/admin/telegram/driver-check/start',
+        [TelegramDriverCheckController::class, 'start']
+    )->name('admin.telegram.driver-check.start');
 
 });
-
-Route::prefix('telegram/driver-check/export')
-    ->group(function () {
-        Route::get(
-            '/operators',
-            [DriverCheckExportController::class, 'operators'],
-        )->name('telegram.driver-check.export.operators');
-
-        Route::get(
-            '/details',
-            [DriverCheckExportController::class, 'details'],
-        )->name('telegram.driver-check.export.details');
-    });
