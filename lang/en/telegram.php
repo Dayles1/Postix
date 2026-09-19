@@ -4,6 +4,130 @@ declare(strict_types=1);
 
 return [
 
+    'operators' => [
+
+        'title' => 'Operator management',
+
+        'description' => 'Link operators to Telegram by hand: reports are copied into their private chat',
+
+        'refresh' => 'Refresh',
+
+        'loading' => 'Loading...',
+
+        'create' => 'Add operator',
+
+        'search_placeholder' => 'Name, @username or Telegram ID',
+
+        'per_page' => 'Per page',
+
+        'stats' => [
+            'total' => 'Operators',
+            'active' => 'Active',
+            'linked' => 'With Telegram',
+            'dm_enabled' => 'Receive direct messages',
+            'failing' => 'Delivery failing',
+        ],
+
+        'filters' => [
+            'title' => 'Filters',
+            'reset' => 'Reset',
+            'status' => 'Status',
+            'status_all' => 'All',
+            'status_active' => 'Active',
+            'status_inactive' => 'Inactive',
+            'dm' => 'Direct messages',
+            'dm_all' => 'All',
+            'dm_on' => 'Enabled',
+            'dm_off' => 'Disabled',
+            'linked' => 'Telegram',
+            'linked_all' => 'All',
+            'linked_yes' => 'Linked',
+            'linked_no' => 'Not linked',
+        ],
+
+        'table' => [
+            'operator' => 'Operator',
+            'telegram' => 'Telegram',
+            'status' => 'Status',
+            'dm' => 'Direct',
+            'drivers' => 'Drivers',
+            'checks' => 'Checks',
+            'last_sent' => 'Last delivery',
+            'actions' => 'Actions',
+            'no_username' => 'No username',
+            'no_id' => 'No ID',
+            'never' => 'Never sent',
+            'active' => 'Active',
+            'inactive' => 'Inactive',
+            'dm_on' => 'Enabled',
+            'dm_off' => 'Disabled',
+            'dm_unreachable' => 'No contact',
+            'edit' => 'Edit',
+            'delete' => 'Delete',
+        ],
+
+        'form' => [
+            'create_title' => 'New operator',
+            'edit_title' => 'Edit operator',
+            'name' => 'Operator name',
+            'name_hint' => 'Must match the "Пользователь:" line of the group message',
+            'name_normalized' => 'Matching key',
+            'telegram_username' => 'Telegram username',
+            'telegram_username_hint' => 'Without the "@". Tried first - it works even if the account has never met the operator',
+            'telegram_id' => 'Telegram ID',
+            'telegram_id_hint' => 'Fallback: only resolves once the account has seen this user',
+            'is_active' => 'Active',
+            'is_active_hint' => 'An inactive operator receives nothing',
+            'dm_enabled' => 'Send reports to the private chat',
+            'dm_enabled_hint' => 'A copy of the group report is sent to the operator directly',
+            'save' => 'Save',
+            'cancel' => 'Cancel',
+            'saving' => 'Saving...',
+        ],
+
+        'validation' => [
+            'duplicate_name' => 'An operator with this name already exists',
+            'username_format' => 'A username may contain latin letters, digits and "_", 5 to 32 characters',
+        ],
+
+        'confirm' => [
+            'delete_title' => 'Delete this operator?',
+            'delete_text' => 'This cannot be undone.',
+            'delete' => 'Delete',
+            'cancel' => 'Cancel',
+        ],
+
+        'messages' => [
+            'created' => 'Operator added',
+            'updated' => 'Changes saved',
+            'deleted' => 'Operator deleted',
+        ],
+
+        'deleted' => 'Operator deleted',
+
+        'errors' => [
+            'title' => 'Error',
+            'load' => 'Could not load the operators',
+            'save' => 'Could not save the operator',
+            'delete' => 'Could not delete the operator',
+            'has_history' => 'This operator has drivers or checks and cannot be deleted. Deactivate it instead.',
+            'dm_last_error' => 'Last delivery error',
+        ],
+
+        'empty' => [
+            'title' => 'No operators yet',
+            'description' => 'Operators are created automatically from group messages. You can also add one by hand.',
+        ],
+
+        'pagination' => [
+            'showing' => 'Showing',
+            'to' => '—',
+            'of' => 'of',
+            'previous' => 'Previous',
+            'next' => 'Next',
+        ],
+    ],
+
     'operation_users' => [
 
         'title' => 'Operators',

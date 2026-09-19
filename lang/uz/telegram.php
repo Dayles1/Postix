@@ -4,6 +4,130 @@ declare(strict_types=1);
 
 return [
 
+    'operators' => [
+
+        'title' => 'Operatorlarni boshqarish',
+
+        'description' => 'Operatorlarni Telegram bilan qo\'lda bog\'lash: hisobotlar ularning shaxsiy chatiga ham yuboriladi',
+
+        'refresh' => 'Yangilash',
+
+        'loading' => 'Yuklanmoqda...',
+
+        'create' => 'Operator qo\'shish',
+
+        'search_placeholder' => 'Ism, @username yoki Telegram ID',
+
+        'per_page' => 'Sahifada',
+
+        'stats' => [
+            'total' => 'Jami operatorlar',
+            'active' => 'Faol',
+            'linked' => 'Telegram bog\'langan',
+            'dm_enabled' => 'Lichkaga oladi',
+            'failing' => 'Yuborishda xato',
+        ],
+
+        'filters' => [
+            'title' => 'Filtrlar',
+            'reset' => 'Tozalash',
+            'status' => 'Holat',
+            'status_all' => 'Hammasi',
+            'status_active' => 'Faol',
+            'status_inactive' => 'Nofaol',
+            'dm' => 'Shaxsiy xabarlar',
+            'dm_all' => 'Hammasi',
+            'dm_on' => 'Yoqilgan',
+            'dm_off' => 'O\'chirilgan',
+            'linked' => 'Telegram',
+            'linked_all' => 'Hammasi',
+            'linked_yes' => 'Bog\'langan',
+            'linked_no' => 'Bog\'lanmagan',
+        ],
+
+        'table' => [
+            'operator' => 'Operator',
+            'telegram' => 'Telegram',
+            'status' => 'Holat',
+            'dm' => 'Lichkaga',
+            'drivers' => 'Haydovchilar',
+            'checks' => 'Tekshiruvlar',
+            'last_sent' => 'Oxirgi yuborilgan',
+            'actions' => 'Amallar',
+            'no_username' => 'Username yo\'q',
+            'no_id' => 'ID yo\'q',
+            'never' => 'Yuborilmagan',
+            'active' => 'Faol',
+            'inactive' => 'Nofaol',
+            'dm_on' => 'Yoqilgan',
+            'dm_off' => 'O\'chirilgan',
+            'dm_unreachable' => 'Kontakt yo\'q',
+            'edit' => 'Tahrirlash',
+            'delete' => 'O\'chirish',
+        ],
+
+        'form' => [
+            'create_title' => 'Yangi operator',
+            'edit_title' => 'Operatorni tahrirlash',
+            'name' => 'Operator ismi',
+            'name_hint' => 'Guruh xabaridagi «Пользователь:» qatori bilan bir xil bo\'lishi kerak',
+            'name_normalized' => 'Moslashtirish kaliti',
+            'telegram_username' => 'Telegram username',
+            'telegram_username_hint' => '«@» belgisisiz. Birinchi navbatda ishlatiladi — akkaunt operatorni hali tanimasa ham ishlaydi',
+            'telegram_id' => 'Telegram ID',
+            'telegram_id_hint' => 'Zaxira variant: akkaunt bu foydalanuvchini allaqachon ko\'rgan bo\'lsagina ishlaydi',
+            'is_active' => 'Faol',
+            'is_active_hint' => 'Nofaol operator hech narsa olmaydi',
+            'dm_enabled' => 'Hisobotlarni lichkaga yuborish',
+            'dm_enabled_hint' => 'Guruhga ketgan hisobot nusxasi operatorga shaxsiy xabar bilan yuboriladi',
+            'save' => 'Saqlash',
+            'cancel' => 'Bekor qilish',
+            'saving' => 'Saqlanmoqda...',
+        ],
+
+        'validation' => [
+            'duplicate_name' => 'Bunday ismli operator allaqachon mavjud',
+            'username_format' => 'Username lotin harflari, raqamlar va «_» dan iborat, 5–32 belgi bo\'lishi kerak',
+        ],
+
+        'confirm' => [
+            'delete_title' => 'Operator o\'chirilsinmi?',
+            'delete_text' => 'Bu amalni qaytarib bo\'lmaydi.',
+            'delete' => 'O\'chirish',
+            'cancel' => 'Bekor qilish',
+        ],
+
+        'messages' => [
+            'created' => 'Operator qo\'shildi',
+            'updated' => 'O\'zgarishlar saqlandi',
+            'deleted' => 'Operator o\'chirildi',
+        ],
+
+        'deleted' => 'Operator o\'chirildi',
+
+        'errors' => [
+            'title' => 'Xato',
+            'load' => 'Operatorlarni yuklab bo\'lmadi',
+            'save' => 'Operatorni saqlab bo\'lmadi',
+            'delete' => 'Operatorni o\'chirib bo\'lmadi',
+            'has_history' => 'Bu operatorda haydovchilar yoki tekshiruvlar bor — o\'chirib bo\'lmaydi. Uni nofaol qilib qo\'ying.',
+            'dm_last_error' => 'Oxirgi yuborishdagi xato',
+        ],
+
+        'empty' => [
+            'title' => 'Operatorlar yo\'q',
+            'description' => 'Operatorlar guruh xabarlaridan avtomatik yaratiladi. Qo\'lda ham qo\'shish mumkin.',
+        ],
+
+        'pagination' => [
+            'showing' => 'Ko\'rsatilmoqda',
+            'to' => '—',
+            'of' => 'dan',
+            'previous' => 'Oldingi',
+            'next' => 'Keyingi',
+        ],
+    ],
+
     'operation_users' => [
 
         'title' => 'Operatorlar',

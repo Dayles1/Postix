@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\Telegram\DriverCheckExportController;
 use App\Http\Controllers\Api\Telegram\OperationUserController;
+use App\Http\Controllers\Api\Telegram\OperatorController;
 use App\Http\Controllers\Api\Telegram\ResolvedPhoneController;
 use App\Http\Controllers\Api\Telegram\TelegramDriverController;
 use App\Http\Controllers\ExternalApi\WareHouseController;
@@ -167,6 +168,19 @@ Route::middleware(['auth', 'role:driverCheck,superadmin'])
             '/operation-users/{operationUser}',
             [DriverCheckController::class, 'operationUser']
         )->name('driver-check.operation-user');
+
+        /*
+         * Operators
+         *
+         * Management page: the Telegram contact of every operator is entered
+         * by hand here, which is what makes the private-chat copy of a report
+         * deliverable at all.
+         */
+        Route::get(
+            '/operators',
+            [DriverCheckController::class, 'operators']
+        )->name('driver-check.operators');
+
         /*
          * Drivers
          */
@@ -230,6 +244,30 @@ Route::middleware(['auth', 'role:driverCheck,superadmin'])
             '/operation-users/{operationUser}/drivers',
             [OperationUserController::class, 'drivers']
         )->name('api.telegram.operation-users.drivers');
+
+        /*
+         * Operators (management CRUD)
+         */
+        Route::get(
+            '/operators',
+            [OperatorController::class, 'index']
+        )->name('api.telegram.operators.index');
+
+        Route::post(
+            '/operators',
+            [OperatorController::class, 'store']
+        )->name('api.telegram.operators.store');
+
+        Route::put(
+            '/operators/{operationUser}',
+            [OperatorController::class, 'update']
+        )->name('api.telegram.operators.update');
+
+        Route::delete(
+            '/operators/{operationUser}',
+            [OperatorController::class, 'destroy']
+        )->name('api.telegram.operators.destroy');
+
         /*
          * Drivers
          */

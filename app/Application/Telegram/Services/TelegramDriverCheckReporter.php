@@ -11,6 +11,11 @@ use Throwable;
 
 final class TelegramDriverCheckReporter
 {
+    public function __construct(
+        private readonly TelegramOperatorNotifier $operatorNotifier,
+    ) {
+    }
+
     public function send(
         SimpleEventHandler $telegram,
         TelegramDriverCheck $check,
@@ -39,6 +44,18 @@ final class TelegramDriverCheckReporter
             $check->update([
                 'reported_at' => now(),
             ]);
+
+            /*
+             * The same report is copied into the operator's private chat.
+             * It runs after the group reply and swallows its own failures,
+             * so an unreachable operator never blocks the group report or
+             * leaves the check unreported.
+             */
+            $this->operatorNotifier->notify(
+                telegram: $telegram,
+                check: $check,
+                report: $message,
+            );
         } catch (Throwable $e) {
             Log::error(
                 'Failed to send driver check reply',

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Application\Telegram\Actions;
 
 use App\Models\Telegram\OperationUser;
-use Illuminate\Support\Str;
 
 final class ResolveOperationUser
 {
@@ -14,7 +13,12 @@ final class ResolveOperationUser
     ): OperationUser {
         $name = trim($name);
 
-        $normalized = $this->normalize($name);
+        /*
+         * Normalisation lives on the model so an operator created by hand on
+         * the operators page produces the exact same key as one created here
+         * from a parsed message - otherwise the two would never meet.
+         */
+        $normalized = OperationUser::normalizeName($name);
 
         return OperationUser::query()->firstOrCreate(
             [
@@ -24,17 +28,5 @@ final class ResolveOperationUser
                 'name' => $name,
             ],
         );
-    }
-
-    private function normalize(
-        string $name,
-    ): string {
-        $name = preg_replace(
-            '/\s+/u',
-            ' ',
-            trim($name),
-        ) ?? trim($name);
-
-        return Str::upper($name);
     }
 }

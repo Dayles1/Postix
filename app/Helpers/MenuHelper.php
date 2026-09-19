@@ -90,6 +90,11 @@ class MenuHelper
                 'path' => '/driver-check/operation-users',
             ],
             [
+                'icon' => 'operators',
+                'name' => 'Управление операторами',
+                'path' => '/driver-check/operators',
+            ],
+            [
                 'icon' => 'user-profile',
                 'name' => 'Водители',
                 'path' => '/driver-check/drivers',
@@ -214,6 +219,7 @@ class MenuHelper
             'statistics' => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13V19C3 19.5523 3.44772 20 4 20H8C8.55228 20 9 19.5523 9 19V13C9 12.4477 8.55228 12 8 12H4C3.44772 12 3 12.4477 3 13Z" /><path d="M15 9V19C15 19.5523 15.4477 20 16 20H20C20.5523 20 21 19.5523 21 19V9C21 8.44772 20.5523 8 20 8H16C15.4477 8 15 8.44772 15 9Z" /><path d="M9 5V19C9 19.5523 9.44772 20 10 20H14C14.5523 20 15 19.5523 15 19V5C15 4.44772 14.5523 4 14 4H10C9.44772 4 9 4.44772 9 5Z" /></svg>',
             'history' => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 8V12L14.5 14.5M12 4C7.03125 4 3 8.03125 3 13C3 17.9688 7.03125 22 12 22C16.9688 22 21 17.9688 21 13H19C19 17.4183 15.4183 21 12 21C8.58172 21 5 17.4183 5 13C5 8.58172 8.58172 5 12 5V4Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
             'operation' => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 6H20M4 12H20M4 18H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+            'operators' => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="9" cy="8" r="3.25" stroke="currentColor" stroke-width="1.5"/><path d="M3.5 19.5C3.5 16.7386 5.96243 14.5 9 14.5C10.2 14.5 11.31 14.85 12.22 15.44" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M15.5 21L14 22V15.5C14 14.9477 14.4477 14.5 15 14.5H20C20.5523 14.5 21 14.9477 21 15.5V20C21 20.5523 20.5523 21 20 21H15.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
             'department' => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="8" width="18" height="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 8V5H11V8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 8V5H17V8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 16H8V12H12V16Z" fill="currentColor"/></svg>',
             'import' => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3V15M12 15L8 11M12 15L16 11M4 21H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
             'export' => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 21V9M12 9L8 13M12 9L16 13M4 3H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',

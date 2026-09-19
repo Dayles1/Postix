@@ -29,6 +29,13 @@ final class DriverCheckController extends Controller
         );
     }
 
+    public function operators()
+    {
+        return view(
+            'pages.driver-check.operators'
+        );
+    }
+
     public function drivers()
     {
         return view(
