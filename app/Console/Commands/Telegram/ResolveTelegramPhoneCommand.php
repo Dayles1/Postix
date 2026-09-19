@@ -65,9 +65,6 @@ final class ResolveTelegramPhoneCommand extends Command
          * ============================================================
          * 2. ONLY CREATED_DRIVER
          * ============================================================
-         *
-         * Handler should already send only CREATED_DRIVER to Job,
-         * but command must protect itself too.
          */
         if (
             $check->type !==
@@ -131,9 +128,7 @@ final class ResolveTelegramPhoneCommand extends Command
          * 5. PHONE IS REQUIRED
          * ============================================================
          */
-        if (
-            ! $check->phone_normalized
-        ) {
+        if (! $check->phone_normalized) {
             $check->update([
                 'status' =>
                     TelegramDriverCheckStatus::NotConfirmed,
@@ -156,8 +151,6 @@ final class ResolveTelegramPhoneCommand extends Command
          * ============================================================
          * 6. ATOMICALLY CLAIM CHECK
          * ============================================================
-         *
-         * Prevent two workers from processing same check.
          */
         $claimed = TelegramDriverCheck::query()
             ->whereKey($check->id)
@@ -183,9 +176,6 @@ final class ResolveTelegramPhoneCommand extends Command
              * ========================================================
              * 7. CACHE FIRST
              * ========================================================
-             *
-             * Existing successfully resolved phone:
-             * do not call Telegram again.
              */
             $resolvedPhone = TelegramResolvedPhone::query()
                 ->where(
@@ -239,19 +229,10 @@ final class ResolveTelegramPhoneCommand extends Command
                 'telegram_raw' => $telegramRaw,
             ]);
 
-            /*
-             * Accounts already used by this check.
-             */
             $usedAccountIds = [];
 
-            /*
-             * Number of "phone not registered" responses.
-             */
             $notRegisteredCount = 0;
 
-            /*
-             * Real Telegram / account errors.
-             */
             $realErrorCount = 0;
 
             $lastError =
@@ -323,9 +304,6 @@ final class ResolveTelegramPhoneCommand extends Command
                             now(),
                     ]);
 
-                    /*
-                     * Current driver state.
-                     */
                     $check->driver?->update([
                         'status' =>
                             'not_confirmed',
@@ -446,12 +424,51 @@ final class ResolveTelegramPhoneCommand extends Command
                      * ------------------------------------------------
                      * RESOLVE PHONE
                      * ------------------------------------------------
+                     *
+                     * IMPORTANT:
+                     * The resolver may catch Throwable internally
+                     * and return an array instead.
                      */
                     $result =
                         $resolver->resolve(
                             $api,
                             $check->phone_normalized,
+                            /*
+                             * Diagnostic context only: lets the resolver name
+                             * the check/attempt/account in its own cancellation
+                             * log. Does not affect resolving or retries.
+                             */
+                            [
+                                'check_id' =>
+                                    $check->id,
+
+                                'attempt' =>
+                                    $attempt,
+
+                                'account_id' =>
+                                    $accountId,
+
+                                'account_phone' =>
+                                    $account->phone,
+                            ],
                         );
+
+                    /*
+                     * ------------------------------------------------
+                     * FULL DIAGNOSTIC LOG FOR CANCELLED OPERATION
+                     * ------------------------------------------------
+                     */
+                    if (
+                        $this->isCancelledResult($result)
+                    ) {
+                        $this->logCancelledResolverResult(
+                            check: $check,
+                            attempt: $attempt,
+                            accountId: $accountId,
+                            accountPhone: $account->phone,
+                            result: $result,
+                        );
+                    }
 
                     $success =
                         (bool) (
@@ -548,8 +565,6 @@ final class ResolveTelegramPhoneCommand extends Command
                      * ------------------------------------------------
                      * PHONE NOT REGISTERED
                      * ------------------------------------------------
-                     *
-                     * This is NOT a broken account.
                      */
                     if (
                         ! $success
@@ -742,9 +757,6 @@ final class ResolveTelegramPhoneCommand extends Command
                                     'telegram_account_id' =>
                                         $accountId,
 
-                                    /*
-                                     * NEW MODEL RELATION
-                                     */
                                     'driver_id' =>
                                         $check->driver_id,
 
@@ -862,6 +874,9 @@ final class ResolveTelegramPhoneCommand extends Command
                             'command_exception',
                         );
 
+                    /*
+                     * FULL EXCEPTION LOG
+                     */
                     Log::error(
                         'Telegram resolver attempt exception',
                         [
@@ -883,6 +898,50 @@ final class ResolveTelegramPhoneCommand extends Command
                             'exception' =>
                                 $e::class,
 
+                            /*
+                             * FULL THROWABLE DETAILS
+                             */
+                            'exception_message' =>
+                                $e->getMessage(),
+
+                            'exception_code' =>
+                                $e->getCode(),
+
+                            'exception_file' =>
+                                $e->getFile(),
+
+                            'exception_line' =>
+                                $e->getLine(),
+
+                            'exception_trace' =>
+                                $e->getTraceAsString(),
+
+                            /*
+                             * PREVIOUS THROWABLE
+                             */
+                            'previous_exception' =>
+                                $e->getPrevious() !== null
+                                    ? $e->getPrevious()::class
+                                    : null,
+
+                            'previous_message' =>
+                                $e->getPrevious()?->getMessage(),
+
+                            'previous_code' =>
+                                $e->getPrevious()?->getCode(),
+
+                            'previous_file' =>
+                                $e->getPrevious()?->getFile(),
+
+                            'previous_line' =>
+                                $e->getPrevious()?->getLine(),
+
+                            'previous_trace' =>
+                                $e->getPrevious()?->getTraceAsString(),
+
+                            /*
+                             * PROCESS STATE
+                             */
                             'failures' =>
                                 $state->failures,
 
@@ -893,6 +952,71 @@ final class ResolveTelegramPhoneCommand extends Command
                                 $state->is_available,
                         ],
                     );
+
+                    /*
+                     * SPECIAL CANCELLED LOG
+                     */
+                    if (
+                        $this->isCancelledThrowable($e)
+                    ) {
+                        Log::critical(
+                            'Telegram resolver CANCELLED OPERATION - FULL THROWABLE',
+                            [
+                                'check_id' =>
+                                    $check->id,
+
+                                'attempt' =>
+                                    $attempt,
+
+                                'account_id' =>
+                                    $accountId,
+
+                                'phone' =>
+                                    $account->phone,
+
+                                'exception' =>
+                                    $e::class,
+
+                                'message' =>
+                                    $e->getMessage(),
+
+                                'code' =>
+                                    $e->getCode(),
+
+                                'file' =>
+                                    $e->getFile(),
+
+                                'line' =>
+                                    $e->getLine(),
+
+                                'trace' =>
+                                    $e->getTraceAsString(),
+
+                                'previous' =>
+                                    $e->getPrevious()
+                                        ? [
+                                            'class' =>
+                                                $e->getPrevious()::class,
+
+                                            'message' =>
+                                                $e->getPrevious()->getMessage(),
+
+                                            'code' =>
+                                                $e->getPrevious()->getCode(),
+
+                                            'file' =>
+                                                $e->getPrevious()->getFile(),
+
+                                            'line' =>
+                                                $e->getPrevious()->getLine(),
+
+                                            'trace' =>
+                                                $e->getPrevious()->getTraceAsString(),
+                                        ]
+                                        : null,
+                            ],
+                        );
+                    }
 
                     continue;
                 } finally {
@@ -936,6 +1060,29 @@ final class ResolveTelegramPhoneCommand extends Command
 
                                     'exception' =>
                                         $e::class,
+
+                                    /*
+                                     * Diagnostic information.
+                                     */
+                                    'exception_file' =>
+                                        $e->getFile(),
+
+                                    'exception_line' =>
+                                        $e->getLine(),
+
+                                    'exception_trace' =>
+                                        $e->getTraceAsString(),
+
+                                    'previous_exception' =>
+                                        $e->getPrevious() !== null
+                                            ? $e->getPrevious()::class
+                                            : null,
+
+                                    'previous_message' =>
+                                        $e->getPrevious()?->getMessage(),
+
+                                    'previous_trace' =>
+                                        $e->getPrevious()?->getTraceAsString(),
                                 ],
                             );
                         }
@@ -1006,9 +1153,6 @@ final class ResolveTelegramPhoneCommand extends Command
                         now(),
                 ]);
 
-                /*
-                 * Current driver state.
-                 */
                 $check->driver?->update([
                     'status' =>
                         'not_confirmed',
@@ -1049,9 +1193,6 @@ final class ResolveTelegramPhoneCommand extends Command
                     now(),
             ]);
 
-            /*
-             * Current driver state.
-             */
             $check->driver?->update([
                 'status' =>
                     'not_confirmed',
@@ -1097,6 +1238,9 @@ final class ResolveTelegramPhoneCommand extends Command
                     1000,
                 );
 
+            /*
+             * FULL GLOBAL THROWABLE
+             */
             Log::error(
                 'ResolveTelegramPhoneCommand failed',
                 [
@@ -1114,8 +1258,105 @@ final class ResolveTelegramPhoneCommand extends Command
 
                     'exception' =>
                         $e::class,
+
+                    'exception_message' =>
+                        $e->getMessage(),
+
+                    'exception_code' =>
+                        $e->getCode(),
+
+                    'exception_file' =>
+                        $e->getFile(),
+
+                    'exception_line' =>
+                        $e->getLine(),
+
+                    'exception_trace' =>
+                        $e->getTraceAsString(),
+
+                    'previous_exception' =>
+                        $e->getPrevious() !== null
+                            ? $e->getPrevious()::class
+                            : null,
+
+                    'previous_message' =>
+                        $e->getPrevious()?->getMessage(),
+
+                    'previous_code' =>
+                        $e->getPrevious()?->getCode(),
+
+                    'previous_file' =>
+                        $e->getPrevious()?->getFile(),
+
+                    'previous_line' =>
+                        $e->getPrevious()?->getLine(),
+
+                    'previous_trace' =>
+                        $e->getPrevious()?->getTraceAsString(),
                 ],
             );
+
+            /*
+             * SPECIAL GLOBAL CANCELLED LOG
+             */
+            if (
+                $this->isCancelledThrowable($e)
+            ) {
+                Log::critical(
+                    'ResolveTelegramPhoneCommand CANCELLED OPERATION - FULL THROWABLE',
+                    [
+                        'check_id' =>
+                            $check->id,
+
+                        'phone' =>
+                            $check->phone_normalized,
+
+                        'attempts' =>
+                            $check->attempts,
+
+                        'exception' =>
+                            $e::class,
+
+                        'message' =>
+                            $e->getMessage(),
+
+                        'code' =>
+                            $e->getCode(),
+
+                        'file' =>
+                            $e->getFile(),
+
+                        'line' =>
+                            $e->getLine(),
+
+                        'trace' =>
+                            $e->getTraceAsString(),
+
+                        'previous' =>
+                            $e->getPrevious()
+                                ? [
+                                    'class' =>
+                                        $e->getPrevious()::class,
+
+                                    'message' =>
+                                        $e->getPrevious()->getMessage(),
+
+                                    'code' =>
+                                        $e->getPrevious()->getCode(),
+
+                                    'file' =>
+                                        $e->getPrevious()->getFile(),
+
+                                    'line' =>
+                                        $e->getPrevious()->getLine(),
+
+                                    'trace' =>
+                                        $e->getPrevious()->getTraceAsString(),
+                                ]
+                                : null,
+                    ],
+                );
+            }
 
             $check->refresh();
 
@@ -1140,9 +1381,6 @@ final class ResolveTelegramPhoneCommand extends Command
                     now(),
             ]);
 
-            /*
-             * Current driver state.
-             */
             $check->driver?->update([
                 'status' =>
                     'not_confirmed',
@@ -1150,6 +1388,177 @@ final class ResolveTelegramPhoneCommand extends Command
 
             return self::FAILURE;
         }
+    }
+
+    /**
+     * Check whether the resolver returned a cancelled operation.
+     */
+    private function isCancelledResult(
+        mixed $result,
+    ): bool {
+        if (! is_array($result)) {
+            return false;
+        }
+
+        $message = mb_strtolower(
+            (string) (
+                $result['error_message']
+                ?? $result['message']
+                ?? ''
+            ),
+        );
+
+        $exception = mb_strtolower(
+            (string) (
+                $result['exception']
+                ?? $result['exception_class']
+                ?? ''
+            ),
+        );
+
+        return str_contains(
+            $message,
+            'operation was cancelled',
+        )
+        || str_contains(
+            $exception,
+            'cancelledexception',
+        );
+    }
+
+    /**
+     * Check whether Throwable is an Amp cancellation.
+     */
+    private function isCancelledThrowable(
+        Throwable $e,
+    ): bool {
+        return $e instanceof \Amp\CancelledException
+            || str_contains(
+                mb_strtolower(
+                    $e->getMessage(),
+                ),
+                'operation was cancelled',
+            )
+            || str_contains(
+                mb_strtolower(
+                    $e::class,
+                ),
+                'cancelledexception',
+            );
+    }
+
+    /**
+     * Log all useful diagnostic information returned by resolver.
+     *
+     * We deliberately do not log `user` or `raw` here because they
+     * may contain personal Telegram data and are not necessary for
+     * diagnosing the cancellation.
+     */
+    private function logCancelledResolverResult(
+        TelegramDriverCheck $check,
+        int $attempt,
+        int $accountId,
+        string $accountPhone,
+        array $result,
+    ): void {
+        Log::critical(
+            'Telegram phone resolver returned CANCELLED OPERATION',
+            [
+                'check_id' =>
+                    $check->id,
+
+                'attempt' =>
+                    $attempt,
+
+                'account_id' =>
+                    $accountId,
+
+                'account_phone' =>
+                    $accountPhone,
+
+                /*
+                 * Resolver result.
+                 */
+                'success' =>
+                    $result['success']
+                    ?? null,
+
+                'reason' =>
+                    $result['reason']
+                    ?? null,
+
+                'error_message' =>
+                    $result['error_message']
+                    ?? null,
+
+                /*
+                 * Original exception, if resolver provides it.
+                 */
+                'exception' =>
+                    $result['exception']
+                    ?? $result['exception_class']
+                    ?? null,
+
+                'exception_message' =>
+                    $result['exception_message']
+                    ?? null,
+
+                'exception_code' =>
+                    $result['exception_code']
+                    ?? null,
+
+                'exception_file' =>
+                    $result['exception_file']
+                    ?? null,
+
+                'exception_line' =>
+                    $result['exception_line']
+                    ?? null,
+
+                'exception_trace' =>
+                    $result['exception_trace']
+                    ?? null,
+
+                /*
+                 * Previous exception.
+                 */
+                'previous_exception' =>
+                    $result['previous_exception']
+                    ?? null,
+
+                'previous_message' =>
+                    $result['previous_message']
+                    ?? null,
+
+                'previous_code' =>
+                    $result['previous_code']
+                    ?? null,
+
+                'previous_file' =>
+                    $result['previous_file']
+                    ?? null,
+
+                'previous_line' =>
+                    $result['previous_line']
+                    ?? null,
+
+                'previous_trace' =>
+                    $result['previous_trace']
+                    ?? null,
+
+                /*
+                 * Process information.
+                 */
+                'pid' =>
+                    getmypid(),
+
+                'php_version' =>
+                    PHP_VERSION,
+
+                'timestamp' =>
+                    now()->toISOString(),
+            ],
+        );
     }
 
     /**
@@ -1183,8 +1592,6 @@ final class ResolveTelegramPhoneCommand extends Command
 
     /**
      * Apply resolved Telegram user to check.
-     *
-     * Also updates current TelegramDriver status.
      */
     private function applyResolvedPhone(
         TelegramDriverCheck $check,

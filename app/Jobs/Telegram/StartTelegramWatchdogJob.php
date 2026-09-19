@@ -24,7 +24,8 @@ class StartTelegramWatchdogJob implements ShouldQueue
         $logFile = storage_path('logs/watchdog.log');
 
         $command = sprintf(
-            'nohup %s %s telegram:watchdog >> %s 2>&1 &',
+            'cd %s && nohup %s %s telegram:watchdog >> %s 2>&1 &',
+            escapeshellarg(base_path()),
             escapeshellarg(PHP_BINARY),
             escapeshellarg($artisan),
             escapeshellarg($logFile)
