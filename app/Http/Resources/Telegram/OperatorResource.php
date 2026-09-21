@@ -22,8 +22,6 @@ final class OperatorResource extends JsonResource
 
             'telegram_id' => $this->telegram_id,
 
-            'is_active' => (bool) $this->is_active,
-
             'dm_enabled' => (bool) $this->dm_enabled,
 
             /*

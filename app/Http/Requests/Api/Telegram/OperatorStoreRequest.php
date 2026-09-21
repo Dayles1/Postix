@@ -47,7 +47,6 @@ class OperatorStoreRequest extends FormRequest
                 Rule::unique('operation_users', 'telegram_id'),
             ],
 
-            'is_active' => ['nullable', 'boolean'],
             'dm_enabled' => ['nullable', 'boolean'],
         ];
     }

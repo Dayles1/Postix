@@ -91,13 +91,12 @@ class OperationUser extends Model
     /**
      * Whether a report may be copied into this operator's private chat.
      *
-     * Both switches must be on AND the operator must be reachable: without a
+     * The switch must be on AND the operator must be reachable: without a
      * username or an id there is no peer to send to.
      */
     public function canReceiveDirectMessages(): bool
     {
-        return $this->is_active
-            && $this->dm_enabled
+        return $this->dm_enabled
             && $this->hasTelegramPeer();
     }
 

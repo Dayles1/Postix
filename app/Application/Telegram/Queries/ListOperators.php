@@ -48,10 +48,6 @@ final class ListOperators
         return [
             'total' => (clone $base)->count(),
 
-            'active' => (clone $base)
-                ->where('is_active', true)
-                ->count(),
-
             'linked' => (clone $base)
                 ->where(
                     fn (Builder $q) => $this->whereHasPeer($q),
@@ -59,7 +55,6 @@ final class ListOperators
                 ->count(),
 
             'dm_enabled' => (clone $base)
-                ->where('is_active', true)
                 ->where('dm_enabled', true)
                 ->where(
                     fn (Builder $q) => $this->whereHasPeer($q),
@@ -101,16 +96,6 @@ final class ListOperators
                         [$like],
                     );
             });
-        }
-
-        if (array_key_exists('is_active', $filters)
-            && $filters['is_active'] !== null
-            && $filters['is_active'] !== ''
-        ) {
-            $query->where(
-                'is_active',
-                (bool) $filters['is_active'],
-            );
         }
 
         if (array_key_exists('dm_enabled', $filters)

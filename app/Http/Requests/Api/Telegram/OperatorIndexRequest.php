@@ -18,7 +18,6 @@ class OperatorIndexRequest extends FormRequest
     {
         return [
             'search' => ['nullable', 'string', 'max:255'],
-            'is_active' => ['nullable', 'boolean'],
             'dm_enabled' => ['nullable', 'boolean'],
             'linked' => ['nullable', 'boolean'],
             'sort' => [

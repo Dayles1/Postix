@@ -169,7 +169,6 @@ final class TelegramOperatorNotifier
                 'check_id' => $check->id,
                 'operation_user_id' => $operator->id,
                 'operator' => $operator->name,
-                'is_active' => $operator->is_active,
                 'dm_enabled' => $operator->dm_enabled,
                 'has_peer' => $operator->hasTelegramPeer(),
             ],

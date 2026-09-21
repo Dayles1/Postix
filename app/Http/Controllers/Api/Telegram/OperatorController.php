@@ -123,8 +123,6 @@ final class OperatorController extends Controller
 
             'telegram_id' => $validated['telegram_id'] ?? null,
 
-            'is_active' => (bool) ($validated['is_active'] ?? true),
-
             'dm_enabled' => (bool) ($validated['dm_enabled'] ?? true),
         ];
     }
