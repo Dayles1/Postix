@@ -22,7 +22,6 @@ return [
 
         'stats' => [
             'total' => 'Jami operatorlar',
-            'active' => 'Faol',
             'linked' => 'Telegram bog\'langan',
             'dm_enabled' => 'Lichkaga oladi',
             'failing' => 'Yuborishda xato',
@@ -31,10 +30,6 @@ return [
         'filters' => [
             'title' => 'Filtrlar',
             'reset' => 'Tozalash',
-            'status' => 'Holat',
-            'status_all' => 'Hammasi',
-            'status_active' => 'Faol',
-            'status_inactive' => 'Nofaol',
             'dm' => 'Shaxsiy xabarlar',
             'dm_all' => 'Hammasi',
             'dm_on' => 'Yoqilgan',
@@ -48,7 +43,6 @@ return [
         'table' => [
             'operator' => 'Operator',
             'telegram' => 'Telegram',
-            'status' => 'Holat',
             'dm' => 'Lichkaga',
             'drivers' => 'Haydovchilar',
             'checks' => 'Tekshiruvlar',
@@ -57,13 +51,10 @@ return [
             'no_username' => 'Username yo\'q',
             'no_id' => 'ID yo\'q',
             'never' => 'Yuborilmagan',
-            'active' => 'Faol',
-            'inactive' => 'Nofaol',
             'dm_on' => 'Yoqilgan',
             'dm_off' => 'O\'chirilgan',
             'dm_unreachable' => 'Kontakt yo\'q',
             'edit' => 'Tahrirlash',
-            'delete' => 'O\'chirish',
         ],
 
         'form' => [
@@ -76,8 +67,6 @@ return [
             'telegram_username_hint' => '«@» belgisisiz. Birinchi navbatda ishlatiladi — akkaunt operatorni hali tanimasa ham ishlaydi',
             'telegram_id' => 'Telegram ID',
             'telegram_id_hint' => 'Zaxira variant: akkaunt bu foydalanuvchini allaqachon ko\'rgan bo\'lsagina ishlaydi',
-            'is_active' => 'Faol',
-            'is_active_hint' => 'Nofaol operator hech narsa olmaydi',
             'dm_enabled' => 'Hisobotlarni lichkaga yuborish',
             'dm_enabled_hint' => 'Guruhga ketgan hisobot nusxasi operatorga shaxsiy xabar bilan yuboriladi',
             'save' => 'Saqlash',
@@ -90,17 +79,9 @@ return [
             'username_format' => 'Username lotin harflari, raqamlar va «_» dan iborat, 5–32 belgi bo\'lishi kerak',
         ],
 
-        'confirm' => [
-            'delete_title' => 'Operator o\'chirilsinmi?',
-            'delete_text' => 'Bu amalni qaytarib bo\'lmaydi.',
-            'delete' => 'O\'chirish',
-            'cancel' => 'Bekor qilish',
-        ],
-
         'messages' => [
             'created' => 'Operator qo\'shildi',
             'updated' => 'O\'zgarishlar saqlandi',
-            'deleted' => 'Operator o\'chirildi',
         ],
 
         'deleted' => 'Operator o\'chirildi',
@@ -109,8 +90,7 @@ return [
             'title' => 'Xato',
             'load' => 'Operatorlarni yuklab bo\'lmadi',
             'save' => 'Operatorni saqlab bo\'lmadi',
-            'delete' => 'Operatorni o\'chirib bo\'lmadi',
-            'has_history' => 'Bu operatorda haydovchilar yoki tekshiruvlar bor — o\'chirib bo\'lmaydi. Uni nofaol qilib qo\'ying.',
+            'has_history' => 'Bu operatorda haydovchilar yoki tekshiruvlar bor — o\'chirib bo\'lmaydi.',
             'dm_last_error' => 'Oxirgi yuborishdagi xato',
         ],
 

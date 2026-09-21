@@ -6,14 +6,16 @@
 <div
     x-data="operatorsPage()"
     x-init="init()"
-    class="min-h-[calc(100vh-5rem)] px-3 py-4 sm:px-5 sm:py-6 lg:px-8 lg:py-8"
+    class="px-3 py-4 sm:px-5 sm:py-6 lg:px-8 lg:py-8"
 >
-    <div class="mx-auto flex w-full max-w-[1920px] flex-col gap-6">
+    <div class="mx-auto flex w-full max-w-[1600px] flex-col gap-5 sm:gap-6">
 
-        {{-- Header --}}
-        <header class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div class="flex min-w-0 items-center gap-3">
-                <div
+        {{-- ================================================================
+             Header
+        ================================================================= --}}
+        <header class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div class="flex min-w-0 items-start gap-3">
+                <span
                     class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl
                            bg-indigo-600 text-white shadow-lg shadow-indigo-600/20
                            dark:bg-indigo-500 dark:shadow-indigo-500/20"
@@ -23,42 +25,41 @@
                         <path stroke-linecap="round" d="M3.5 19.5C3.5 16.74 5.96 14.5 9 14.5c1.2 0 2.31.35 3.22.94" />
                         <path stroke-linejoin="round" d="M15.5 21 14 22v-6.5a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1h-4.5Z" />
                     </svg>
-                </div>
+                </span>
 
                 <div class="min-w-0">
                     <div class="flex flex-wrap items-center gap-2">
-                        <h1 class="truncate text-xl font-semibold tracking-tight text-gray-950 sm:text-2xl dark:text-white">
+                        <h1 class="text-xl font-semibold tracking-tight text-gray-950 sm:text-2xl dark:text-white">
                             {{ __('telegram.operators.title') }}
                         </h1>
 
                         <span
                             class="rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[10px]
-                                   font-semibold uppercase tracking-wider text-gray-500 shadow-sm
+                                   font-semibold uppercase tracking-wider text-gray-500
                                    dark:border-gray-800 dark:bg-white/[0.04] dark:text-gray-400"
                         >
                             Telegram
                         </span>
                     </div>
 
-                    <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
+                    <p class="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
                         {{ __('telegram.operators.description') }}
                     </p>
                 </div>
             </div>
 
-            <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <div class="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row">
                 <button
                     type="button"
                     @click="load()"
                     :disabled="loading"
-                    class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl
-                           border border-gray-200 bg-white px-4 text-sm font-medium text-gray-700
-                           shadow-sm transition hover:-translate-y-0.5 hover:border-gray-300
-                           hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60
-                           sm:w-auto dark:border-gray-800 dark:bg-gray-900/80
-                           dark:text-gray-200 dark:hover:border-gray-700 dark:hover:bg-white/[0.05]"
+                    class="inline-flex h-10 items-center justify-center gap-2 rounded-xl border
+                           border-gray-200 bg-white px-4 text-sm font-medium text-gray-700
+                           transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60
+                           dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200
+                           dark:hover:bg-white/[0.05]"
                 >
-                    <svg class="h-4 w-4" :class="{ 'animate-spin': loading }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <svg class="h-4 w-4" :class="loading && 'animate-spin'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9M4.582 9H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2M19.419 15H15" />
                     </svg>
 
@@ -68,10 +69,9 @@
                 <button
                     type="button"
                     @click="openCreate()"
-                    class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl
-                           bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm
-                           shadow-indigo-600/20 transition hover:-translate-y-0.5 hover:bg-indigo-700
-                           sm:w-auto dark:bg-indigo-500 dark:hover:bg-indigo-400"
+                    class="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-indigo-600
+                           px-4 text-sm font-semibold text-white shadow-sm shadow-indigo-600/20
+                           transition hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400"
                 >
                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14" />
@@ -81,13 +81,12 @@
             </div>
         </header>
 
-        {{-- Stats --}}
-        <section class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
+        {{-- ================================================================
+             Stats
+        ================================================================= --}}
+        <section class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
             <template x-for="card in statCards()" :key="card.key">
-                <div
-                    class="rounded-2xl border border-gray-200/80 bg-white p-4 shadow-sm
-                           dark:border-gray-800 dark:bg-gray-900/60"
-                >
+                <div class="rounded-2xl border border-gray-200/80 bg-white p-4 dark:border-gray-800 dark:bg-gray-900/60">
                     <p class="text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400"
                        x-text="card.label"></p>
 
@@ -98,12 +97,11 @@
             </template>
         </section>
 
-        {{-- Filters --}}
-        <section
-            class="rounded-2xl border border-gray-200/80 bg-white p-4 shadow-sm
-                   sm:p-5 dark:border-gray-800 dark:bg-gray-900/60"
-        >
-            <div class="mb-4 flex items-center justify-between">
+        {{-- ================================================================
+             Filters
+        ================================================================= --}}
+        <section class="rounded-2xl border border-gray-200/80 bg-white p-4 sm:p-5 dark:border-gray-800 dark:bg-gray-900/60">
+            <div class="mb-4 flex items-center justify-between gap-3">
                 <h2 class="text-sm font-semibold text-gray-900 dark:text-white">
                     {{ __('telegram.operators.filters.title') }}
                 </h2>
@@ -111,22 +109,23 @@
                 <button
                     type="button"
                     @click="resetFilters()"
-                    class="text-xs font-medium text-gray-500 transition hover:text-gray-900
+                    class="shrink-0 text-xs font-medium text-gray-500 transition hover:text-gray-900
                            dark:text-gray-400 dark:hover:text-white"
                 >
                     {{ __('telegram.operators.filters.reset') }}
                 </button>
             </div>
 
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <div class="sm:col-span-2">
-                    <label class="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                    <label for="operators-search" class="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
                         {{ __('telegram.operators.search_placeholder') }}
                     </label>
 
                     <input
+                        id="operators-search"
                         type="search"
-                        x-model.debounce.400ms="filters.search"
+                        x-model="filters.search"
                         @input.debounce.400ms="applyFilters()"
                         placeholder="{{ __('telegram.operators.search_placeholder') }}"
                         class="h-10 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm
@@ -137,30 +136,12 @@
                 </div>
 
                 <div>
-                    <label class="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
-                        {{ __('telegram.operators.filters.status') }}
-                    </label>
-
-                    <select
-                        x-model="filters.is_active"
-                        @change="applyFilters()"
-                        class="h-10 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm
-                               text-gray-900 focus:border-indigo-500 focus:outline-none
-                               focus:ring-2 focus:ring-indigo-500/20
-                               dark:border-gray-800 dark:bg-gray-950 dark:text-white"
-                    >
-                        <option value="">{{ __('telegram.operators.filters.status_all') }}</option>
-                        <option value="1">{{ __('telegram.operators.filters.status_active') }}</option>
-                        <option value="0">{{ __('telegram.operators.filters.status_inactive') }}</option>
-                    </select>
-                </div>
-
-                <div>
-                    <label class="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                    <label for="operators-dm" class="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
                         {{ __('telegram.operators.filters.dm') }}
                     </label>
 
                     <select
+                        id="operators-dm"
                         x-model="filters.dm_enabled"
                         @change="applyFilters()"
                         class="h-10 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm
@@ -175,11 +156,12 @@
                 </div>
 
                 <div>
-                    <label class="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                    <label for="operators-linked" class="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
                         {{ __('telegram.operators.filters.linked') }}
                     </label>
 
                     <select
+                        id="operators-linked"
                         x-model="filters.linked"
                         @change="applyFilters()"
                         class="h-10 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm
@@ -195,7 +177,9 @@
             </div>
         </section>
 
-        {{-- Error --}}
+        {{-- ================================================================
+             Error
+        ================================================================= --}}
         <div
             x-show="error"
             x-cloak
@@ -205,116 +189,119 @@
             <p class="text-sm font-medium text-red-700 dark:text-red-300">
                 {{ __('telegram.operators.errors.title') }}
             </p>
-            <p class="mt-0.5 text-sm text-red-600 dark:text-red-400" x-text="error"></p>
+            <p class="mt-0.5 break-words text-sm text-red-600 dark:text-red-400" x-text="error"></p>
         </div>
 
-        {{-- Table --}}
-        <section class="overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900/60">
-            <div class="overflow-x-auto">
-                <table class="w-full min-w-[980px] text-left">
-                    <thead class="border-b border-gray-200/80 bg-gray-50/80 dark:border-gray-800 dark:bg-white/[0.02]">
-                        <tr class="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                            <th class="px-4 py-3 font-medium sm:px-5">{{ __('telegram.operators.table.operator') }}</th>
-                            <th class="px-4 py-3 font-medium">{{ __('telegram.operators.table.telegram') }}</th>
-                            <th class="px-4 py-3 font-medium">{{ __('telegram.operators.table.status') }}</th>
-                            <th class="px-4 py-3 font-medium">{{ __('telegram.operators.table.dm') }}</th>
-                            <th class="px-4 py-3 text-right font-medium">{{ __('telegram.operators.table.drivers') }}</th>
-                            <th class="px-4 py-3 text-right font-medium">{{ __('telegram.operators.table.checks') }}</th>
-                            <th class="px-4 py-3 font-medium">{{ __('telegram.operators.table.last_sent') }}</th>
-                            <th class="px-4 py-3 text-right font-medium sm:px-5">{{ __('telegram.operators.table.actions') }}</th>
-                        </tr>
-                    </thead>
+        {{-- ================================================================
+             Rows
 
-                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                        <template x-for="row in rows" :key="row.id">
-                            <tr class="transition hover:bg-gray-50/70 dark:hover:bg-white/[0.02]">
-                                {{-- Operator --}}
-                                <td class="px-4 py-3 sm:px-5">
-                                    <div class="flex items-center gap-3">
-                                        <span
-                                            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full
-                                                   text-xs font-semibold"
-                                            :class="row.is_active
-                                                ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300'
-                                                : 'bg-gray-100 text-gray-500 dark:bg-white/[0.06] dark:text-gray-400'"
-                                            x-text="initials(row.name)"
-                                        ></span>
+             Two separate renderings of the same data: a table from lg up, a
+             card list below it. One layout squeezed into both widths is what
+             made the columns collide on a narrow screen.
+        ================================================================= --}}
+        <section class="rounded-2xl border border-gray-200/80 bg-white dark:border-gray-800 dark:bg-gray-900/60">
 
-                                        <div class="min-w-0">
-                                            <p class="truncate text-sm font-medium text-gray-900 dark:text-white"
-                                               x-text="row.name"></p>
-                                            <p class="truncate text-[11px] text-gray-400 dark:text-gray-500"
-                                               x-text="row.name_normalized"></p>
+            {{-- Table (lg and up) --}}
+            <div class="hidden lg:block">
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[900px] table-fixed text-left">
+                        <colgroup>
+                            <col class="w-[22%]">
+                            <col class="w-[18%]">
+                            <col class="w-[13%]">
+                            <col class="w-[9%]">
+                            <col class="w-[9%]">
+                            <col class="w-[19%]">
+                            <col class="w-[10%]">
+                        </colgroup>
+
+                        <thead class="border-b border-gray-200/80 bg-gray-50/80 dark:border-gray-800 dark:bg-white/[0.02]">
+                            <tr class="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                <th class="px-5 py-3 font-medium">{{ __('telegram.operators.table.operator') }}</th>
+                                <th class="px-4 py-3 font-medium">{{ __('telegram.operators.table.telegram') }}</th>
+                                <th class="px-4 py-3 font-medium">{{ __('telegram.operators.table.dm') }}</th>
+                                <th class="px-4 py-3 text-right font-medium">{{ __('telegram.operators.table.drivers') }}</th>
+                                <th class="px-4 py-3 text-right font-medium">{{ __('telegram.operators.table.checks') }}</th>
+                                <th class="px-4 py-3 font-medium">{{ __('telegram.operators.table.last_sent') }}</th>
+                                <th class="px-5 py-3 text-right font-medium">{{ __('telegram.operators.table.actions') }}</th>
+                            </tr>
+                        </thead>
+
+                        <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                            <template x-for="row in rows" :key="row.id">
+                                <tr class="align-top transition hover:bg-gray-50/70 dark:hover:bg-white/[0.02]">
+                                    {{-- Operator --}}
+                                    <td class="px-5 py-3">
+                                        <div class="flex items-center gap-3">
+                                            <span
+                                                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
+                                                :class="avatarClass(row)"
+                                                x-text="initials(row.name)"
+                                            ></span>
+
+                                            <div class="min-w-0">
+                                                <p class="truncate text-sm font-medium text-gray-900 dark:text-white"
+                                                   :title="row.name"
+                                                   x-text="row.name"></p>
+                                                <p class="truncate text-[11px] text-gray-400 dark:text-gray-500"
+                                                   :title="row.name_normalized"
+                                                   x-text="row.name_normalized"></p>
+                                            </div>
                                         </div>
-                                    </div>
-                                </td>
+                                    </td>
 
-                                {{-- Telegram --}}
-                                <td class="px-4 py-3">
-                                    <p class="text-sm"
-                                       :class="row.telegram_username
-                                           ? 'text-gray-900 dark:text-white'
-                                           : 'text-gray-400 dark:text-gray-500'"
-                                       x-text="row.telegram_username
-                                           ? '@' + row.telegram_username
-                                           : translations.table.no_username"></p>
+                                    {{-- Telegram --}}
+                                    <td class="px-4 py-3">
+                                        <p class="truncate text-sm"
+                                           :class="row.telegram_username
+                                               ? 'text-gray-900 dark:text-white'
+                                               : 'text-gray-400 dark:text-gray-500'"
+                                           x-text="row.telegram_username
+                                               ? '@' + row.telegram_username
+                                               : translations.table.no_username"></p>
 
-                                    <p class="text-[11px]"
-                                       :class="row.telegram_id
-                                           ? 'text-gray-500 dark:text-gray-400'
-                                           : 'text-gray-400 dark:text-gray-500'"
-                                       x-text="row.telegram_id
-                                           ? 'ID ' + row.telegram_id
-                                           : translations.table.no_id"></p>
-                                </td>
+                                        <p class="truncate text-[11px]"
+                                           :class="row.telegram_id
+                                               ? 'text-gray-500 dark:text-gray-400'
+                                               : 'text-gray-400 dark:text-gray-500'"
+                                           x-text="row.telegram_id
+                                               ? 'ID ' + row.telegram_id
+                                               : translations.table.no_id"></p>
+                                    </td>
 
-                                {{-- Status --}}
-                                <td class="px-4 py-3">
-                                    <span
-                                        class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium"
-                                        :class="row.is_active
-                                            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
-                                            : 'bg-gray-100 text-gray-600 dark:bg-white/[0.06] dark:text-gray-400'"
-                                        x-text="row.is_active
-                                            ? translations.table.active
-                                            : translations.table.inactive"
-                                    ></span>
-                                </td>
+                                    {{-- DM --}}
+                                    <td class="px-4 py-3">
+                                        <span
+                                            class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium"
+                                            :class="dmBadgeClass(row)"
+                                            x-text="dmBadgeLabel(row)"
+                                        ></span>
+                                    </td>
 
-                                {{-- DM --}}
-                                <td class="px-4 py-3">
-                                    <span
-                                        class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium"
-                                        :class="dmBadgeClass(row)"
-                                        x-text="dmBadgeLabel(row)"
-                                    ></span>
-                                </td>
+                                    <td class="px-4 py-3 text-right text-sm tabular-nums text-gray-700 dark:text-gray-300"
+                                        x-text="formatNumber(row.drivers_count)"></td>
 
-                                <td class="px-4 py-3 text-right text-sm text-gray-700 dark:text-gray-300"
-                                    x-text="formatNumber(row.drivers_count)"></td>
+                                    <td class="px-4 py-3 text-right text-sm tabular-nums text-gray-700 dark:text-gray-300"
+                                        x-text="formatNumber(row.checks_count)"></td>
 
-                                <td class="px-4 py-3 text-right text-sm text-gray-700 dark:text-gray-300"
-                                    x-text="formatNumber(row.checks_count)"></td>
+                                    {{-- Last delivery --}}
+                                    <td class="px-4 py-3">
+                                        <p class="text-sm text-gray-700 dark:text-gray-300"
+                                           x-text="row.dm_last_sent_at
+                                               ? formatDate(row.dm_last_sent_at)
+                                               : translations.table.never"></p>
 
-                                {{-- Last delivery --}}
-                                <td class="px-4 py-3">
-                                    <p class="text-sm text-gray-700 dark:text-gray-300"
-                                       x-text="row.dm_last_sent_at
-                                           ? formatDate(row.dm_last_sent_at, true)
-                                           : translations.table.never"></p>
+                                        <p
+                                            x-show="row.dm_last_error"
+                                            x-cloak
+                                            class="mt-0.5 line-clamp-2 text-[11px] text-red-600 dark:text-red-400"
+                                            :title="row.dm_last_error"
+                                            x-text="translations.errors.dm_last_error + ': ' + row.dm_last_error"
+                                        ></p>
+                                    </td>
 
-                                    <p
-                                        x-show="row.dm_last_error"
-                                        x-cloak
-                                        class="mt-0.5 max-w-[280px] truncate text-[11px] text-red-600 dark:text-red-400"
-                                        :title="row.dm_last_error"
-                                        x-text="translations.errors.dm_last_error + ': ' + row.dm_last_error"
-                                    ></p>
-                                </td>
-
-                                {{-- Actions --}}
-                                <td class="px-4 py-3 text-right sm:px-5">
-                                    <div class="flex items-center justify-end gap-2">
+                                    {{-- Actions --}}
+                                    <td class="px-5 py-3 text-right">
                                         <button
                                             type="button"
                                             @click="openEdit(row)"
@@ -325,34 +312,103 @@
                                         >
                                             {{ __('telegram.operators.table.edit') }}
                                         </button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
-                                        <button
-                                            type="button"
-                                            @click="askDelete(row)"
-                                            class="h-8 rounded-lg border border-red-200 bg-white px-3 text-xs font-medium
-                                                   text-red-600 transition hover:bg-red-50
-                                                   dark:border-red-900/40 dark:bg-gray-950 dark:text-red-400
-                                                   dark:hover:bg-red-950/30"
-                                        >
-                                            {{ __('telegram.operators.table.delete') }}
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        </template>
+            {{-- Cards (below lg) --}}
+            <div class="divide-y divide-gray-100 lg:hidden dark:divide-gray-800">
+                <template x-for="row in rows" :key="'card-' + row.id">
+                    <article class="flex flex-col gap-3 p-4">
+                        <div class="flex items-start gap-3">
+                            <span
+                                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
+                                :class="avatarClass(row)"
+                                x-text="initials(row.name)"
+                            ></span>
 
-                        <tr x-show="!loading && rows.length === 0" x-cloak>
-                            <td colspan="8" class="px-4 py-12 text-center sm:px-5">
-                                <p class="text-sm font-medium text-gray-900 dark:text-white">
-                                    {{ __('telegram.operators.empty.title') }}
-                                </p>
-                                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                    {{ __('telegram.operators.empty.description') }}
-                                </p>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                            <div class="min-w-0 flex-1">
+                                <p class="break-words text-sm font-medium text-gray-900 dark:text-white"
+                                   x-text="row.name"></p>
+                                <p class="break-all text-[11px] text-gray-400 dark:text-gray-500"
+                                   x-text="row.name_normalized"></p>
+                            </div>
+
+                            <span
+                                class="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium"
+                                :class="dmBadgeClass(row)"
+                                x-text="dmBadgeLabel(row)"
+                            ></span>
+                        </div>
+
+                        <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">
+                            <div class="min-w-0">
+                                <dt class="text-gray-400 dark:text-gray-500">{{ __('telegram.operators.table.telegram') }}</dt>
+                                <dd class="break-all text-xs text-gray-700 dark:text-gray-300"
+                                    x-text="row.telegram_username
+                                        ? '@' + row.telegram_username
+                                        : translations.table.no_username"></dd>
+                                <dd class="break-all text-[11px] text-gray-500 dark:text-gray-400"
+                                    x-text="row.telegram_id
+                                        ? 'ID ' + row.telegram_id
+                                        : translations.table.no_id"></dd>
+                            </div>
+
+                            <div class="min-w-0">
+                                <dt class="text-gray-400 dark:text-gray-500">{{ __('telegram.operators.table.last_sent') }}</dt>
+                                <dd class="text-xs text-gray-700 dark:text-gray-300"
+                                    x-text="row.dm_last_sent_at
+                                        ? formatDate(row.dm_last_sent_at)
+                                        : translations.table.never"></dd>
+                            </div>
+
+                            <div>
+                                <dt class="text-gray-400 dark:text-gray-500">{{ __('telegram.operators.table.drivers') }}</dt>
+                                <dd class="text-xs tabular-nums text-gray-700 dark:text-gray-300"
+                                    x-text="formatNumber(row.drivers_count)"></dd>
+                            </div>
+
+                            <div>
+                                <dt class="text-gray-400 dark:text-gray-500">{{ __('telegram.operators.table.checks') }}</dt>
+                                <dd class="text-xs tabular-nums text-gray-700 dark:text-gray-300"
+                                    x-text="formatNumber(row.checks_count)"></dd>
+                            </div>
+                        </dl>
+
+                        <p
+                            x-show="row.dm_last_error"
+                            x-cloak
+                            class="break-words rounded-lg bg-red-50 px-2.5 py-1.5 text-[11px] text-red-600
+                                   dark:bg-red-950/30 dark:text-red-400"
+                            x-text="translations.errors.dm_last_error + ': ' + row.dm_last_error"
+                        ></p>
+
+                        <button
+                            type="button"
+                            @click="openEdit(row)"
+                            class="h-9 w-full rounded-lg border border-gray-200 bg-white text-xs font-medium
+                                   text-gray-700 transition hover:bg-gray-50
+                                   dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300
+                                   dark:hover:bg-white/[0.04]"
+                        >
+                            {{ __('telegram.operators.table.edit') }}
+                        </button>
+                    </article>
+                </template>
+            </div>
+
+            {{-- Empty --}}
+            <div x-show="!loading && rows.length === 0" x-cloak class="px-4 py-12 text-center">
+                <p class="text-sm font-medium text-gray-900 dark:text-white">
+                    {{ __('telegram.operators.empty.title') }}
+                </p>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    {{ __('telegram.operators.empty.description') }}
+                </p>
             </div>
 
             {{-- Pagination --}}
@@ -400,250 +456,216 @@
         </section>
     </div>
 
-    {{-- Form modal --}}
-    <div
-        x-show="formOpen"
-        x-cloak
-        class="fixed inset-0 z-[99999] flex items-end justify-center bg-gray-900/50 p-0 sm:items-center sm:p-4"
-        @keydown.escape.window="closeForm()"
-    >
+    {{-- ====================================================================
+         Form modal
+
+         Teleported to <body>: inside the page it sits under the layout's
+         sidebar/header stacking contexts, which is what made it render
+         behind the rest of the page.
+    ===================================================================== --}}
+    <template x-teleport="body">
         <div
-            @click.outside="closeForm()"
-            class="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-5
-                   shadow-xl sm:rounded-3xl sm:p-6 dark:bg-gray-900"
+            x-show="formOpen"
+            x-cloak
+            class="fixed inset-0 z-[9999]"
+            role="dialog"
+            aria-modal="true"
+            @keydown.escape.window="closeForm()"
         >
-            <div class="mb-5 flex items-start justify-between gap-4">
-                <div>
-                    <h2 class="text-lg font-semibold text-gray-950 dark:text-white"
-                        x-text="form.id
-                            ? translations.form.edit_title
-                            : translations.form.create_title"></h2>
-                </div>
+            <div
+                x-show="formOpen"
+                x-transition.opacity
+                class="absolute inset-0 bg-gray-900/60"
+            ></div>
 
-                <button
-                    type="button"
-                    @click="closeForm()"
-                    class="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700
-                           dark:hover:bg-white/[0.06] dark:hover:text-gray-200"
+            <div class="absolute inset-0 overflow-y-auto overscroll-contain">
+                <div
+                    class="flex min-h-full items-end justify-center p-0 sm:items-center sm:p-4"
+                    @click.self="closeForm()"
                 >
-                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                        <path stroke-linecap="round" d="M6 6l12 12M18 6L6 18" />
-                    </svg>
-                </button>
-            </div>
-
-            <form @submit.prevent="save()" class="flex flex-col gap-4">
-                {{-- Name --}}
-                <div>
-                    <label class="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
-                        {{ __('telegram.operators.form.name') }}
-                    </label>
-
-                    <input
-                        type="text"
-                        x-model="form.name"
-                        required
-                        class="h-10 w-full rounded-xl border bg-white px-3 text-sm text-gray-900
-                               focus:outline-none focus:ring-2 focus:ring-indigo-500/20
-                               dark:bg-gray-950 dark:text-white"
-                        :class="fieldError('name')
-                            ? 'border-red-400 dark:border-red-800'
-                            : 'border-gray-200 focus:border-indigo-500 dark:border-gray-800'"
+                    <div
+                        x-show="formOpen"
+                        x-transition
+                        class="relative w-full max-w-lg rounded-t-3xl bg-white p-5 shadow-xl
+                               sm:rounded-3xl sm:p-6 dark:bg-gray-900"
                     >
+                        <div class="mb-5 flex items-start justify-between gap-4">
+                            <h2 class="text-lg font-semibold text-gray-950 dark:text-white"
+                                x-text="form.id
+                                    ? translations.form.edit_title
+                                    : translations.form.create_title"></h2>
 
-                    <p class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
-                        {{ __('telegram.operators.form.name_hint') }}
-                    </p>
+                            <button
+                                type="button"
+                                @click="closeForm()"
+                                class="-m-1.5 rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100
+                                       hover:text-gray-700 dark:hover:bg-white/[0.06] dark:hover:text-gray-200"
+                            >
+                                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                    <path stroke-linecap="round" d="M6 6l12 12M18 6L6 18" />
+                                </svg>
+                            </button>
+                        </div>
 
-                    <p x-show="fieldError('name') || fieldError('name_normalized')" x-cloak
-                       class="mt-1 text-[11px] text-red-600 dark:text-red-400"
-                       x-text="fieldError('name') || fieldError('name_normalized')"></p>
+                        <form @submit.prevent="save()" class="flex flex-col gap-4">
+                            {{-- Name --}}
+                            <div>
+                                <label for="operator-name" class="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                                    {{ __('telegram.operators.form.name') }}
+                                </label>
 
-                    <p x-show="form.name" x-cloak
-                       class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
-                        {{ __('telegram.operators.form.name_normalized') }}:
-                        <span class="font-mono" x-text="normalizedPreview()"></span>
-                    </p>
-                </div>
+                                <input
+                                    id="operator-name"
+                                    type="text"
+                                    x-model="form.name"
+                                    required
+                                    class="h-10 w-full rounded-xl border bg-white px-3 text-sm text-gray-900
+                                           focus:outline-none focus:ring-2 focus:ring-indigo-500/20
+                                           dark:bg-gray-950 dark:text-white"
+                                    :class="fieldError('name') || fieldError('name_normalized')
+                                        ? 'border-red-400 dark:border-red-800'
+                                        : 'border-gray-200 focus:border-indigo-500 dark:border-gray-800'"
+                                >
 
-                {{-- Username --}}
-                <div>
-                    <label class="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
-                        {{ __('telegram.operators.form.telegram_username') }}
-                    </label>
+                                <p class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+                                    {{ __('telegram.operators.form.name_hint') }}
+                                </p>
 
-                    <div class="relative">
-                        <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">@</span>
+                                <p x-show="form.name" x-cloak
+                                   class="mt-1 break-all text-[11px] text-gray-400 dark:text-gray-500">
+                                    {{ __('telegram.operators.form.name_normalized') }}:
+                                    <span class="font-mono" x-text="normalizedPreview()"></span>
+                                </p>
 
-                        <input
-                            type="text"
-                            x-model="form.telegram_username"
-                            placeholder="username"
-                            class="h-10 w-full rounded-xl border bg-white pl-7 pr-3 text-sm text-gray-900
-                                   focus:outline-none focus:ring-2 focus:ring-indigo-500/20
-                                   dark:bg-gray-950 dark:text-white"
-                            :class="fieldError('telegram_username')
-                                ? 'border-red-400 dark:border-red-800'
-                                : 'border-gray-200 focus:border-indigo-500 dark:border-gray-800'"
-                        >
+                                <p x-show="fieldError('name') || fieldError('name_normalized')" x-cloak
+                                   class="mt-1 text-[11px] text-red-600 dark:text-red-400"
+                                   x-text="fieldError('name') || fieldError('name_normalized')"></p>
+                            </div>
+
+                            {{-- Username --}}
+                            <div>
+                                <label for="operator-username" class="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                                    {{ __('telegram.operators.form.telegram_username') }}
+                                </label>
+
+                                <div class="relative">
+                                    <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">&#64;</span>
+
+                                    <input
+                                        id="operator-username"
+                                        type="text"
+                                        x-model="form.telegram_username"
+                                        placeholder="username"
+                                        autocomplete="off"
+                                        class="h-10 w-full rounded-xl border bg-white pl-7 pr-3 text-sm text-gray-900
+                                               focus:outline-none focus:ring-2 focus:ring-indigo-500/20
+                                               dark:bg-gray-950 dark:text-white"
+                                        :class="fieldError('telegram_username')
+                                            ? 'border-red-400 dark:border-red-800'
+                                            : 'border-gray-200 focus:border-indigo-500 dark:border-gray-800'"
+                                    >
+                                </div>
+
+                                <p class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+                                    {{ __('telegram.operators.form.telegram_username_hint') }}
+                                </p>
+
+                                <p x-show="fieldError('telegram_username')" x-cloak
+                                   class="mt-1 text-[11px] text-red-600 dark:text-red-400"
+                                   x-text="fieldError('telegram_username')"></p>
+                            </div>
+
+                            {{-- Telegram id --}}
+                            <div>
+                                <label for="operator-telegram-id" class="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                                    {{ __('telegram.operators.form.telegram_id') }}
+                                </label>
+
+                                <input
+                                    id="operator-telegram-id"
+                                    type="number"
+                                    min="1"
+                                    x-model="form.telegram_id"
+                                    placeholder="123456789"
+                                    class="h-10 w-full rounded-xl border bg-white px-3 text-sm text-gray-900
+                                           focus:outline-none focus:ring-2 focus:ring-indigo-500/20
+                                           dark:bg-gray-950 dark:text-white"
+                                    :class="fieldError('telegram_id')
+                                        ? 'border-red-400 dark:border-red-800'
+                                        : 'border-gray-200 focus:border-indigo-500 dark:border-gray-800'"
+                                >
+
+                                <p class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+                                    {{ __('telegram.operators.form.telegram_id_hint') }}
+                                </p>
+
+                                <p x-show="fieldError('telegram_id')" x-cloak
+                                   class="mt-1 text-[11px] text-red-600 dark:text-red-400"
+                                   x-text="fieldError('telegram_id')"></p>
+                            </div>
+
+                            {{-- The only switch: copy the report into the operator's private chat --}}
+                            <label class="flex cursor-pointer items-start gap-3 rounded-2xl border border-gray-200 p-4 dark:border-gray-800">
+                                <input
+                                    type="checkbox"
+                                    x-model="form.dm_enabled"
+                                    class="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-indigo-600
+                                           focus:ring-indigo-500/30 dark:border-gray-700"
+                                >
+                                <span class="min-w-0">
+                                    <span class="block text-sm font-medium text-gray-900 dark:text-white">
+                                        {{ __('telegram.operators.form.dm_enabled') }}
+                                    </span>
+                                    <span class="block text-[11px] text-gray-400 dark:text-gray-500">
+                                        {{ __('telegram.operators.form.dm_enabled_hint') }}
+                                    </span>
+                                </span>
+                            </label>
+
+                            <p x-show="formError" x-cloak
+                               class="break-words rounded-xl bg-red-50 px-3 py-2 text-xs text-red-600
+                                      dark:bg-red-950/30 dark:text-red-400"
+                               x-text="formError"></p>
+
+                            <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                                <button
+                                    type="button"
+                                    @click="closeForm()"
+                                    class="h-10 rounded-xl border border-gray-200 bg-white px-4 text-sm font-medium
+                                           text-gray-700 transition hover:bg-gray-50 dark:border-gray-800
+                                           dark:bg-gray-950 dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                                >
+                                    {{ __('telegram.operators.form.cancel') }}
+                                </button>
+
+                                <button
+                                    type="submit"
+                                    :disabled="saving"
+                                    class="h-10 rounded-xl bg-indigo-600 px-5 text-sm font-semibold text-white
+                                           transition hover:bg-indigo-700 disabled:cursor-not-allowed
+                                           disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+                                    x-text="saving ? translations.form.saving : translations.form.save"
+                                ></button>
+                            </div>
+                        </form>
                     </div>
-
-                    <p class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
-                        {{ __('telegram.operators.form.telegram_username_hint') }}
-                    </p>
-
-                    <p x-show="fieldError('telegram_username')" x-cloak
-                       class="mt-1 text-[11px] text-red-600 dark:text-red-400"
-                       x-text="fieldError('telegram_username')"></p>
                 </div>
-
-                {{-- Telegram id --}}
-                <div>
-                    <label class="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
-                        {{ __('telegram.operators.form.telegram_id') }}
-                    </label>
-
-                    <input
-                        type="number"
-                        min="1"
-                        x-model="form.telegram_id"
-                        placeholder="123456789"
-                        class="h-10 w-full rounded-xl border bg-white px-3 text-sm text-gray-900
-                               focus:outline-none focus:ring-2 focus:ring-indigo-500/20
-                               dark:bg-gray-950 dark:text-white"
-                        :class="fieldError('telegram_id')
-                            ? 'border-red-400 dark:border-red-800'
-                            : 'border-gray-200 focus:border-indigo-500 dark:border-gray-800'"
-                    >
-
-                    <p class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
-                        {{ __('telegram.operators.form.telegram_id_hint') }}
-                    </p>
-
-                    <p x-show="fieldError('telegram_id')" x-cloak
-                       class="mt-1 text-[11px] text-red-600 dark:text-red-400"
-                       x-text="fieldError('telegram_id')"></p>
-                </div>
-
-                {{-- Toggles --}}
-                <div class="flex flex-col gap-3 rounded-2xl border border-gray-200 p-4 dark:border-gray-800">
-                    <label class="flex cursor-pointer items-start gap-3">
-                        <input
-                            type="checkbox"
-                            x-model="form.is_active"
-                            class="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600
-                                   focus:ring-indigo-500/30 dark:border-gray-700"
-                        >
-                        <span>
-                            <span class="block text-sm font-medium text-gray-900 dark:text-white">
-                                {{ __('telegram.operators.form.is_active') }}
-                            </span>
-                            <span class="block text-[11px] text-gray-400 dark:text-gray-500">
-                                {{ __('telegram.operators.form.is_active_hint') }}
-                            </span>
-                        </span>
-                    </label>
-
-                    <label class="flex cursor-pointer items-start gap-3">
-                        <input
-                            type="checkbox"
-                            x-model="form.dm_enabled"
-                            class="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600
-                                   focus:ring-indigo-500/30 dark:border-gray-700"
-                        >
-                        <span>
-                            <span class="block text-sm font-medium text-gray-900 dark:text-white">
-                                {{ __('telegram.operators.form.dm_enabled') }}
-                            </span>
-                            <span class="block text-[11px] text-gray-400 dark:text-gray-500">
-                                {{ __('telegram.operators.form.dm_enabled_hint') }}
-                            </span>
-                        </span>
-                    </label>
-                </div>
-
-                <p x-show="formError" x-cloak
-                   class="rounded-xl bg-red-50 px-3 py-2 text-xs text-red-600
-                          dark:bg-red-950/30 dark:text-red-400"
-                   x-text="formError"></p>
-
-                <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                    <button
-                        type="button"
-                        @click="closeForm()"
-                        class="h-10 rounded-xl border border-gray-200 bg-white px-4 text-sm font-medium
-                               text-gray-700 transition hover:bg-gray-50 dark:border-gray-800
-                               dark:bg-gray-950 dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                    >
-                        {{ __('telegram.operators.form.cancel') }}
-                    </button>
-
-                    <button
-                        type="submit"
-                        :disabled="saving"
-                        class="h-10 rounded-xl bg-indigo-600 px-5 text-sm font-semibold text-white
-                               transition hover:bg-indigo-700 disabled:cursor-not-allowed
-                               disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-400"
-                        x-text="saving ? translations.form.saving : translations.form.save"
-                    ></button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    {{-- Delete confirmation --}}
-    <div
-        x-show="deleteTarget"
-        x-cloak
-        class="fixed inset-0 z-[99999] flex items-center justify-center bg-gray-900/50 p-4"
-        @keydown.escape.window="deleteTarget = null"
-    >
-        <div
-            @click.outside="deleteTarget = null"
-            class="w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl dark:bg-gray-900"
-        >
-            <h2 class="text-base font-semibold text-gray-950 dark:text-white">
-                {{ __('telegram.operators.confirm.delete_title') }}
-            </h2>
-
-            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                <span x-text="deleteTarget?.name"></span> —
-                {{ __('telegram.operators.confirm.delete_text') }}
-            </p>
-
-            <div class="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                <button
-                    type="button"
-                    @click="deleteTarget = null"
-                    class="h-10 rounded-xl border border-gray-200 bg-white px-4 text-sm font-medium
-                           text-gray-700 transition hover:bg-gray-50 dark:border-gray-800
-                           dark:bg-gray-950 dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                >
-                    {{ __('telegram.operators.confirm.cancel') }}
-                </button>
-
-                <button
-                    type="button"
-                    @click="destroy()"
-                    :disabled="deleting"
-                    class="h-10 rounded-xl bg-red-600 px-5 text-sm font-semibold text-white transition
-                           hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                    {{ __('telegram.operators.confirm.delete') }}
-                </button>
             </div>
         </div>
-    </div>
+    </template>
 
     {{-- Toast --}}
-    <div
-        x-show="toast"
-        x-cloak
-        x-transition
-        class="fixed bottom-5 left-1/2 z-[99999] -translate-x-1/2 rounded-xl bg-gray-900 px-4 py-2.5
-               text-sm font-medium text-white shadow-lg dark:bg-white dark:text-gray-900"
-        x-text="toast"
-    ></div>
+    <template x-teleport="body">
+        <div
+            x-show="toast"
+            x-cloak
+            x-transition
+            class="pointer-events-none fixed bottom-5 left-1/2 z-[10000] -translate-x-1/2 rounded-xl
+                   bg-gray-900 px-4 py-2.5 text-sm font-medium text-white shadow-lg
+                   dark:bg-white dark:text-gray-900"
+            x-text="toast"
+        ></div>
+    </template>
 </div>
 @endsection
 
@@ -665,7 +687,6 @@
 
             loading: false,
             saving: false,
-            deleting: false,
 
             error: null,
             formError: null,
@@ -677,7 +698,6 @@
 
             stats: {
                 total: 0,
-                active: 0,
                 linked: 0,
                 dm_enabled: 0,
                 failing: 0,
@@ -693,7 +713,6 @@
 
             filters: {
                 search: '',
-                is_active: '',
                 dm_enabled: '',
                 linked: '',
                 sort: 'name',
@@ -703,20 +722,53 @@
             },
 
             formOpen: false,
-            deleteTarget: null,
 
             form: {
                 id: null,
                 name: '',
                 telegram_username: '',
                 telegram_id: '',
-                is_active: true,
                 dm_enabled: true,
             },
 
             init() {
                 this.readUrl();
                 this.load();
+
+                this.$watch('formOpen', open => this.lockScroll(open));
+            },
+
+            /*
+             * =====================================================
+             * SCROLL LOCK
+             *
+             * The overlay does its own scrolling, so the page behind it must
+             * stay put. html and body are both locked because the layout sets
+             * h-full on each, which makes html the scrolling element - locking
+             * body alone would do nothing. The scrollbar width is given back as
+             * padding so the page underneath does not jump sideways.
+             * =====================================================
+             */
+            lockScroll(locked) {
+                const root = document.documentElement;
+                const body = document.body;
+
+                if (locked) {
+                    const gap = window.innerWidth - root.clientWidth;
+
+                    root.style.overflow = 'hidden';
+                    body.style.overflow = 'hidden';
+
+                    if (gap > 0) {
+                        body.style.paddingRight = gap + 'px';
+                    }
+
+                    return;
+                }
+
+                root.style.overflow = '';
+                body.style.overflow = '';
+                body.style.paddingRight = '';
             },
 
             /*
@@ -731,12 +783,6 @@
                         label: this.translations.stats.total,
                         value: this.stats.total,
                         tone: 'text-gray-950 dark:text-white',
-                    },
-                    {
-                        key: 'active',
-                        label: this.translations.stats.active,
-                        value: this.stats.active,
-                        tone: 'text-emerald-600 dark:text-emerald-400',
                     },
                     {
                         key: 'linked',
@@ -762,8 +808,8 @@
             },
 
             /*
-             * A report only reaches an operator when both switches are on AND
-             * a username or id is filled in, so the badge reports that whole
+             * A report only reaches an operator when the switch is on AND a
+             * username or id is filled in, so the badge reports that whole
              * condition rather than the dm_enabled flag alone.
              */
             dmBadgeLabel(row) {
@@ -775,9 +821,7 @@
                     return this.translations.table.dm_unreachable;
                 }
 
-                return row.can_receive_dm
-                    ? this.translations.table.dm_on
-                    : this.translations.table.dm_off;
+                return this.translations.table.dm_on;
             },
 
             dmBadgeClass(row) {
@@ -790,6 +834,12 @@
                 }
 
                 return 'bg-gray-100 text-gray-600 dark:bg-white/[0.06] dark:text-gray-400';
+            },
+
+            avatarClass(row) {
+                return row.can_receive_dm
+                    ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300'
+                    : 'bg-gray-100 text-gray-500 dark:bg-white/[0.06] dark:text-gray-400';
             },
 
             /*
@@ -840,7 +890,6 @@
 
                     this.stats = {
                         total: Number(json.stats?.total ?? 0),
-                        active: Number(json.stats?.active ?? 0),
                         linked: Number(json.stats?.linked ?? 0),
                         dm_enabled: Number(json.stats?.dm_enabled ?? 0),
                         failing: Number(json.stats?.failing ?? 0),
@@ -871,7 +920,6 @@
             resetFilters() {
                 this.filters = {
                     search: '',
-                    is_active: '',
                     dm_enabled: '',
                     linked: '',
                     sort: 'name',
@@ -903,7 +951,6 @@
                 const params = new URLSearchParams(window.location.search);
 
                 this.filters.search = params.get('search') || '';
-                this.filters.is_active = params.get('is_active') || '';
                 this.filters.dm_enabled = params.get('dm_enabled') || '';
                 this.filters.linked = params.get('linked') || '';
                 this.filters.per_page = Number(params.get('per_page') || 20);
@@ -931,7 +978,6 @@
                     name: '',
                     telegram_username: '',
                     telegram_id: '',
-                    is_active: true,
                     dm_enabled: true,
                 };
 
@@ -946,7 +992,6 @@
                     name: row.name || '',
                     telegram_username: row.telegram_username || '',
                     telegram_id: row.telegram_id ?? '',
-                    is_active: !!row.is_active,
                     dm_enabled: !!row.dm_enabled,
                 };
 
@@ -1004,7 +1049,6 @@
                             telegram_id: this.form.telegram_id === ''
                                 ? null
                                 : Number(this.form.telegram_id),
-                            is_active: this.form.is_active,
                             dm_enabled: this.form.dm_enabled,
                         }),
                     });
@@ -1033,51 +1077,6 @@
                     this.formError = e.message || this.translations.errors.save;
                 } finally {
                     this.saving = false;
-                }
-            },
-
-            /*
-             * =====================================================
-             * DELETE
-             * =====================================================
-             */
-            askDelete(row) {
-                this.deleteTarget = row;
-            },
-
-            async destroy() {
-                if (!this.deleteTarget) {
-                    return;
-                }
-
-                this.deleting = true;
-
-                try {
-                    const response = await fetch(
-                        this.endpoints.base + '/' + this.deleteTarget.id,
-                        {
-                            method: 'DELETE',
-                            headers: {
-                                Accept: 'application/json',
-                                'X-Requested-With': 'XMLHttpRequest',
-                                'X-CSRF-TOKEN': this.csrf,
-                            },
-                            credentials: 'same-origin',
-                        },
-                    );
-
-                    await this.readResponse(response);
-
-                    this.deleteTarget = null;
-
-                    this.showToast(this.translations.messages.deleted);
-
-                    this.load();
-                } catch (e) {
-                    this.deleteTarget = null;
-                    this.error = e.message || this.translations.errors.delete;
-                } finally {
-                    this.deleting = false;
                 }
             },
 
@@ -1118,7 +1117,7 @@
                 return Number(value || 0).toLocaleString();
             },
 
-            formatDate(value, withTime = false) {
+            formatDate(value) {
                 if (!value) {
                     return '—';
                 }
@@ -1131,19 +1130,13 @@
 
                 return new Intl.DateTimeFormat(
                     document.documentElement.lang || 'uz-UZ',
-                    withTime
-                        ? {
-                            day: '2-digit',
-                            month: 'short',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                        }
-                        : {
-                            day: '2-digit',
-                            month: 'short',
-                            year: 'numeric',
-                        },
+                    {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                    },
                 ).format(date);
             },
 
