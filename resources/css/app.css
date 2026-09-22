@@ -910,3 +910,124 @@ pre[class*='language-'] {
     margin-right: -60px !important;
   }
 }
+/*
+|--------------------------------------------------------------------------
+| Driver check panel
+|--------------------------------------------------------------------------
+|
+| Everything the panel needs that a utility class cannot express. These
+| rules are deliberately left outside @layer: unlayered declarations win
+| over layered ones, which is how .dc-date undoes the global rule that
+| hides the native date picker button.
+|
+*/
+
+/* The picker button is the only way to open a date field with a mouse. */
+input.dc-date[type='date']::-webkit-calendar-picker-indicator {
+  display: block;
+  -webkit-appearance: auto;
+  opacity: 0.5;
+  cursor: pointer;
+}
+
+input.dc-date[type='date']:hover::-webkit-calendar-picker-indicator,
+input.dc-date[type='date']:focus::-webkit-calendar-picker-indicator {
+  opacity: 1;
+}
+
+.dark input.dc-date[type='date']::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  opacity: 0.45;
+}
+
+/* Period / status chips: swipeable on a phone, no scrollbar in the way. */
+.dc-chips {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  scroll-snap-type: x proximity;
+}
+
+.dc-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.dc-chips > * {
+  scroll-snap-align: start;
+}
+
+/* Loading placeholders. */
+@keyframes dc-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.dc-skeleton {
+  position: relative;
+  overflow: hidden;
+}
+
+.dc-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.45),
+    transparent
+  );
+  animation: dc-shimmer 1.6s infinite;
+}
+
+.dark .dc-skeleton::after {
+  background-image: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.06),
+    transparent
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dc-skeleton::after {
+    animation: none;
+  }
+}
+
+/* Touch devices get no lingering grey flash on tap. */
+.dc-tap {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Long Telegram handles and normalised names must never widen a card. */
+.dc-break {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* The panel draws its own clear button, so the WebKit one is redundant. */
+input.dc-search[type='search']::-webkit-search-cancel-button,
+input.dc-search[type='search']::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
+
+/*
+ * Invalid field state.
+ *
+ * Expressed as an attribute rather than a class: the base input already
+ * sets a border colour through a utility, and two utilities for the same
+ * property are resolved by stylesheet order, not by the order they appear
+ * in the class attribute. An unlayered rule wins outright.
+ */
+.dc-input[data-invalid] {
+  border-color: var(--color-error-400);
+}
+
+.dc-input[data-invalid]:focus {
+  border-color: var(--color-error-500);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--color-error-500) 12%, transparent);
+}

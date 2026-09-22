@@ -4,6 +4,57 @@ declare(strict_types=1);
 
 return [
 
+    /*
+    |--------------------------------------------------------------------------
+    | Shared panel chrome
+    |--------------------------------------------------------------------------
+    |
+    | Labels used by the driver-check components: filters, sorting, paging,
+    | empty and error states. One copy, so every page says the same thing.
+    |
+    */
+
+    'ui' => [
+
+        'filters' => 'Filters',
+        'filters_show' => 'More filters',
+        'filters_hide' => 'Hide filters',
+        'filters_active' => 'Active filters',
+        'reset' => 'Reset',
+        'apply' => 'Apply',
+        'search' => 'Search',
+        'search_clear' => 'Clear search',
+        'sort' => 'Sort',
+        'sort_asc' => 'Ascending',
+        'sort_desc' => 'Descending',
+        'order' => 'Order',
+        'per_page' => 'Per page',
+        'showing' => 'Showing',
+        'of' => 'of',
+        'page' => 'Page',
+        'previous' => 'Previous',
+        'next' => 'Next',
+        'loading' => 'Loading...',
+        'refresh' => 'Refresh',
+        'retry' => 'Try again',
+        'copy' => 'Copy',
+        'copied' => 'Copied',
+        'open' => 'Open',
+        'close' => 'Close',
+        'cancel' => 'Cancel',
+        'save' => 'Save',
+        'saving' => 'Saving...',
+        'created' => 'Created',
+        'period' => 'Period',
+        'period_custom' => 'Custom range',
+        'details' => 'Details',
+        'error' => 'Error',
+        'never' => 'Never',
+        'show_more' => 'Show more',
+        'show_less' => 'Show less',
+        'results' => 'results',
+    ],
+
     'operators' => [
 
         'title' => 'Operator management',

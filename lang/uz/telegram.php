@@ -4,6 +4,57 @@ declare(strict_types=1);
 
 return [
 
+    /*
+    |--------------------------------------------------------------------------
+    | Umumiy panel elementlari
+    |--------------------------------------------------------------------------
+    |
+    | Driver-check komponentlari ishlatadigan matnlar: filtrlar, saralash,
+    | sahifalash, bo'sh va xato holatlari. Bitta nusxa - hamma sahifada bir xil.
+    |
+    */
+
+    'ui' => [
+
+        'filters' => 'Filtrlar',
+        'filters_show' => 'Ko\'proq filtr',
+        'filters_hide' => 'Filtrlarni yashirish',
+        'filters_active' => 'Faol filtrlar',
+        'reset' => 'Tozalash',
+        'apply' => 'Qo\'llash',
+        'search' => 'Qidirish',
+        'search_clear' => 'Qidiruvni tozalash',
+        'sort' => 'Saralash',
+        'sort_asc' => 'O\'sish bo\'yicha',
+        'sort_desc' => 'Kamayish bo\'yicha',
+        'order' => 'Tartib',
+        'per_page' => 'Sahifada',
+        'showing' => 'Ko\'rsatilmoqda',
+        'of' => 'dan',
+        'page' => 'Sahifa',
+        'previous' => 'Oldingi',
+        'next' => 'Keyingi',
+        'loading' => 'Yuklanmoqda...',
+        'refresh' => 'Yangilash',
+        'retry' => 'Qayta urinish',
+        'copy' => 'Nusxalash',
+        'copied' => 'Nusxalandi',
+        'open' => 'Ochish',
+        'close' => 'Yopish',
+        'cancel' => 'Bekor qilish',
+        'save' => 'Saqlash',
+        'saving' => 'Saqlanmoqda...',
+        'created' => 'Yaratilgan sana',
+        'period' => 'Davr',
+        'period_custom' => 'Boshqa oraliq',
+        'details' => 'Batafsil',
+        'error' => 'Xatolik',
+        'never' => 'Hech qachon',
+        'show_more' => 'Ko\'proq',
+        'show_less' => 'Yig\'ish',
+        'results' => 'ta natija',
+    ],
+
     'operators' => [
 
         'title' => 'Operatorlarni boshqarish',

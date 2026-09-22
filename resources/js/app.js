@@ -6,6 +6,7 @@ import flatpickr from 'flatpickr';
 import 'flatpickr/dist/flatpickr.min.css';
 import { Calendar } from '@fullcalendar/core';
 import { requestJson, requestRaw } from "./request";
+import { registerDriverCheck } from './driver-check';
 
 window.requestJson = requestJson;
 window.requestRaw = requestRaw;
@@ -93,6 +94,12 @@ window.Alpine = Alpine;
 window.ApexCharts = ApexCharts;
 window.flatpickr = flatpickr;
 window.FullCalendar = Calendar;
+
+/*
+ * Must run before start(): Alpine only resolves x-data names that were
+ * registered by the time it walks the DOM.
+ */
+registerDriverCheck(Alpine);
 
 Alpine.start();
 

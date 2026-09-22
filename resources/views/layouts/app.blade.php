@@ -2,13 +2,17 @@
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <title>{{ $title ?? 'Dashboard' }} | Postix</title>
 
-    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
-
+    {{--
+        Alpine ships inside the bundle (resources/js/app.js) together with its
+        plugins and the registered components. The CDN copy that used to sit
+        here started a second, separate Alpine instance, so every x-init ran
+        twice and every page fired its API requests twice.
+    --}}
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
     <style>
