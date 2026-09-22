@@ -34,8 +34,15 @@ final class TelegramDriverCheckChats
     /**
      * Copies TELEGRAM_DRIVER_CHECK_CHAT_LINKS into the table.
      *
-     * Idempotent, and it never touches a row that already exists: the
-     * environment seeds the list, the panel owns it afterwards.
+     * Each configured chat is imported exactly once, ever. "Once" has to
+     * be remembered outside the table, because the table is the one
+     * place it cannot be read from: a chat removed in the panel is
+     * indistinguishable from a chat that was never imported, so
+     * checking the table alone meant every listener restart quietly
+     * brought back the groups an operator had just deleted.
+     *
+     * The environment seeds the list; from the first start onwards the
+     * panel owns it.
      */
     public function syncFromConfig(): void
     {
@@ -45,12 +52,24 @@ final class TelegramDriverCheckChats
             return;
         }
 
+        $imported = $this->importedSeeds();
+
         foreach ($links as $raw) {
             $parsed = TelegramDriverCheckChat::parseInput((string) $raw);
 
             if ($parsed['link'] === null && $parsed['chat_id'] === null) {
                 continue;
             }
+
+            $seed = $parsed['link'] ?? (string) $parsed['chat_id'];
+
+            if (in_array($seed, $imported, true)) {
+                continue;
+            }
+
+            $imported[] = $seed;
+
+            $this->rememberSeeds($imported);
 
             $exists = TelegramDriverCheckChat::query()
                 ->when(
@@ -146,6 +165,77 @@ final class TelegramDriverCheckChats
                 ],
             );
         }
+    }
+
+    /**
+     * Configured chats that have already been imported once.
+     *
+     * A file rather than a table row: this has to be readable before
+     * anything else runs and has to survive `migrate:fresh` no worse
+     * than the session it sits beside.
+     *
+     * @return list<string>
+     */
+    private function importedSeeds(): array
+    {
+        try {
+            $path = $this->seedMarkerPath();
+
+            if (! is_file($path)) {
+                return [];
+            }
+
+            $decoded = json_decode((string) file_get_contents($path), true);
+
+            return is_array($decoded)
+                ? array_values(array_filter($decoded, 'is_string'))
+                : [];
+        } catch (Throwable $e) {
+            /*
+             * An unreadable marker must not stop the listener; the worst
+             * it can cost is one re-import.
+             */
+            Log::warning(
+                'Driver check chat seed marker could not be read',
+                ['error' => $e->getMessage()],
+            );
+
+            return [];
+        }
+    }
+
+    /**
+     * @param list<string> $seeds
+     */
+    private function rememberSeeds(array $seeds): void
+    {
+        try {
+            $path = $this->seedMarkerPath();
+            $directory = dirname($path);
+
+            if (! is_dir($directory)) {
+                mkdir($directory, 0775, true);
+            }
+
+            file_put_contents(
+                $path,
+                (string) json_encode(
+                    array_values(array_unique($seeds)),
+                    JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
+                ),
+                LOCK_EX,
+            );
+        } catch (Throwable $e) {
+            Log::warning(
+                'Driver check chat seed marker could not be written',
+                ['error' => $e->getMessage()],
+            );
+        }
+    }
+
+    private function seedMarkerPath(): string
+    {
+        return storage_path('app/telegram/driver-check-chat-seeds.json');
     }
 
     private function resolveChat(
