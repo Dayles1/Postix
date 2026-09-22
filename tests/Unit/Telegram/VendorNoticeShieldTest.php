@@ -110,6 +110,60 @@ final class VendorNoticeShieldTest extends TestCase
         }
     }
 
+    public function test_a_handler_the_library_installed_is_left_where_it_put_it(): void
+    {
+        // MadelineProto's Magic::start() installs an error handler on
+        // first use and never restores it. A plain
+        // restore_error_handler() would pop *that* one.
+        $libraryHandler = static fn (): bool => true;
+
+        VendorNoticeShield::guard('test.operation', static function () use ($libraryHandler): void {
+            set_error_handler($libraryHandler);
+        });
+
+        $current = set_error_handler(null);
+        restore_error_handler();
+
+        try {
+            $this->assertSame($libraryHandler, $current);
+        } finally {
+            // The library's handler, and the inert shield underneath it.
+            restore_error_handler();
+            restore_error_handler();
+        }
+    }
+
+    public function test_the_shield_stops_demoting_once_its_call_is_over(): void
+    {
+        // If the shield could not be popped it stays on the stack, and
+        // from then on it must behave as though it were not there --
+        // otherwise it would swallow every vendor notice in the process.
+        $seen = [];
+
+        set_error_handler(static function (int $severity, string $message) use (&$seen): bool {
+            $seen[] = $message;
+
+            return true;
+        });
+
+        try {
+            VendorNoticeShield::guard('test.operation', static function (): void {
+                set_error_handler(static fn (): bool => true);
+            });
+
+            // The library's handler goes away; the shield underneath does not.
+            restore_error_handler();
+
+            postix_vendor_notice('after the guard');
+
+            $this->assertSame(['after the guard'], $seen);
+        } finally {
+            // The inert shield, and this test's own recording handler.
+            restore_error_handler();
+            restore_error_handler();
+        }
+    }
+
     public function test_the_handler_is_restored_even_when_the_operation_throws(): void
     {
         $marker = static fn (): bool => true;
