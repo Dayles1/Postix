@@ -32,10 +32,16 @@ final class ApplyResolvedTelegramPhone
         $telegramRaw['resolved_phone_id'] =
             $resolvedPhone->id;
 
+        /*
+         * Username included: it is often the only field spelling the
+         * name in Latin letters, and the cached path must reach the
+         * same verdict as the live one.
+         */
         $match = $this->nameMatcher->match(
             $check->driver_name,
             $resolvedPhone->telegram_first_name,
             $resolvedPhone->telegram_last_name,
+            $resolvedPhone->telegram_username,
         );
 
         $telegramRaw['name_match'] = $match;

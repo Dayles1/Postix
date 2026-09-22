@@ -1718,10 +1718,18 @@ final class ResolveTelegramPhoneCommand extends Command
          * Name matching
          * ------------------------------------------------------------
          */
+        /*
+         * The username is evidence like any other field, and often the
+         * only field carrying the name in Latin letters
+         * (@zjorayev320 next to a Cyrillic display name). It was being
+         * resolved, stored, printed in the report - and then dropped
+         * before the comparison.
+         */
         $match = $nameMatcher->match(
             $check->driver_name,
             $resolvedPhone->telegram_first_name,
             $resolvedPhone->telegram_last_name,
+            $resolvedPhone->telegram_username,
         );
 
         $telegramRaw[
