@@ -140,7 +140,13 @@ class TelegramDriverCheckCommand extends Command
                 self::LOCK_NAME
             );
 
-            Log::critical(
+            /*
+             * Refusing to start because a healthy instance already owns the
+             * session is the guard doing its job, not an incident. The
+             * watchdog polls this path while it waits for the session, so a
+             * critical here would bury the crashes that do need attention.
+             */
+            Log::warning(
                 'Telegram driver check listener already running',
                 [
                     'account_id' => $account->id,

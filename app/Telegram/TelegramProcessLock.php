@@ -113,6 +113,65 @@ final class TelegramProcessLock
     }
 
     /**
+     * Does this process already hold the lock?
+     */
+    public static function holds(string $name): bool
+    {
+        return isset(self::$handles[$name]);
+    }
+
+    /**
+     * Is another live process holding this lock right now?
+     *
+     * Asked by the watchdog before it spawns a listener: starting a process
+     * whose only possible outcome is EXIT_ALREADY_RUNNING is a restart that
+     * never had to happen. The lock is taken and released again straight away,
+     * which is the only authoritative answer - a PID file can be stale, flock
+     * cannot.
+     *
+     * A lock this process already owns is not "another process", and an
+     * unusable lock file answers false so a broken guard can never stop the
+     * listener from being started.
+     */
+    public static function isHeldByOtherProcess(string $name): bool
+    {
+        if (isset(self::$handles[$name])) {
+            return false;
+        }
+
+        try {
+            $path = self::path($name);
+
+            if (!is_file($path)) {
+                return false;
+            }
+
+            $handle = @fopen($path, 'c+');
+
+            if ($handle === false) {
+                return false;
+            }
+
+            /*
+             * A probe, not a claim: the file is never written to, so the pid
+             * recorded in it keeps pointing at the real owner instead of being
+             * overwritten by every poll.
+             */
+            $free = flock($handle, LOCK_EX | LOCK_NB);
+
+            if ($free) {
+                flock($handle, LOCK_UN);
+            }
+
+            fclose($handle);
+
+            return !$free;
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    /**
      * PID currently recorded in the lock file, for diagnostics only.
      */
     public static function holderPid(string $name): ?int
