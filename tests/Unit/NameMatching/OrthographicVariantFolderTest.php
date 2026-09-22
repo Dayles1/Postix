@@ -26,6 +26,16 @@ final class OrthographicVariantFolderTest extends TestCase
         );
     }
 
+    public function test_english_spellings_of_the_same_sound_fold_with_it(): void
+    {
+        // "Ж" reached for through English: DJAMSHID, JHONIBEK.
+        $canonical = $this->folder->fold('jamshid');
+
+        $this->assertSame($canonical, $this->folder->fold('djamshid'));
+        $this->assertSame($canonical, $this->folder->fold('zhamshid'));
+        $this->assertSame($this->folder->fold('jonibek'), $this->folder->fold('jhonibek'));
+    }
+
     public function test_kh_x_and_h_fold_to_the_same_canonical_form(): void
     {
         $canonical = $this->folder->fold('hamid');

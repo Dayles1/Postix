@@ -37,7 +37,11 @@ final class OrthographicVariantFolder
     private const DIGRAPH_FOLDS = [
         // Uzbek/Russian "Ж" romanizes as both "zh" and "j" -- this is the
         // single most important fold for this dataset (IKRAMZHON <-> IKRAMJON).
+        // "jh" and "dj" are the same sound typed by someone reaching for an
+        // English spelling of it (JHONIBEK, DJAMSHID).
         'zh' => 'j',
+        'jh' => 'j',
+        'dj' => 'j',
 
         // "Х" romanizes as "kh", "x" or (informally) "h".
         'kh' => 'h',

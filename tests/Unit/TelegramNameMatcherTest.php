@@ -583,4 +583,150 @@ final class TelegramNameMatcherTest extends TestCase
 
         $this->assertSame(0.0, $control['score']);
     }
+
+    /* =====================================================================
+     | Production regressions
+     |
+     | Every case below is a check that came back "НЕ ПОДТВЕРЖДЕНО" with a
+     | score of 0 while the phone number had already resolved to the right
+     | person. They are kept verbatim -- same driver name, same Telegram
+     | profile -- because each one stands for a whole class of misses.
+     |==================================================================== */
+
+    public function test_production_nickname_drops_a_prefix_and_adds_a_suffix(): void
+    {
+        // check #941: ABDULKODIR and Qodirali are one name with two
+        // different affixes around the same root.
+        $result = $this->matcher->match('TOJIMATOV ABDULKODIR UGLI', 'Qodirali', null);
+
+        $this->assertTrue($result['matched']);
+        $this->assertGreaterThanOrEqual(80.0, $result['score']);
+        $this->assertSame('name_root_match', $result['matched_parts'][0]['kind']);
+    }
+
+    public function test_production_uzbek_and_russian_vowels_of_one_name(): void
+    {
+        // check #921: ADILKHAN / Odilxon -- a different affix on top of
+        // the o/a axis.
+        $result = $this->matcher->match('SAYDAKHMEDOV ADILKHAN JALALKHANOVICH', 'Odilxon', null);
+
+        $this->assertTrue($result['matched']);
+        $this->assertGreaterThanOrEqual(80.0, $result['score']);
+    }
+
+    public function test_production_cyrillic_yo_is_not_flattened_to_e(): void
+    {
+        // check #915 and #901: "ё" decomposes to е + ◌̈ in Unicode, and
+        // stripping the mark before transliterating turned Элёрбек into
+        // "elerbek" and Ёодгор into "eodgor" -- neither could reach the
+        // Latin spelling of its own name.
+        $elyor = $this->matcher->match('BOZOROV ELYOR ESAJONOVICH', 'Элёрбек', null);
+        $yodgor = $this->matcher->match('JUMANIYAZOV YADGOR AZIMBAEVICH', 'Ёодгор', null);
+
+        $this->assertTrue($elyor['matched']);
+        $this->assertTrue($yodgor['matched']);
+    }
+
+    public function test_production_initials_with_decoration_match_the_full_name(): void
+    {
+        // check #912: the profile is the driver's monogram, in Cyrillic,
+        // behind a row of emoji.
+        $result = $this->matcher->match(
+            'BOBOJONOV KUDRAT ABDULLAEVICH',
+            '🇺🇿🕋🕋🕋🚛🚛🚛 К.Б.А',
+            null,
+        );
+
+        $this->assertTrue($result['matched']);
+        $this->assertSame('initials_match', $result['decision']);
+    }
+
+    public function test_production_comma_separated_initials_match(): void
+    {
+        // check #911.
+        $result = $this->matcher->match('АҲМАДИЁВ АНВАР АЛИ ЎҒЛИ', 'А,А,А,', null);
+
+        $this->assertTrue($result['matched']);
+    }
+
+    public function test_production_username_is_used_as_evidence_when_supplied(): void
+    {
+        // check #882: the profile carried @zjorayev320 next to the first
+        // name, and the resolver was throwing the username away.
+        $result = $this->matcher->match(
+            'JURAVOEV ZUKHRIDDIN AKROM UGLI',
+            'Zuhriddin',
+            null,
+            'zjorayev320',
+        );
+
+        $this->assertTrue($result['matched']);
+        $this->assertGreaterThanOrEqual(96.0, $result['score']);
+    }
+
+    /* =====================================================================
+     | The looser tiers must not start inventing matches
+     |==================================================================== */
+
+    public function test_a_shared_honorific_suffix_alone_is_not_a_match(): void
+    {
+        // Two unrelated names that both end in -bek share an affix, not
+        // a root.
+        $result = $this->matcher->match('TURSUNOV SARDORBEK', 'Elyorbek', null);
+
+        $this->assertFalse($result['matched']);
+    }
+
+    public function test_a_shared_honorific_prefix_alone_is_not_a_match(): void
+    {
+        $result = $this->matcher->match('YULDASHEV ABDULAZIZ', 'Abdulhamid', null);
+
+        $this->assertFalse($result['matched']);
+    }
+
+    public function test_the_vowel_axis_does_not_pair_off_unrelated_names(): void
+    {
+        $result = $this->matcher->match('KARIMOV SHERZOD BAXTIYOROVICH', 'Dilshod', null);
+
+        $this->assertSame(0.0, $result['score']);
+    }
+
+    public function test_somebody_elses_initials_score_zero(): void
+    {
+        $result = $this->matcher->match('BOBOJONOV KUDRAT ABDULLAEVICH', 'X.Y.Z', null);
+
+        $this->assertSame(0.0, $result['score']);
+    }
+
+    /* =====================================================================
+     | Which part of the name matched changes what it is worth
+     |==================================================================== */
+
+    public function test_a_matched_given_name_outweighs_a_matched_surname(): void
+    {
+        $givenName = $this->matcher->match('ALIYEV AKMAL', 'Akmal', null);
+        $surname = $this->matcher->match('ALIYEV AKMAL', 'Aliyev', null);
+
+        $this->assertTrue($givenName['matched']);
+        $this->assertTrue($surname['matched']);
+        $this->assertGreaterThan($surname['score'], $givenName['score']);
+    }
+
+    public function test_a_matched_given_name_alone_is_enough(): void
+    {
+        // A Telegram profile carries the given name and nothing else far
+        // more often than not; that must be a confirmation on its own.
+        $result = $this->matcher->match('SAYDAKHMEDOV ADILKHAN JALALKHANOVICH', 'Adilkhan', null);
+
+        $this->assertTrue($result['matched']);
+        $this->assertSame(100.0, $result['score']);
+    }
+
+    public function test_a_matched_patronymic_alone_is_worth_least(): void
+    {
+        $givenName = $this->matcher->match('ALIYEV AKMAL ANVAROVICH', 'Akmal', null);
+        $patronymic = $this->matcher->match('ALIYEV AKMAL ANVAROVICH', 'Anvarovich', null);
+
+        $this->assertGreaterThan($patronymic['score'], $givenName['score']);
+    }
 }

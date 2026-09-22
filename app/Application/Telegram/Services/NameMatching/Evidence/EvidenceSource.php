@@ -14,6 +14,14 @@ namespace App\Application\Telegram\Services\NameMatching\Evidence;
 enum EvidenceSource: string
 {
     case FirstName = 'telegram_first_name';
+
+    /**
+     * The first and last name read together, used where the evidence is
+     * a property of the whole displayed name rather than of one field --
+     * initials, for instance, are routinely split across both fields
+     * ("К.Б." / "А.") by the same person in one sitting.
+     */
+    case DisplayName = 'telegram_display_name';
     case LastName = 'telegram_last_name';
     case Username = 'username';
 }

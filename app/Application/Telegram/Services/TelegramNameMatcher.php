@@ -6,10 +6,12 @@ namespace App\Application\Telegram\Services;
 
 use App\Application\Telegram\Services\NameMatching\Evidence\EvidenceSource;
 use App\Application\Telegram\Services\NameMatching\Evidence\EvidenceToken;
+use App\Application\Telegram\Services\NameMatching\Evidence\InitialsMatcher;
 use App\Application\Telegram\Services\NameMatching\Evidence\TokenSetMatcher;
 use App\Application\Telegram\Services\NameMatching\Explaining\MatchExplainer;
 use App\Application\Telegram\Services\NameMatching\NameNormalizer;
 use App\Application\Telegram\Services\NameMatching\NameTokenizer;
+use App\Application\Telegram\Services\NameMatching\Roles\NameRoleClassifier;
 use App\Application\Telegram\Services\NameMatching\Scoring\MatchDecision;
 use App\Application\Telegram\Services\NameMatching\Scoring\MatchLevelClassifier;
 use App\Application\Telegram\Services\NameMatching\Scoring\MatchScoreAggregator;
@@ -32,8 +34,13 @@ use App\Application\Telegram\Services\NameMatching\Token;
  *
  *   NameMatching\NameNormalizer              case/diacritics/emoji/styled-Unicode/Cyrillic
  *   NameMatching\Support\OrthographicVariantFolder   canonical spelling-variant folding (zh<->j, kh<->h, ...)
+ *   NameMatching\Support\NameAffixStripper    honorific affix stripping (Elyor <-> Elyorbek)
+ *   NameMatching\Support\PhoneticKeyBuilder   vowel-axis folding (Adil <-> Odil)
  *   NameMatching\NameTokenizer                word/username splitting, patronymic filtering
- *   NameMatching\Comparison\*                 exact / transliteration / typo / partial-name tiers
+ *   NameMatching\Roles\*                      surname / given name / patronymic of each token
+ *   NameMatching\Comparison\*                 exact / transliteration / typo / partial-name /
+ *                                             name-root / phonetic tiers
+ *   NameMatching\Evidence\InitialsMatcher     display names that are only initials (K.B.A)
  *   NameMatching\Commonness\*                 short/common-fragment penalty (pluggable)
  *   NameMatching\Evidence\TokenSetMatcher     order-independent, one-to-one token assignment
  *   NameMatching\Scoring\*                    score aggregation + level/confidence classification
@@ -59,6 +66,8 @@ final class TelegramNameMatcher
         private readonly MatchScoreAggregator $aggregator = new MatchScoreAggregator,
         private readonly MatchLevelClassifier $classifier = new MatchLevelClassifier,
         private readonly MatchExplainer $explainer = new MatchExplainer,
+        private readonly NameRoleClassifier $roleClassifier = new NameRoleClassifier,
+        private readonly InitialsMatcher $initialsMatcher = new InitialsMatcher,
     ) {
         $this->tokenSetMatcher = $tokenSetMatcher ?? TokenSetMatcher::withDefaultComparators();
     }
@@ -89,7 +98,16 @@ final class TelegramNameMatcher
             );
         }
 
-        $driverTokens = $this->tokenizer->tokenize((string) $expectedName);
+        /*
+         * Roles are assigned here, once, because every later stage wants
+         * them: the scoring layer prices a matched given name above a
+         * matched surname, and the initials reader needs the parts in
+         * document order.
+         */
+        $driverTokens = $this->roleClassifier->classify(
+            $this->tokenizer->tokenize((string) $expectedName),
+            $this->normalizer->normalize((string) $expectedName),
+        );
 
         if ($driverTokens === []) {
             return $this->noDataResult(
@@ -110,6 +128,20 @@ final class TelegramNameMatcher
         $assignments = $this->tokenSetMatcher->match($driverTokens, $evidenceTokens, $username['compact']);
 
         $decision = $this->aggregator->aggregate($assignments, count($driverTokens));
+
+        /*
+         * A display name that is only initials ("К.Б.А") carries no
+         * tokens at all -- single letters are dropped long before the
+         * comparison tiers ever run -- so it is read separately, as one
+         * piece of whole-name evidence, and used when it says more than
+         * the tokens managed to.
+         */
+        $initials = $this->initialsMatcher->match($driverTokens, $telegramDisplayName);
+
+        if ($initials !== null && $initials->decision->score > $decision->score) {
+            $decision = $initials->decision;
+            $assignments = $initials->assignments;
+        }
 
         return $this->buildResult(
             expectedName: (string) $expectedName,

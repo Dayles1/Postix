@@ -28,6 +28,8 @@ final class TokenComparatorPipeline
             new CanonicalEqualityComparator,
             new EditDistanceComparator,
             new PartialNameComparator,
+            new AffixTolerantComparator,
+            new PhoneticKeyComparator,
         ]);
     }
 
