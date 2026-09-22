@@ -96,6 +96,27 @@ final class NameNormalizerTest extends TestCase
         $this->assertSame('ulugbek', $this->normalizer->normalize('Улуғбек'));
     }
 
+    public function test_cyrillic_letters_that_carry_a_combining_mark_survive_transliteration(): void
+    {
+        // "ё" is е + ◌̈ in Unicode, "й" is и + ◌̆ and "ў" is у + ◌̆.
+        // Stripping marks before transliterating silently turned each of
+        // them into its bare base letter, so these names could never
+        // reach their own Latin spelling.
+        $this->assertSame('yodgor', $this->normalizer->normalize('Ёдгор'));
+        $this->assertSame('elyorbek', $this->normalizer->normalize('Элёрбек'));
+        $this->assertSame('sayfullaev', $this->normalizer->normalize('Сайфуллаев'));
+        $this->assertSame('ulugbek', $this->normalizer->normalize('Улуғбек'));
+        $this->assertSame('ugli', $this->normalizer->normalize('ЎҒЛИ'));
+    }
+
+    public function test_a_decomposed_cyrillic_letter_normalizes_like_a_composed_one(): void
+    {
+        $this->assertSame(
+            $this->normalizer->normalize('Ёдгор'),
+            $this->normalizer->normalize("\u{0415}\u{0308}дгор"),
+        );
+    }
+
     public function test_apostrophe_variants_are_stripped_consistently(): void
     {
         $this->assertSame(

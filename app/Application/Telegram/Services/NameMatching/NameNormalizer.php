@@ -21,8 +21,8 @@ use Normalizer;
  *   1. Decode styled Unicode letters (fancy fonts) to plain Latin.
  *   2. Strip zero-width / variation-selector characters.
  *   3. Lowercase.
- *   4. Strip combining diacritical marks (é -> e).
- *   5. Transliterate Cyrillic to Latin.
+ *   4. Compose to NFC, then transliterate Cyrillic to Latin.
+ *   5. Strip combining diacritical marks (é -> e).
  *   6. Strip apostrophe variants (oʻ/o' -> o).
  *   7. Strip everything that is not a-z/0-9/space -- this is what
  *      removes emoji, decorative symbols and separators (. _ - | • ⚡).
@@ -56,8 +56,27 @@ final class NameNormalizer
         ) ?? $value;
 
         $value = $this->lower($value);
-        $value = $this->stripDiacritics($value);
+
+        /*
+         * Transliteration runs BEFORE diacritics are stripped, and on a
+         * composed (NFC) string.
+         *
+         * Half of the Uzbek/Russian Cyrillic letters that carry identity
+         * are a base letter plus a combining mark in Unicode terms:
+         * "ё" = е + ◌̈, "й" = и + ◌̆, "ў" = у + ◌̆. Stripping marks first
+         * turned them into their bare base letter before the map ever saw
+         * them, so "Ёодгор" normalized to "eodgor" instead of "yodgor" and
+         * "Элёрбек" to "elerbek" instead of "elyorbek" -- neither could
+         * then match the Latin spelling of the same name. Composing first
+         * also catches names that arrive already decomposed.
+         */
+        $value = $this->compose($value);
         $value = $this->transliterator->transliterate($value);
+
+        /*
+         * Whatever marks are left are genuine Latin accents (José -> jose).
+         */
+        $value = $this->stripDiacritics($value);
 
         $value = str_replace(
             ["'", '’', '‘', '′', '`', 'ʻ', 'ʼ', 'ʹ', 'ʺ'],
@@ -79,6 +98,23 @@ final class NameNormalizer
         }
 
         return str_replace(' ', '', $this->normalize($username));
+    }
+
+    /**
+     * Canonical composition (NFC): re-joins a base letter and its
+     * combining mark into the single code point the Cyrillic map is
+     * keyed by, so an already-decomposed "ё" is transliterated like a
+     * precomposed one.
+     */
+    private function compose(string $value): string
+    {
+        if (! class_exists(Normalizer::class)) {
+            return $value;
+        }
+
+        $composed = Normalizer::normalize($value, Normalizer::FORM_C);
+
+        return is_string($composed) ? $composed : $value;
     }
 
     private function stripDiacritics(string $value): string
