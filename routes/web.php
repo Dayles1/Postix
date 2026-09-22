@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\Telegram\DriverCheckChatController;
 use App\Http\Controllers\Api\Telegram\DriverCheckExportController;
 use App\Http\Controllers\Api\Telegram\OperationUserController;
 use App\Http\Controllers\Api\Telegram\OperatorController;
@@ -182,6 +183,17 @@ Route::middleware(['auth', 'role:driverCheck,superadmin'])
         )->name('driver-check.operators');
 
         /*
+         * Watched chats
+         *
+         * The groups the listener follows. Editable here so a new group can
+         * be added without touching .env or restarting the listener.
+         */
+        Route::get(
+            '/chats',
+            [DriverCheckController::class, 'chats']
+        )->name('driver-check.chats');
+
+        /*
          * Drivers
          */
         Route::get(
@@ -267,6 +279,29 @@ Route::middleware(['auth', 'role:driverCheck,superadmin'])
             '/operators/{operationUser}',
             [OperatorController::class, 'destroy']
         )->name('api.telegram.operators.destroy');
+
+        /*
+         * Watched chats (management CRUD)
+         */
+        Route::get(
+            '/chats',
+            [DriverCheckChatController::class, 'index']
+        )->name('api.telegram.chats.index');
+
+        Route::post(
+            '/chats',
+            [DriverCheckChatController::class, 'store']
+        )->name('api.telegram.chats.store');
+
+        Route::put(
+            '/chats/{chat}',
+            [DriverCheckChatController::class, 'update']
+        )->name('api.telegram.chats.update');
+
+        Route::delete(
+            '/chats/{chat}',
+            [DriverCheckChatController::class, 'destroy']
+        )->name('api.telegram.chats.destroy');
 
         /*
          * Drivers

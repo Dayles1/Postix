@@ -95,6 +95,11 @@ class MenuHelper
                 'path' => '/driver-check/operators',
             ],
             [
+                'icon' => 'chat',
+                'name' => 'Чаты',
+                'path' => '/driver-check/chats',
+            ],
+            [
                 'icon' => 'user-profile',
                 'name' => 'Водители',
                 'path' => '/driver-check/drivers',

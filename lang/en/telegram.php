@@ -179,6 +179,117 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Watched chats
+    |--------------------------------------------------------------------------
+    |
+    | The groups the listener follows. The list may hold one chat, several or
+    | none at all; it is read by the running listener, not by the panel.
+    |
+    */
+
+    'chats' => [
+
+        'title' => 'Watched chats',
+
+        'description' => 'The groups the driver-check listener follows. None, one or several.',
+
+        'notice' => 'Only the listener can resolve a link, so a new chat needs up to a minute before it is watched.',
+
+        'create' => 'Add chat',
+
+        'search_placeholder' => 'Link, name or chat ID',
+
+        'stats' => [
+            'total' => 'Chats',
+            'active' => 'Enabled',
+            'watching' => 'Watching',
+            'failing' => 'Errors',
+        ],
+
+        'filters' => [
+            'status' => 'Status',
+            'status_all' => 'All',
+            'status_active' => 'Enabled',
+            'status_inactive' => 'Paused',
+            'resolved' => 'Resolution',
+            'resolved_all' => 'All',
+            'resolved_yes' => 'Resolved',
+            'resolved_no' => 'Pending',
+        ],
+
+        'table' => [
+            'chat' => 'Chat',
+            'peer' => 'Chat ID',
+            'status' => 'Status',
+            'checks' => 'Checks',
+            'last_message' => 'Last message',
+            'actions' => 'Actions',
+            'no_link' => 'Added as an ID',
+            'no_id' => 'Not resolved yet',
+            'never' => 'Nothing yet',
+            'edit' => 'Edit',
+            'source_env' => 'From .env',
+        ],
+
+        'status' => [
+            'watching' => 'Watching',
+            'pending' => 'Resolving',
+            'failed' => 'Error',
+            'paused' => 'Paused',
+        ],
+
+        'form' => [
+            'create_title' => 'New chat',
+            'edit_title' => 'Edit chat',
+            'chat' => 'Link or chat ID',
+            'chat_hint' => 'An invite link (t.me/+...), a @username, or a numeric id (-100...)',
+            'title' => 'Name',
+            'title_hint' => 'Panel only. Left empty, the listener fills it in from Telegram',
+            'is_active' => 'Watch this chat',
+            'is_active_hint' => 'Turned off, the listener ignores the group without forgetting it',
+            'save' => 'Save',
+            'cancel' => 'Cancel',
+            'saving' => 'Saving...',
+            'delete' => 'Remove',
+        ],
+
+        'validation' => [
+            'format' => 'Enter a t.me link, a @username or a numeric chat id',
+            'duplicate' => 'This chat is already on the list',
+        ],
+
+        'confirm' => [
+            'delete_title' => 'Remove this chat?',
+            'delete_text' => 'The listener stops watching it. The checks it already produced are kept.',
+            'delete' => 'Remove',
+            'cancel' => 'Cancel',
+        ],
+
+        'messages' => [
+            'created' => 'Chat added',
+            'updated' => 'Changes saved',
+            'deleted' => 'Chat removed',
+        ],
+
+        'deleted' => 'Chat removed',
+
+        'errors' => [
+            'title' => 'Error',
+            'load' => 'Could not load the chats',
+            'load_failed' => 'Could not load the chats',
+            'save' => 'Could not save the chat',
+            'delete' => 'Could not remove the chat',
+            'resolve' => 'Resolution error',
+        ],
+
+        'empty' => [
+            'title' => 'No chats yet',
+            'description' => 'Add the group whose driver messages should be checked. Without one the listener runs but stays silent.',
+        ],
+    ],
+
     'operation_users' => [
 
         'title' => 'Operators',

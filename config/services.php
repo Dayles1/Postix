@@ -43,7 +43,29 @@ return [
 
         'api_id' => env('TELEGRAM_API_ID'),
         'api_hash' => env('TELEGRAM_API_HASH'),
-        'driver_check_chat_link' => env('TELEGRAM_DRIVER_CHECK_CHAT_LINK'),
+        /*
+         * Groups the driver check listener watches, as a comma (or whitespace)
+         * separated list: one link, several, or none at all.
+         *
+         * These are only the seed values - on startup they are imported into
+         * telegram_driver_check_chats, which is what the listener actually
+         * reads, so chats can be added from the panel without a deploy.
+         */
+        'driver_check_chat_links' => array_values(
+            array_filter(
+                array_map(
+                    'trim',
+                    preg_split(
+                        '/[\s,;]+/',
+                        (string) env(
+                            'TELEGRAM_DRIVER_CHECK_CHAT_LINKS',
+                            (string) env('TELEGRAM_DRIVER_CHECK_CHAT_LINK', '')
+                        )
+                    ) ?: []
+                ),
+                static fn (string $link): bool => $link !== ''
+            )
+        ),
         'driver_check_account_id' => env('TELEGRAM_DRIVER_CHECK_ACCOUNT_ID'),
         'driver_check_notification_chat_id' => env('TELEGRAM_DRIVER_CHECK_NOTIFICATION_CHAT_ID'),
     ],

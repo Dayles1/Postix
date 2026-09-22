@@ -159,6 +159,117 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Kuzatiladigan chatlar
+    |--------------------------------------------------------------------------
+    |
+    | Listener tinglaydigan guruhlar. Ro'yxatda bitta chat, bir nechtasi yoki
+    | umuman bo'lmasligi mumkin; ro'yxatni panel emas, listener o'qiydi.
+    |
+    */
+
+    'chats' => [
+
+        'title' => 'Kuzatiladigan chatlar',
+
+        'description' => 'Haydovchi tekshiruvi tinglaydigan guruhlar. Bitta, bir nechta yoki umuman yo\'q.',
+
+        'notice' => 'Havolani listener o\'zi aniqlaydi, shuning uchun yangi chat bir daqiqagacha vaqt oladi.',
+
+        'create' => 'Chat qo\'shish',
+
+        'search_placeholder' => 'Havola, nom yoki chat ID',
+
+        'stats' => [
+            'total' => 'Chatlar',
+            'active' => 'Yoqilgan',
+            'watching' => 'Kuzatilmoqda',
+            'failing' => 'Xatolar',
+        ],
+
+        'filters' => [
+            'status' => 'Holat',
+            'status_all' => 'Barchasi',
+            'status_active' => 'Yoqilgan',
+            'status_inactive' => 'To\'xtatilgan',
+            'resolved' => 'Aniqlash',
+            'resolved_all' => 'Barchasi',
+            'resolved_yes' => 'Aniqlangan',
+            'resolved_no' => 'Kutilmoqda',
+        ],
+
+        'table' => [
+            'chat' => 'Chat',
+            'peer' => 'Chat ID',
+            'status' => 'Holat',
+            'checks' => 'Tekshiruvlar',
+            'last_message' => 'Oxirgi xabar',
+            'actions' => 'Amallar',
+            'no_link' => 'ID orqali qo\'shilgan',
+            'no_id' => 'Hali aniqlanmagan',
+            'never' => 'Hali yo\'q',
+            'edit' => 'Tahrirlash',
+            'source_env' => '.env dan',
+        ],
+
+        'status' => [
+            'watching' => 'Kuzatilmoqda',
+            'pending' => 'Aniqlanmoqda',
+            'failed' => 'Xato',
+            'paused' => 'To\'xtatilgan',
+        ],
+
+        'form' => [
+            'create_title' => 'Yangi chat',
+            'edit_title' => 'Chatni tahrirlash',
+            'chat' => 'Havola yoki chat ID',
+            'chat_hint' => 'Taklif havolasi (t.me/+...), @username yoki raqamli ID (-100...)',
+            'title' => 'Nomi',
+            'title_hint' => 'Faqat panel uchun. Bo\'sh qoldirilsa, listener Telegramdan oladi',
+            'is_active' => 'Bu chatni kuzatish',
+            'is_active_hint' => 'O\'chirilsa, listener guruhni e\'tiborsiz qoldiradi, lekin unutmaydi',
+            'save' => 'Saqlash',
+            'cancel' => 'Bekor qilish',
+            'saving' => 'Saqlanmoqda...',
+            'delete' => 'O\'chirish',
+        ],
+
+        'validation' => [
+            'format' => 't.me havolasi, @username yoki raqamli chat ID kiriting',
+            'duplicate' => 'Bu chat ro\'yxatda allaqachon bor',
+        ],
+
+        'confirm' => [
+            'delete_title' => 'Bu chat o\'chirilsinmi?',
+            'delete_text' => 'Listener uni tinglashni to\'xtatadi. Yaratilgan tekshiruvlar saqlanib qoladi.',
+            'delete' => 'O\'chirish',
+            'cancel' => 'Bekor qilish',
+        ],
+
+        'messages' => [
+            'created' => 'Chat qo\'shildi',
+            'updated' => 'O\'zgarishlar saqlandi',
+            'deleted' => 'Chat o\'chirildi',
+        ],
+
+        'deleted' => 'Chat o\'chirildi',
+
+        'errors' => [
+            'title' => 'Xato',
+            'load' => 'Chatlarni yuklab bo\'lmadi',
+            'load_failed' => 'Chatlarni yuklab bo\'lmadi',
+            'save' => 'Chatni saqlab bo\'lmadi',
+            'delete' => 'Chatni o\'chirib bo\'lmadi',
+            'resolve' => 'Aniqlash xatosi',
+        ],
+
+        'empty' => [
+            'title' => 'Hozircha chat yo\'q',
+            'description' => 'Xabarlari tekshiriladigan guruhni qo\'shing. Usiz listener ishlaydi, lekin jim turadi.',
+        ],
+    ],
+
     'operation_users' => [
 
         'title' => 'Operatorlar',

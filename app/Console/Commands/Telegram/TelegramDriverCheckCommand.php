@@ -56,20 +56,12 @@ class TelegramDriverCheckCommand extends Command
             return self::INVALID;
         }
 
-        $chatLink = trim(
-            (string) config(
-                'services.telegram.driver_check_chat_link'
-            )
-        );
-
-        if ($chatLink === '') {
-            $this->error(
-                'TELEGRAM_DRIVER_CHECK_CHAT_LINK is not configured.'
-            );
-
-            return self::INVALID;
-        }
-
+        /*
+         * The watch list itself is no longer a start condition: it lives in
+         * telegram_driver_check_chats, it may legitimately be empty, and the
+         * listener re-reads it while it runs. Only the account still has to
+         * be right, because nothing can be done without a session.
+         */
         $account = TelegramAccount::query()
             ->whereKey((int) $accountId)
             ->first();
@@ -174,7 +166,9 @@ class TelegramDriverCheckCommand extends Command
             'pid' => getmypid(),
             'account_id' => $account->id,
             'phone' => $account->phone,
-            'chat_link' => $chatLink,
+            'chat_links' => config(
+                'services.telegram.driver_check_chat_links'
+            ),
             'session_path' => $account->session_path,
             'madelineproto_version' => API::RELEASE,
             'proxy_enabled' => $settings

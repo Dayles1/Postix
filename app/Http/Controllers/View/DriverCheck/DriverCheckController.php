@@ -36,6 +36,13 @@ final class DriverCheckController extends Controller
         );
     }
 
+    public function chats()
+    {
+        return view(
+            'pages.driver-check.chats'
+        );
+    }
+
     public function drivers()
     {
         return view(

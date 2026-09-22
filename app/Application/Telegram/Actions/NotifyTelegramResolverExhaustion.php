@@ -13,14 +13,21 @@ use Throwable;
 
 final class NotifyTelegramResolverExhaustion
 {
+    /**
+     * @param list<int> $targetChatIds
+     */
     public function execute(
         SimpleEventHandler $telegram,
-        int $targetChatId,
+        array $targetChatIds,
     ): void {
+        if ($targetChatIds === []) {
+            return;
+        }
+
         $checks = TelegramDriverCheck::query()
-            ->where(
+            ->whereIn(
                 'telegram_chat_id',
-                $targetChatId,
+                $targetChatIds,
             )
             ->where(
                 'status',

@@ -8,6 +8,7 @@ use App\Application\Telegram\Actions\NotifyTelegramResolverExhaustion;
 use App\Application\Telegram\Actions\ProcessCreatedDriverMessage;
 use App\Application\Telegram\Actions\ProcessTelegramDriverCheckResults;
 use App\Application\Telegram\Actions\TelegramDriverCheckStarter;
+use App\Application\Telegram\Services\TelegramDriverCheckChats;
 use App\Application\Telegram\Services\TelegramDriverCheckRecorder;
 use App\Application\Telegram\Services\TelegramMessageTypeDetector;
 use App\Enums\Drivers\TelegramDriverMessageType;
@@ -37,7 +38,23 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
      */
     private const HEALTH_CHECK_STRIKES = 3;
 
-    private ?int $targetChatId = null;
+    /**
+     * How often the watch list is re-read from the database, seconds.
+     *
+     * This is what makes a chat added or removed in the panel take effect
+     * without restarting the listener.
+     */
+    private const CHAT_REFRESH_PERIOD = 30.0;
+
+    /**
+     * Chats to watch, or null when onStart() could not run at all.
+     *
+     * An empty list is a legitimate state - no chat configured yet - and
+     * must not be confused with a failed start.
+     *
+     * @var list<int>|null
+     */
+    private ?array $targetChatIds = null;
 
     private int $unhealthyStrikes = 0;
 
@@ -48,14 +65,17 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
     Log::info('TelegramDriverCheckHandler: onStart');
 
     try {
-        $this->targetChatId = app(
+        $this->targetChatIds = app(
             TelegramDriverCheckStarter::class,
         )->execute($this);
 
         Log::info(
             'TelegramDriverCheckHandler: started',
             [
-                'target_chat_id' => $this->targetChatId,
+                'chat_count' => $this->targetChatIds === null
+                    ? 0
+                    : count($this->targetChatIds),
+                'target_chat_ids' => $this->targetChatIds,
             ],
         );
     } catch (Throwable $e) {
@@ -76,7 +96,10 @@ public function handleIncomingMessage(
     Incoming&TelegramIncomingMessage $message,
 ): void {
     try {
-        if ($this->targetChatId === null) {
+        if (
+            $this->targetChatIds === null
+            || $this->targetChatIds === []
+        ) {
             return;
         }
 
@@ -87,9 +110,13 @@ public function handleIncomingMessage(
         }
 
         // Ignore all other chats silently.
-        if ((int) $chatId !== $this->targetChatId) {
+        if (! in_array((int) $chatId, $this->targetChatIds, true)) {
             return;
         }
+
+        app(
+            TelegramDriverCheckChats::class,
+        )->touch((int) $chatId);
 
         Log::info(
             'TelegramDriverCheckHandler: incoming message',
@@ -189,11 +216,15 @@ public function cron(): void
     
 
     try {
-        if ($this->targetChatId === null) {
+        if ($this->targetChatIds === null) {
             Log::warning(
-                'TelegramDriverCheckHandler: cron targetChatId is null',
+                'TelegramDriverCheckHandler: cron has no watch list',
             );
 
+            return;
+        }
+
+        if ($this->targetChatIds === []) {
             return;
         }
 
@@ -201,7 +232,7 @@ public function cron(): void
             ProcessTelegramDriverCheckResults::class,
         )->execute(
             $this,
-            $this->targetChatId,
+            $this->targetChatIds,
         );
 
         
@@ -210,13 +241,65 @@ public function cron(): void
             NotifyTelegramResolverExhaustion::class,
         )->execute(
             $this,
-            $this->targetChatId,
+            $this->targetChatIds,
         );
 
         
     } catch (Throwable $e) {
         Log::error(
             'TelegramDriverCheckHandler: cron failed',
+            [
+                'error' => $e->getMessage(),
+                'exception' => $e::class,
+            ],
+        );
+    }
+}
+
+/**
+ * Re-reads the watch list from the database.
+ *
+ * The panel writes to telegram_driver_check_chats while this process is
+ * running, so without this the only way to add or remove a group would be a
+ * restart. Resolution of a new invite link happens here too - it needs the
+ * MadelineProto session this process owns.
+ */
+#[Cron(period: self::CHAT_REFRESH_PERIOD)]
+public function refreshChats(): void
+{
+    /*
+     * onStart() failed: the health probe is already asking for a restart,
+     * and a watch list without a start notification would only hide it.
+     */
+    if ($this->targetChatIds === null || $this->restartRequested) {
+        return;
+    }
+
+    try {
+        $chatIds = app(
+            TelegramDriverCheckChats::class,
+        )->resolve($this);
+
+        if ($chatIds === $this->targetChatIds) {
+            return;
+        }
+
+        Log::info(
+            'TelegramDriverCheckHandler: watch list changed',
+            [
+                'from' => $this->targetChatIds,
+                'to' => $chatIds,
+            ],
+        );
+
+        $this->targetChatIds = $chatIds;
+    } catch (Throwable $e) {
+        /*
+         * Keep watching what we already have: a failed refresh is a reason
+         * to skip a beat, never to go deaf.
+         */
+        Log::error(
+            'TelegramDriverCheckHandler: watch list refresh failed',
             [
                 'error' => $e->getMessage(),
                 'exception' => $e::class,
@@ -289,7 +372,7 @@ public function healthCheck(): void
  */
 private function detectProblem(): ?string
 {
-    if ($this->targetChatId === null) {
+    if ($this->targetChatIds === null) {
         /*
          * onStart() could not resolve the target chat: the listener is up but
          * silently ignores every message. Restarting is the only way out.
@@ -338,7 +421,7 @@ private function requestProcessRestart(string $reason): void
 
     $context = [
         'pid' => getmypid(),
-        'target_chat_id' => $this->targetChatId,
+        'target_chat_ids' => $this->targetChatIds,
         'strikes' => $this->unhealthyStrikes,
         'probe_period' => self::HEALTH_CHECK_PERIOD,
     ];
