@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Telegram\Services;
 
+use App\Application\Telegram\Support\VendorNoticeShield;
 use App\Models\Driver\TelegramDriverCheck;
 use danog\MadelineProto\SimpleEventHandler;
 use Illuminate\Support\Facades\Log;
@@ -27,19 +28,32 @@ final class TelegramDriverCheckReporter
                 match: $match,
             );
 
-            $telegram->messages->sendMessage([
-                'peer' => $check->telegram_chat_id,
+            /*
+             * A PHP notice from inside MadelineProto must not abort a
+             * report that Telegram has already accepted: reported_at
+             * would stay null and the cron would send the same reply
+             * again on every pass. See VendorNoticeShield.
+             */
+            VendorNoticeShield::guard(
+                'messages.sendMessage',
+                static fn (): mixed => $telegram->messages->sendMessage([
+                    'peer' => $check->telegram_chat_id,
 
-                'reply_to' => [
-                    '_' => 'inputReplyToMessage',
-                    'reply_to_msg_id' =>
-                        $check->telegram_message_id,
+                    'reply_to' => [
+                        '_' => 'inputReplyToMessage',
+                        'reply_to_msg_id' =>
+                            $check->telegram_message_id,
+                    ],
+
+                    'message' => $message,
+                    'parse_mode' => 'html',
+                    'no_webpage' => true,
+                ]),
+                [
+                    'check_id' => $check->id,
+                    'chat_id' => $check->telegram_chat_id,
                 ],
-
-                'message' => $message,
-                'parse_mode' => 'html',
-                'no_webpage' => true,
-            ]);
+            );
 
             $check->update([
                 'reported_at' => now(),

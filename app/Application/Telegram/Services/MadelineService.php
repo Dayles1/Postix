@@ -2,6 +2,7 @@
 
 namespace App\Application\Telegram\Services;
 
+use App\Application\Telegram\Support\VendorNoticeShield;
 use App\Models\Telegram\TelegramAccount;
 use danog\MadelineProto\API;
 use danog\MadelineProto\Logger;
@@ -46,17 +47,34 @@ class MadelineService
         }
 
         try {
-            $api = new API(
-                $account->session_path,
-                $this->settings()
+            /*
+             * Starting a session walks a lot of library code, and a PHP
+             * notice raised anywhere in it would otherwise become an
+             * exception and cost us an account for the attempt. See
+             * VendorNoticeShield.
+             */
+            $api = VendorNoticeShield::guard(
+                'madeline.start',
+                function () use ($account): API {
+                    $api = new API(
+                        $account->session_path,
+                        $this->settings()
+                    );
+
+                    Log::debug('MadelineProto API created', [
+                        'account_id' => $account->id,
+                        'phone' => $account->phone,
+                    ]);
+
+                    $api->start();
+
+                    return $api;
+                },
+                [
+                    'account_id' => $account->id,
+                    'phone' => $account->phone,
+                ],
             );
-
-            Log::debug('MadelineProto API created', [
-                'account_id' => $account->id,
-                'phone' => $account->phone,
-            ]);
-
-            $api->start();
 
             Log::info('MadelineProto started successfully', [
                 'account_id' => $account->id,

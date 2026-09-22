@@ -3,6 +3,7 @@
 namespace App\Application\Telegram\Services;
 
 use Amp\CancelledException;
+use App\Application\Telegram\Support\VendorNoticeShield;
 use danog\MadelineProto\API;
 use danog\MadelineProto\RPCErrorException;
 use Illuminate\Support\Facades\Log;
@@ -22,8 +23,17 @@ class TelegramContactResolver
         array $context = [],
     ): array {
         try {
-            $result = $api->contacts->resolvePhone(
-                phone: $phone
+            /*
+             * A PHP notice raised inside MadelineProto while it parses
+             * the response must not take a successful resolve down with
+             * it -- see VendorNoticeShield.
+             */
+            $result = VendorNoticeShield::guard(
+                'contacts.resolvePhone',
+                static fn (): array => $api->contacts->resolvePhone(
+                    phone: $phone
+                ),
+                $context,
             );
 
             $user = $result['users'][0] ?? null;

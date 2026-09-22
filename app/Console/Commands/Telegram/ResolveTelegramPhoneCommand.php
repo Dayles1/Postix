@@ -1363,6 +1363,52 @@ final class ResolveTelegramPhoneCommand extends Command
             $telegramRaw =
                 $this->getTelegramRaw($check);
 
+            /*
+             * ========================================================
+             * 13a. A LATE FAILURE MUST NOT ERASE A VERDICT
+             * ========================================================
+             *
+             * Everything below this point runs after the phone was
+             * resolved and the name compared. If the check already
+             * carries its verdict, whatever went wrong afterwards is a
+             * problem with this run, not with the driver: overwriting
+             * the verdict here is how check #882 came back "NOT
+             * CONFIRMED - Undefined property:
+             * danog\MadelineProto\Exception::$class" while its own
+             * report, one block further down, printed a name match of
+             * 96. The error is recorded next to the verdict instead.
+             */
+            if ($this->hasVerdict($check, $telegramRaw)) {
+                $telegramRaw[
+                    'resolver_result'
+                ] = 'command_failed_after_verdict';
+
+                $telegramRaw[
+                    'post_verdict_error'
+                ] = $error;
+
+                $check->update([
+                    'telegram_raw' =>
+                        $telegramRaw,
+                ]);
+
+                Log::warning(
+                    'ResolveTelegramPhoneCommand failed after the verdict was decided, verdict kept',
+                    [
+                        'check_id' =>
+                            $check->id,
+
+                        'status' =>
+                            $check->status?->value,
+
+                        'error' =>
+                            $error,
+                    ],
+                );
+
+                return self::SUCCESS;
+            }
+
             $telegramRaw[
                 'resolver_result'
             ] = 'command_failed';
@@ -1388,6 +1434,34 @@ final class ResolveTelegramPhoneCommand extends Command
 
             return self::FAILURE;
         }
+    }
+
+    /**
+     * Has this check already been decided?
+     *
+     * A verdict is a finished comparison: a final status, the time it
+     * was reached, and the name_match that produced it. All three
+     * together, because a status alone can also be the claim marker
+     * being rolled back.
+     *
+     * @param  array<string, mixed>  $telegramRaw
+     */
+    private function hasVerdict(
+        TelegramDriverCheck $check,
+        array $telegramRaw,
+    ): bool {
+        if ($check->checked_at === null) {
+            return false;
+        }
+
+        if (
+            $check->status !== TelegramDriverCheckStatus::Confirmed
+            && $check->status !== TelegramDriverCheckStatus::NotConfirmed
+        ) {
+            return false;
+        }
+
+        return isset($telegramRaw['name_match']);
     }
 
     /**
