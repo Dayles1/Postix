@@ -455,8 +455,19 @@ final class ResolveTelegramPhoneCommand extends Command
 
                     /*
                      * ------------------------------------------------
-                     * FULL DIAGNOSTIC LOG FOR CANCELLED OPERATION
+                     * CANCELLED: REOPEN THE SESSION AND TRY AGAIN
                      * ------------------------------------------------
+                     *
+                     * "The operation was cancelled" is an Amp timeout
+                     * on the MTProto call, so it says the connection
+                     * behind this session is wedged - not that the
+                     * account is bad and not that the phone is
+                     * unknown. The account still has a real attempt in
+                     * it, and spending it needs a new session: on the
+                     * old one every further call is cancelled the same
+                     * way, which is how a check ended up reporting
+                     * nothing but "The operation was cancelled" after
+                     * burning all five accounts.
                      */
                     if (
                         $this->isCancelledResult($result)
@@ -468,6 +479,54 @@ final class ResolveTelegramPhoneCommand extends Command
                             accountPhone: $account->phone,
                             result: $result,
                         );
+
+                        $api = $madelineService->restart(
+                            $account,
+                            $api,
+                        );
+
+                        if ($api) {
+                            $result = $resolver->resolve(
+                                $api,
+                                $check->phone_normalized,
+                                [
+                                    'check_id' =>
+                                        $check->id,
+
+                                    'attempt' =>
+                                        $attempt,
+
+                                    'account_id' =>
+                                        $accountId,
+
+                                    'account_phone' =>
+                                        $account->phone,
+
+                                    'after_session_restart' =>
+                                        true,
+                                ],
+                            );
+
+                            Log::info(
+                                'Telegram resolver retried after a cancelled operation',
+                                [
+                                    'check_id' =>
+                                        $check->id,
+
+                                    'attempt' =>
+                                        $attempt,
+
+                                    'account_id' =>
+                                        $accountId,
+
+                                    'success' =>
+                                        (bool) ($result['success'] ?? false),
+
+                                    'cancelled_again' =>
+                                        $this->isCancelledResult($result),
+                                ],
+                            );
+                        }
                     }
 
                     $success =
@@ -1472,6 +1531,10 @@ final class ResolveTelegramPhoneCommand extends Command
     ): bool {
         if (! is_array($result)) {
             return false;
+        }
+
+        if (($result['cancelled'] ?? false) === true) {
+            return true;
         }
 
         $message = mb_strtolower(

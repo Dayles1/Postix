@@ -86,7 +86,9 @@ class TelegramContactResolver
              * lives in getPrevious(), so it is captured here before the
              * exception is discarded.
              */
-            $diagnostics = $this->isCancellation($e)
+            $cancelled = $this->isCancellation($e);
+
+            $diagnostics = $cancelled
                 ? $this->cancellationDiagnostics($e, $context)
                 : [];
 
@@ -101,6 +103,15 @@ class TelegramContactResolver
                 'success' => false,
 
                 'reason' => 'telegram_error',
+
+                /*
+                 * Stated rather than left to be recognised from the
+                 * message: a cancellation is a wedged connection, not a
+                 * bad account, and the caller answers it by reopening
+                 * the session instead of spending another account on
+                 * the same phone.
+                 */
+                'cancelled' => $cancelled,
 
                 'user' => null,
 

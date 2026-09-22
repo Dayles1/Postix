@@ -95,6 +95,45 @@ class MadelineService
         }
     }
 
+    /**
+     * Throw away a session and open a fresh one for the same account.
+     *
+     * An Amp cancellation ("The operation was cancelled", wrapping a
+     * timeout on the MTProto call) leaves the session in a state where
+     * the next call through the same instance tends to be cancelled the
+     * same way: the connection behind it is the thing that is wedged,
+     * not the account. Re-running the resolve on a new instance is what
+     * turns that into a second real chance instead of a wasted account.
+     *
+     * The old instance is released first so its destructor can close
+     * the socket and write the session file back; MadelineProto has no
+     * synchronous "close" to call here, so dropping the last reference
+     * and collecting cycles is the whole of it.
+     */
+    public function restart(TelegramAccount $account, ?API $api = null): ?API
+    {
+        Log::warning('MadelineProto session restarting', [
+            'account_id' => $account->id,
+            'phone' => $account->phone,
+        ]);
+
+        if ($api !== null) {
+            try {
+                unset($api);
+
+                gc_collect_cycles();
+            } catch (Throwable $e) {
+                Log::warning('MadelineProto session could not be released cleanly', [
+                    'account_id' => $account->id,
+                    'exception' => $e::class,
+                    'message' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $this->for($account);
+    }
+
     private function settings(): Settings
     {
         $settings = new Settings();
