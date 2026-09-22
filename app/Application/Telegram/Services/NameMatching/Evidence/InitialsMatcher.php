@@ -242,10 +242,16 @@ final class InitialsMatcher
     /**
      * Whether this initial can stand for this name part.
      *
-     * Compared against the canonical form as well as the display one, so
-     * the "К" of a Cyrillic profile stands for a driver's QODIROV
-     * exactly as it stands for his neighbour's KARIMOV -- q and k are
-     * one letter as far as spelling variance goes.
+     * Both sides are compared in canonical form, which is what makes the
+     * letters people write interchangeably interchangeable here too:
+     * Q and K are one letter, as are X, KH and H, and ZH and J. Folding
+     * only the driver's side -- as this did at first -- makes the
+     * equivalence work in one direction and one direction only, so
+     * QODIROV matched a Cyrillic "К." while KODIROV did not match the
+     * Uzbek Latin "Q." of the very same person.
+     *
+     * The display form is still accepted as a fallback for the letters
+     * folding leaves alone.
      */
     private function stands(string $initial, Token $driverToken): bool
     {
@@ -253,7 +259,10 @@ final class InitialsMatcher
             return false;
         }
 
-        return str_starts_with($driverToken->canonical, $initial)
+        $canonicalInitial = (new Token($initial))->canonical;
+
+        return ($canonicalInitial !== '' && str_starts_with($driverToken->canonical, $canonicalInitial))
+            || str_starts_with($driverToken->canonical, $initial)
             || str_starts_with($driverToken->display, $initial);
     }
 
