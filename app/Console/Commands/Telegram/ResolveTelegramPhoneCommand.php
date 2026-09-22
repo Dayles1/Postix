@@ -26,6 +26,17 @@ final class ResolveTelegramPhoneCommand extends Command
 
     private const MAX_ATTEMPTS = 5;
 
+    /**
+     * How many cancelled operations may be retried on a fresh session
+     * without costing an attempt.
+     *
+     * A cancellation is a wedged connection, so retrying is worth it;
+     * but when Telegram itself is unreachable every session is
+     * cancelled, and an unbounded retry would keep a check spinning
+     * forever.
+     */
+    private const MAX_CANCELLED_RETRIES = 2;
+
     public function handle(
         MadelineService $madelineService,
         TelegramContactResolver $resolver,
@@ -234,6 +245,8 @@ final class ResolveTelegramPhoneCommand extends Command
             $notRegisteredCount = 0;
 
             $realErrorCount = 0;
+
+            $cancelledRetries = 0;
 
             $lastError =
                 'Telegram resolve failed.';
@@ -455,19 +468,30 @@ final class ResolveTelegramPhoneCommand extends Command
 
                     /*
                      * ------------------------------------------------
-                     * CANCELLED: REOPEN THE SESSION AND TRY AGAIN
+                     * CANCELLED: A FRESH SESSION, NOT A LOST ATTEMPT
                      * ------------------------------------------------
                      *
                      * "The operation was cancelled" is an Amp timeout
-                     * on the MTProto call, so it says the connection
+                     * on the MTProto call. It says the connection
                      * behind this session is wedged - not that the
                      * account is bad and not that the phone is
-                     * unknown. The account still has a real attempt in
-                     * it, and spending it needs a new session: on the
-                     * old one every further call is cancelled the same
-                     * way, which is how a check ended up reporting
-                     * nothing but "The operation was cancelled" after
-                     * burning all five accounts.
+                     * unknown. On the same session every further call
+                     * is cancelled the same way, which is how a check
+                     * ended up reporting nothing but "The operation was
+                     * cancelled" after spending all five accounts.
+                     *
+                     * The answer is another session, and the cleanest
+                     * way to get one is to end this attempt: the
+                     * finally below stops MadelineProto, the account
+                     * goes back in the pool, and the next pass opens a
+                     * session from scratch - on this account or on
+                     * another, whichever the pool hands out. The
+                     * attempt is not charged, because nothing was
+                     * asked of Telegram that it managed to answer.
+                     *
+                     * Bounded by MAX_CANCELLED_RETRIES so a Telegram
+                     * side outage, where every session is cancelled,
+                     * still terminates.
                      */
                     if (
                         $this->isCancelledResult($result)
@@ -480,53 +504,62 @@ final class ResolveTelegramPhoneCommand extends Command
                             result: $result,
                         );
 
-                        $api = $madelineService->restart(
-                            $account,
-                            $api,
-                        );
+                        if (
+                            $cancelledRetries < self::MAX_CANCELLED_RETRIES
+                        ) {
+                            $cancelledRetries++;
 
-                        if ($api) {
-                            $result = $resolver->resolve(
-                                $api,
-                                $check->phone_normalized,
+                            /*
+                             * The account was never really tried, so it
+                             * is not spent: put it back in the pool.
+                             */
+                            $usedAccountIds = array_values(
+                                array_diff(
+                                    $usedAccountIds,
+                                    [$accountId],
+                                ),
+                            );
+
+                            /*
+                             * Undo this iteration's charge against the
+                             * attempt budget; the for-loop's increment
+                             * puts it straight back.
+                             */
+                            $attempt--;
+
+                            Log::warning(
+                                'Telegram resolver retrying a cancelled operation on a new session',
                                 [
                                     'check_id' =>
                                         $check->id,
 
-                                    'attempt' =>
-                                        $attempt,
-
                                     'account_id' =>
                                         $accountId,
 
-                                    'account_phone' =>
-                                        $account->phone,
+                                    'cancelled_retries' =>
+                                        $cancelledRetries,
 
-                                    'after_session_restart' =>
-                                        true,
+                                    'max_cancelled_retries' =>
+                                        self::MAX_CANCELLED_RETRIES,
                                 ],
                             );
 
-                            Log::info(
-                                'Telegram resolver retried after a cancelled operation',
-                                [
-                                    'check_id' =>
-                                        $check->id,
-
-                                    'attempt' =>
-                                        $attempt,
-
-                                    'account_id' =>
-                                        $accountId,
-
-                                    'success' =>
-                                        (bool) ($result['success'] ?? false),
-
-                                    'cancelled_again' =>
-                                        $this->isCancelledResult($result),
-                                ],
-                            );
+                            continue;
                         }
+
+                        Log::critical(
+                            'Telegram resolver out of cancellation retries',
+                            [
+                                'check_id' =>
+                                    $check->id,
+
+                                'account_id' =>
+                                    $accountId,
+
+                                'cancelled_retries' =>
+                                    $cancelledRetries,
+                            ],
+                        );
                     }
 
                     $success =
@@ -917,6 +950,48 @@ final class ResolveTelegramPhoneCommand extends Command
                      * ATTEMPT EXCEPTION
                      * ------------------------------------------------
                      */
+
+                    /*
+                     * applyResolvedPhone() writes the verdict and only
+                     * then touches the driver row and the console, so a
+                     * throw can land here with the check already
+                     * decided. Carrying on would blame the account for
+                     * it, spend the rest of the pool, and let block 12
+                     * below overwrite a correct verdict with this
+                     * message - which is exactly the failure the
+                     * verdict guard exists to prevent.
+                     */
+                    $decided = $check->fresh() ?? $check;
+
+                    if (
+                        $this->hasVerdict(
+                            $decided,
+                            $this->getTelegramRaw($decided),
+                        )
+                    ) {
+                        Log::warning(
+                            'Telegram resolver attempt failed after the verdict was decided, verdict kept',
+                            [
+                                'check_id' =>
+                                    $check->id,
+
+                                'attempt' =>
+                                    $attempt,
+
+                                'account_id' =>
+                                    $accountId,
+
+                                'error' =>
+                                    $e->getMessage(),
+
+                                'exception' =>
+                                    $e::class,
+                            ],
+                        );
+
+                        return self::SUCCESS;
+                    }
+
                     $realErrorCount++;
 
                     $lastError =
@@ -1168,6 +1243,32 @@ final class ResolveTelegramPhoneCommand extends Command
 
             $telegramRaw =
                 $this->getTelegramRaw($check);
+
+            /*
+             * A verdict reached during the loop ends the command here.
+             * Blocks 11 and 12 below both write a final status
+             * unconditionally, so without this a check that was decided
+             * and then hit trouble on the way out would be rewritten as
+             * "not confirmed" with whatever the last error happened to
+             * be.
+             */
+            if ($this->hasVerdict($check, $telegramRaw)) {
+                Log::warning(
+                    'Telegram resolver loop ended after the verdict was decided, verdict kept',
+                    [
+                        'check_id' =>
+                            $check->id,
+
+                        'status' =>
+                            $check->status?->value,
+
+                        'error' =>
+                            $lastError,
+                    ],
+                );
+
+                return self::SUCCESS;
+            }
 
             $telegramRaw[
                 'resolver_finished'
