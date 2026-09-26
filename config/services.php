@@ -68,6 +68,13 @@ return [
         ),
         'driver_check_account_id' => env('TELEGRAM_DRIVER_CHECK_ACCOUNT_ID'),
         'driver_check_notification_chat_id' => env('TELEGRAM_DRIVER_CHECK_NOTIFICATION_CHAT_ID'),
+        /*
+         * Shared with the gateway project, which receives the Telegram
+         * webhook and forwards updates to POST /api/telegram/webhook. It
+         * arrives as X-Telegram-Bot-Api-Secret-Token or as a bearer
+         * token. The bot token itself lives in config/telegram.php.
+         */
+        'bot_webhook_secret' => env('TELEGRAM_BOT_WEBHOOK_SECRET'),
     ],
 
 ];
