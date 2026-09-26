@@ -110,6 +110,35 @@ final class DriverCheckReportQueueTest extends TestCase
         $this->assertSame([], $check->telegram_raw ?? []);
     }
 
+    public function test_a_report_whose_check_changed_is_queued_for_an_edit(): void
+    {
+        $check = $this->finishedCheck(1);
+        $check->update(['reported_at' => now(), 'report_message_id' => 501]);
+
+        // A button in the group changed the verdict after the report went out.
+        $check->recordManualDecision(TelegramDriverCheckStatus::NotConfirmed, 7, 'Ali');
+
+        $this->assertNotNull($check->fresh()->report_dirty_at);
+
+        $this->action()->execute($this->deadTelegram(), [self::WATCHED_CHAT]);
+
+        $check->refresh();
+
+        // The edit failed, so the mark stays for the next tick.
+        $this->assertNotNull($check->report_dirty_at);
+        $this->assertSame(1, $check->telegram_raw['report_edit_failures'] ?? 0);
+
+        for ($tick = 2; $tick <= 5; $tick++) {
+            $this->action()->execute($this->deadTelegram(), [self::WATCHED_CHAT]);
+        }
+
+        // Given up on, but the verdict itself is untouched.
+        $check->refresh();
+        $this->assertNull($check->report_dirty_at);
+        $this->assertSame(TelegramDriverCheckStatus::NotConfirmed, $check->status);
+        $this->assertSame(TelegramDriverCheckStatus::Confirmed, $check->system_status);
+    }
+
     private function action(): ProcessTelegramDriverCheckResults
     {
         return app(ProcessTelegramDriverCheckResults::class);

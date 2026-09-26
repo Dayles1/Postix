@@ -81,6 +81,105 @@ final class ProcessTelegramDriverCheckResults
                 $this->recordFailure($check, $e);
             }
         }
+
+        $this->editChangedReports($telegram, $targetChatIds);
+    }
+
+    /**
+     * Edits the reports whose check changed after they were posted.
+     *
+     * This is how a button pressed in the group reaches the report: the
+     * bot runs in another process and cannot touch a message the
+     * MadelineProto account sent, so it marks the check
+     * (report_dirty_at) and the listener, which owns the report, brings
+     * it up to date here.
+     *
+     * @param list<int> $targetChatIds
+     */
+    private function editChangedReports(
+        SimpleEventHandler $telegram,
+        array $targetChatIds,
+    ): void {
+        $checks = TelegramDriverCheck::query()
+            ->whereIn(
+                'telegram_chat_id',
+                $targetChatIds,
+            )
+            ->whereNotNull('report_dirty_at')
+            ->whereNotNull('reported_at')
+            ->orderBy('report_dirty_at')
+            ->limit(10)
+            ->get();
+
+        foreach ($checks as $check) {
+            try {
+                $this->reporter->edit($telegram, $check);
+
+                /*
+                 * Cleared only if nothing changed while the edit was in
+                 * flight; a newer change keeps its mark and is edited on
+                 * the next tick.
+                 */
+                TelegramDriverCheck::query()
+                    ->whereKey($check->id)
+                    ->where(
+                        'report_dirty_at',
+                        $check->getRawOriginal('report_dirty_at'),
+                    )
+                    ->update(['report_dirty_at' => null]);
+            } catch (Throwable $e) {
+                $this->recordEditFailure($check, $e);
+            }
+        }
+    }
+
+    private function recordEditFailure(
+        TelegramDriverCheck $check,
+        Throwable $e,
+    ): void {
+        try {
+            $raw = is_array($check->telegram_raw)
+                ? $check->telegram_raw
+                : [];
+
+            $failures = (int) ($raw['report_edit_failures'] ?? 0) + 1;
+
+            $raw['report_edit_failures'] = $failures;
+            $raw['report_edit_last_error'] = mb_substr($e->getMessage(), 0, 500);
+
+            $attributes = ['telegram_raw' => $raw];
+
+            $exhausted = $failures >= self::MAX_REPORT_ATTEMPTS;
+
+            if ($exhausted) {
+                // The check is right; only its report stays behind.
+                $attributes['report_dirty_at'] = null;
+            }
+
+            $check->forceFill($attributes)->save();
+
+            Log::log(
+                $exhausted ? 'critical' : 'warning',
+                $exhausted
+                    ? 'Driver check report edit abandoned after repeated failures'
+                    : 'Driver check report edit failed, will be retried',
+                [
+                    'check_id' => $check->id,
+                    'report_message_id' => $check->report_message_id,
+                    'failures' => $failures,
+                    'error' => $e->getMessage(),
+                    'exception' => $e::class,
+                ],
+            );
+        } catch (Throwable $bookkeeping) {
+            Log::error(
+                'Driver check report edit failure could not be recorded',
+                [
+                    'check_id' => $check->id,
+                    'error' => $bookkeeping->getMessage(),
+                ],
+            );
+        }
     }
 
     /**
