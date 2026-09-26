@@ -13,6 +13,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use ReflectionClass;
 use RuntimeException;
+use Tests\Support\DriverCheckColumns;
 use Tests\TestCase;
 
 /**
@@ -117,6 +118,7 @@ class OperatorNotificationTest extends TestCase
                 $table->string('driver_name')->nullable();
                 $table->unsignedBigInteger('operation_user_id')->nullable();
                 $table->string('status')->nullable();
+                DriverCheckColumns::lifecycle($table);
                 $table->timestamps();
             }
         );

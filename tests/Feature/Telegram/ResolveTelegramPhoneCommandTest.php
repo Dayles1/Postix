@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Schema;
 use Mockery;
 use ReflectionClass;
 use RuntimeException;
+use Tests\Support\DriverCheckColumns;
 use Tests\TestCase;
 
 /**
@@ -329,6 +330,7 @@ final class ResolveTelegramPhoneCommandTest extends TestCase
             $table->text('telegram_raw')->nullable();
             $table->timestamp('checked_at')->nullable();
             $table->timestamp('reported_at')->nullable();
+            DriverCheckColumns::lifecycle($table);
             $table->timestamps();
         });
     }

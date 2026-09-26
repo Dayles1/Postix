@@ -12,6 +12,7 @@ use danog\MadelineProto\SimpleEventHandler;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use ReflectionClass;
+use Tests\Support\DriverCheckColumns;
 use Tests\TestCase;
 
 /**
@@ -52,6 +53,7 @@ final class DriverCheckReportQueueTest extends TestCase
             $table->text('telegram_raw')->nullable();
             $table->timestamp('checked_at')->nullable();
             $table->timestamp('reported_at')->nullable();
+            DriverCheckColumns::lifecycle($table);
             $table->timestamps();
         });
     }
