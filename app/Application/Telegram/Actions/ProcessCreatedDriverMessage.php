@@ -7,9 +7,7 @@ namespace App\Application\Telegram\Actions;
 use App\Application\Telegram\Services\TelegramDriverMessageParser;
 use App\Application\Telegram\Services\TelegramOperationUserParser;
 use App\Enums\Drivers\TelegramDriverCheckStatus;
-use App\Jobs\Telegram\ResolveTelegramPhoneJob;
 use App\Models\Driver\TelegramDriverCheck;
-use App\Models\Telegram\TelegramResolvedPhone;
 use Illuminate\Support\Facades\Log;
 
 final class ProcessCreatedDriverMessage
@@ -19,7 +17,7 @@ final class ProcessCreatedDriverMessage
         private readonly TelegramDriverMessageParser $driverParser,
         private readonly ResolveOperationUser $resolveOperationUser,
         private readonly ResolveTelegramDriver $resolveTelegramDriver,
-        private readonly ApplyResolvedTelegramPhone $applyResolvedTelegramPhone,
+        private readonly StartTelegramPhoneResolve $startPhoneResolve,
     ) {
     }
 
@@ -169,51 +167,9 @@ final class ProcessCreatedDriverMessage
 
         /*
          * ---------------------------------------------------------
-         * 7. CACHE FIRST
+         * 7. CACHE FIRST, RESOLVER OTHERWISE
          * ---------------------------------------------------------
          */
-        $resolvedPhone = TelegramResolvedPhone::query()
-            ->where(
-                'phone_normalized',
-                $phoneNormalized,
-            )
-            ->first();
-
-        if ($resolvedPhone !== null) {
-            Log::info(
-                'Telegram resolved phone found in cache',
-                [
-                    'check_id' => $check->id,
-                    'phone' => $phoneNormalized,
-                    'resolved_phone_id' => $resolvedPhone->id,
-                ],
-            );
-
-            $this->applyResolvedTelegramPhone->execute(
-                check: $check,
-                resolvedPhone: $resolvedPhone,
-            );
-
-            return;
-        }
-
-        /*
-         * ---------------------------------------------------------
-         * 8. Dispatch Job
-         * ---------------------------------------------------------
-         *
-         * ONLY CREATED_DRIVER reaches this action.
-         */
-        ResolveTelegramPhoneJob::dispatch(
-            $check->id,
-        )->onQueue('telegram');
-
-        Log::info(
-            'ResolveTelegramPhoneJob dispatched',
-            [
-                'check_id' => $check->id,
-                'phone' => $phoneNormalized,
-            ],
-        );
+        $this->startPhoneResolve->execute($check);
     }
 }
