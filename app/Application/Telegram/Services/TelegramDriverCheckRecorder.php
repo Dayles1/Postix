@@ -25,6 +25,19 @@ final class TelegramDriverCheckRecorder
         }
 
         /*
+         * Only driver messages are worth a row. Everything else in the
+         * group (transport, chatter) used to be attempted with a null
+         * status and bounced off the NOT NULL column - and the unique
+         * guard below read that as a duplicate.
+         */
+        if (
+            $type !== TelegramDriverMessageType::CREATED_DRIVER
+            && $type !== TelegramDriverMessageType::UPDATED_DRIVER
+        ) {
+            return null;
+        }
+
+        /*
          * Application-level duplicate protection.
          */
         $existing = TelegramDriverCheck::query()
@@ -52,9 +65,13 @@ final class TelegramDriverCheckRecorder
 
                 'message_text' => $text,
 
+                /*
+                 * An update is nothing to check until
+                 * ProcessUpdatedDriverMessage finds a phone change in it.
+                 */
                 'status' => $type === TelegramDriverMessageType::CREATED_DRIVER
                     ? TelegramDriverCheckStatus::Pending
-                    : null,
+                    : TelegramDriverCheckStatus::Skipped,
 
                 'attempts' => 0,
 
