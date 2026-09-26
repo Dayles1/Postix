@@ -29,6 +29,10 @@ final class TelegramMessageTypeDetector
                 $text,
                 '👤 Изменен водитель',
             )
+            || str_contains(
+                $text,
+                '👤 Изменены данные водителя',
+            )
         ) {
             return TelegramDriverMessageType::UPDATED_DRIVER;
         }
