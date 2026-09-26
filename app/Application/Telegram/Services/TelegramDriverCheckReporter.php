@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Application\Telegram\Services;
 
+use App\Application\Telegram\Actions\RerunTelegramDriverCheck;
 use App\Application\Telegram\Support\VendorNoticeShield;
+use App\Enums\Drivers\TelegramDriverCheckStatus;
 use App\Models\Driver\TelegramDriverCheck;
 use danog\MadelineProto\SimpleEventHandler;
 use Illuminate\Support\Facades\Log;
@@ -14,7 +16,196 @@ final class TelegramDriverCheckReporter
 {
     public function __construct(
         private readonly TelegramOperatorNotifier $operatorNotifier,
+        private readonly DriverCheckBot $bot,
     ) {
+    }
+
+    /**
+     * Brings an already posted report in line with the check.
+     *
+     * Called when the verdict changed after the report went out: a
+     * button in the group decided it by hand, or a re-run reached a new
+     * answer. The report is edited in place, so the group keeps one
+     * report per driver; one sent before report ids were kept has no
+     * message to edit, and gets a fresh reply instead.
+     */
+    public function edit(
+        SimpleEventHandler $telegram,
+        TelegramDriverCheck $check,
+    ): void {
+        $message = $this->buildMessage(
+            check: $check,
+            match: data_get($check->telegram_raw, 'name_match'),
+        );
+
+        if ($check->report_message_id === null) {
+            $check->forceFill([
+                'report_message_id' => $this->post($telegram, $check, $message),
+            ])->save();
+        } else {
+            $this->editMessage($telegram, $check, (int) $check->report_message_id, $message);
+        }
+
+        $this->bot->queueSync($check);
+    }
+
+    /**
+     * Marks a posted report as outdated, before its check is re-run
+     * under another message: the verdict it shows is struck through and
+     * the note says where the new one will be.
+     */
+    public function retire(
+        SimpleEventHandler $telegram,
+        TelegramDriverCheck $check,
+        string $note,
+    ): void {
+        if ($check->report_message_id === null) {
+            return;
+        }
+
+        try {
+            $message = $this->buildMessage(
+                check: $check,
+                match: data_get($check->telegram_raw, 'name_match'),
+                statusLine: '<b>Статус:</b> <s>'
+                    . $this->statusLabel($check->status?->value ?? 'unknown')
+                    . '</s> 🔄 ПОВТОРНАЯ ПРОВЕРКА',
+            );
+
+            $this->editMessage(
+                $telegram,
+                $check,
+                (int) $check->report_message_id,
+                $message . "\n\n" . $this->escape($note),
+            );
+        } catch (Throwable $e) {
+            // The new report is what matters; an outdated one left as is is not.
+            Log::warning(
+                'Failed to mark a driver check report as outdated',
+                [
+                    'check_id' => $check->id,
+                    'report_message_id' => $check->report_message_id,
+                    'error' => $e->getMessage(),
+                ],
+            );
+        }
+    }
+
+    /**
+     * Posts the report under the message it answers and returns the id
+     * Telegram gave it.
+     */
+    private function post(
+        SimpleEventHandler $telegram,
+        TelegramDriverCheck $check,
+        string $message,
+    ): ?int {
+        /*
+         * A PHP notice from inside MadelineProto must not abort a
+         * report that Telegram has already accepted: reported_at
+         * would stay null and the cron would send the same reply
+         * again on every pass. See VendorNoticeShield.
+         */
+        $result = VendorNoticeShield::guard(
+            'messages.sendMessage',
+            static fn (): mixed => $telegram->messages->sendMessage([
+                'peer' => $check->telegram_chat_id,
+
+                'reply_to' => [
+                    '_' => 'inputReplyToMessage',
+                    'reply_to_msg_id' =>
+                        $check->report_reply_to_message_id
+                        ?? $check->telegram_message_id,
+                ],
+
+                'message' => $message,
+                'parse_mode' => 'html',
+                'no_webpage' => true,
+            ]),
+            [
+                'check_id' => $check->id,
+                'chat_id' => $check->telegram_chat_id,
+            ],
+        );
+
+        return self::sentMessageId($result);
+    }
+
+    private function editMessage(
+        SimpleEventHandler $telegram,
+        TelegramDriverCheck $check,
+        int $messageId,
+        string $message,
+    ): void {
+        try {
+            VendorNoticeShield::guard(
+                'messages.editMessage',
+                static fn (): mixed => $telegram->messages->editMessage([
+                    'peer' => $check->telegram_chat_id,
+                    'id' => $messageId,
+                    'message' => $message,
+                    'parse_mode' => 'html',
+                    'no_webpage' => true,
+                ]),
+                [
+                    'check_id' => $check->id,
+                    'chat_id' => $check->telegram_chat_id,
+                ],
+            );
+        } catch (Throwable $e) {
+            /*
+             * Two edits raced to the same text: the report already
+             * says what it should.
+             */
+            if (str_contains($e->getMessage(), 'MESSAGE_NOT_MODIFIED')) {
+                return;
+            }
+
+            throw $e;
+        }
+    }
+
+    /**
+     * The id of the message a messages.sendMessage call created.
+     *
+     * MadelineProto hands back the raw Updates: a short
+     * updateShortSentMessage, or an updates bundle where the id sits in
+     * updateMessageID and in the new-message update itself.
+     */
+    public static function sentMessageId(mixed $result): ?int
+    {
+        if (! is_array($result)) {
+            return null;
+        }
+
+        if (($result['_'] ?? null) === 'updateShortSentMessage' && isset($result['id'])) {
+            return (int) $result['id'];
+        }
+
+        $updates = ($result['_'] ?? null) === 'updateShort'
+            ? [$result['update'] ?? null]
+            : ($result['updates'] ?? []);
+
+        foreach ($updates as $update) {
+            if (! is_array($update)) {
+                continue;
+            }
+
+            $type = $update['_'] ?? null;
+
+            if ($type === 'updateMessageID' && isset($update['id'])) {
+                return (int) $update['id'];
+            }
+
+            if (
+                in_array($type, ['updateNewChannelMessage', 'updateNewMessage'], true)
+                && isset($update['message']['id'])
+            ) {
+                return (int) $update['message']['id'];
+            }
+        }
+
+        return null;
     }
 
     public function send(
@@ -34,30 +225,15 @@ final class TelegramDriverCheckReporter
              * would stay null and the cron would send the same reply
              * again on every pass. See VendorNoticeShield.
              */
-            VendorNoticeShield::guard(
-                'messages.sendMessage',
-                static fn (): mixed => $telegram->messages->sendMessage([
-                    'peer' => $check->telegram_chat_id,
+            $sent = $this->post($telegram, $check, $message);
 
-                    'reply_to' => [
-                        '_' => 'inputReplyToMessage',
-                        'reply_to_msg_id' =>
-                            $check->telegram_message_id,
-                    ],
-
-                    'message' => $message,
-                    'parse_mode' => 'html',
-                    'no_webpage' => true,
-                ]),
-                [
-                    'check_id' => $check->id,
-                    'chat_id' => $check->telegram_chat_id,
-                ],
-            );
-
-            $check->update([
+            $check->forceFill([
                 'reported_at' => now(),
-            ]);
+                'report_message_id' => $sent,
+                'report_dirty_at' => null,
+            ])->save();
+
+            $this->bot->queueSync($check);
 
             /*
              * The same report is copied into the operator's private chat.
@@ -98,23 +274,21 @@ final class TelegramDriverCheckReporter
     private function buildMessage(
         TelegramDriverCheck $check,
         ?array $match,
+        ?string $statusLine = null,
     ): string {
-        $status =
-            $check->status?->value
-            ?? 'unknown';
-
         $lines = [
             '<b>Проверка Telegram водителя</b>',
             '',
 
-            '<b>Статус:</b> '
-            . $this->statusLabel($status),
+            $statusLine ?? $this->statusLine($check),
 
             '<b>ID проверки:</b> '
             . $check->id,
 
             '<b>ID сообщения:</b> '
             . $check->telegram_message_id,
+
+            ...$this->decisionLines($check),
 
             '',
 
@@ -455,6 +629,79 @@ final class TelegramDriverCheckReporter
                 $parts,
             )
             : '-';
+    }
+
+    /**
+     * The status, with the one it replaced struck through.
+     *
+     * What gets struck is the verdict a reader would otherwise take for
+     * the current one: the system's own verdict when a person overrode
+     * it, or the previous run's verdict when a re-run changed it -
+     * "❌ НЕ ПОДТВЕРЖДЕНО" crossed out, "✅ ПОДТВЕРЖДЕНО" after it.
+     */
+    private function statusLine(
+        TelegramDriverCheck $check,
+    ): string {
+        $current = $check->status;
+
+        $replaced = $check->isManuallyDecided()
+            ? $check->system_status
+            : $check->previousStatus();
+
+        $line = '<b>Статус:</b> ';
+
+        if (
+            $replaced !== null
+            && $replaced !== $current
+            && $replaced->isFinal()
+        ) {
+            $line .= '<s>' . $this->statusLabel($replaced->value) . '</s> ';
+        }
+
+        return $line . $this->statusLabel($current?->value ?? 'unknown');
+    }
+
+    /**
+     * Who changed the verdict, and why the check ran again.
+     *
+     * @return list<string>
+     */
+    private function decisionLines(
+        TelegramDriverCheck $check,
+    ): array {
+        $lines = [];
+
+        if ($check->isManuallyDecided()) {
+            $lines[] = ($check->status === TelegramDriverCheckStatus::Confirmed
+                    ? '<b>Подтвердил вручную:</b> '
+                    : '<b>Отклонил вручную:</b> ')
+                . $this->escape((string) $check->manual_by_name)
+                . ' · '
+                . $check->manual_at?->format('d.m.Y H:i');
+        }
+
+        $history = $check->history();
+        $last = $history === [] ? null : $history[array_key_last($history)];
+
+        if (! is_array($last)) {
+            return $lines;
+        }
+
+        $by = is_string($last['by'] ?? null) && trim($last['by']) !== ''
+            ? ' (' . $this->escape(trim($last['by'])) . ')'
+            : '';
+
+        if (($last['trigger'] ?? null) === RerunTelegramDriverCheck::TRIGGER_PHONE_CHANGED) {
+            $lines[] = '<b>Номер изменён:</b> '
+                . $this->escape((string) ($last['phone'] ?? '-'))
+                . ' ⟶ '
+                . $this->escape((string) ($check->phone_normalized ?? '-'))
+                . $by;
+        } elseif (($last['trigger'] ?? null) === RerunTelegramDriverCheck::TRIGGER_RECHECK) {
+            $lines[] = '<b>Повторная проверка</b>' . $by;
+        }
+
+        return $lines;
     }
 
     private function statusLabel(
