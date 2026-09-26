@@ -101,7 +101,7 @@ class TelegramDriverMessageParser
     /**
      * Normalize phone.
      */
-    private function normalizePhone(
+    public function normalizePhone(
         ?string $phone
     ): ?string {
         if (! $phone) {
