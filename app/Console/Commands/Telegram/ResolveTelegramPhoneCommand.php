@@ -74,12 +74,18 @@ final class ResolveTelegramPhoneCommand extends Command
 
         /*
          * ============================================================
-         * 2. ONLY CREATED_DRIVER
+         * 2. ONLY DRIVER CHECKS
          * ============================================================
+         *
+         * An update is a check of its own when it changed the phone of
+         * a driver this listener had never checked
+         * (ProcessUpdatedDriverMessage).
          */
         if (
             $check->type !==
             TelegramDriverMessageType::CREATED_DRIVER
+            && $check->type !==
+            TelegramDriverMessageType::UPDATED_DRIVER
         ) {
             Log::info(
                 'ResolveTelegramPhoneCommand skipped non-created-driver check',
