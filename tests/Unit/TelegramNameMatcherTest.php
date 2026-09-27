@@ -788,4 +788,22 @@ final class TelegramNameMatcherTest extends TestCase
 
         $this->assertTrue($result['matched']);
     }
+
+    public function test_surname_and_given_name_initials_are_a_match(): void
+    {
+        // Check #1041: "I N" behind the phone of ISLOMOV NURBEK.
+        $result = $this->matcher->match('ISLOMOV NURBEK KHAKIMOVICH', 'I N', null);
+
+        $this->assertTrue($result['matched']);
+        $this->assertSame('initials_match', $result['decision']);
+    }
+
+    public function test_an_initial_pair_with_the_patronymic_is_still_not_a_match(): void
+    {
+        // N for NURBEK, K for KHAKIMOVICH: not the letters he signs with.
+        $result = $this->matcher->match('ISLOMOV NURBEK KHAKIMOVICH', 'N K', null);
+
+        $this->assertFalse($result['matched']);
+        $this->assertGreaterThan(0.0, $result['score']);
+    }
 }

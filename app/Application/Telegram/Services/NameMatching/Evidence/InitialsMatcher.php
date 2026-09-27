@@ -6,6 +6,7 @@ namespace App\Application\Telegram\Services\NameMatching\Evidence;
 
 use App\Application\Telegram\Services\NameMatching\Comparison\ComparisonResult;
 use App\Application\Telegram\Services\NameMatching\NameNormalizer;
+use App\Application\Telegram\Services\NameMatching\Roles\NameRole;
 use App\Application\Telegram\Services\NameMatching\Scoring\MatchDecision;
 use App\Application\Telegram\Services\NameMatching\Token;
 
@@ -42,7 +43,8 @@ final class InitialsMatcher
      * Two initials are a coincidence waiting to happen, three are not
      * (a pair of letters collides across a driver list of any size; a
      * triple, ordered or not, effectively does not). Two are therefore
-     * reported as real but sub-threshold evidence, three as a match.
+     * reported as real but sub-threshold evidence, three as a match --
+     * unless the two are the right two, see SCORE_SURNAME_AND_GIVEN.
      *
      * @var array<int, float>
      */
@@ -50,6 +52,19 @@ final class InitialsMatcher
         2 => 62.0,
         3 => 86.0,
     ];
+
+    /**
+     * Two initials that stand for the surname and the given name.
+     *
+     * The comparison is not against a driver list: the phone number has
+     * already tied this profile to one person, and the only question
+     * left is whether that person is the driver. "I N" on the profile
+     * behind the phone of ISLOMOV NURBEK is the driver writing his name
+     * the short way, and was being turned away at 64. The pair has to be
+     * exactly those two parts -- the ones a person signs with -- so a
+     * patronymic initial still leaves the pair below the threshold.
+     */
+    private const SCORE_SURNAME_AND_GIVEN = 76.0;
 
     private const SCORE_FOUR_OR_MORE = 90.0;
 
@@ -279,6 +294,10 @@ final class InitialsMatcher
             ? self::SCORE_FOUR_OR_MORE
             : (self::SCORE_BY_COUNT[$count] ?? 0.0);
 
+        if ($count === 2 && $this->coversSurnameAndGivenName($assignments)) {
+            $score = self::SCORE_SURNAME_AND_GIVEN;
+        }
+
         if ($score === 0.0) {
             return 0.0;
         }
@@ -288,6 +307,20 @@ final class InitialsMatcher
         }
 
         return min(self::MAX_SCORE, $score);
+    }
+
+    /**
+     * @param  list<TokenAssignment>  $assignments
+     */
+    private function coversSurnameAndGivenName(array $assignments): bool
+    {
+        $roles = array_map(
+            static fn (TokenAssignment $assignment): NameRole => $assignment->driverToken->role,
+            $assignments,
+        );
+
+        return in_array(NameRole::Surname, $roles, true)
+            && in_array(NameRole::GivenName, $roles, true);
     }
 
     /**
