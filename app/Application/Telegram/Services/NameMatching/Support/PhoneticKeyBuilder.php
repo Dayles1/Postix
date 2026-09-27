@@ -55,6 +55,32 @@ final class PhoneticKeyBuilder
          * each other ("yo" -> "ia" -> ... ), and a doubled letter never
          * distinguishes two spellings of one name, so runs collapse.
          */
-        return (string) (preg_replace('/(.)\1+/', '$1', $key) ?? $key);
+        $key = (string) (preg_replace('/(.)\1+/', '$1', $key) ?? $key);
+
+        return $this->foldDinEnding($key);
+    }
+
+    /**
+     * The Arabic "ad-din" ending is written every way there is.
+     *
+     *   KAMOLIDDIN  KAMALIDDIN  KAMALDIN  KAMOLIDIN  KAMALUTDIN
+     *   NURIDDIN    NURUTDIN    NURITDIN  NURDIN
+     *
+     * Russian passports tend to drop the linking vowel or voice the "t",
+     * Uzbek profiles keep both, so the same man is KAMALDIN on paper and
+     * Камолиддин on Telegram. Vowel folding alone cannot bridge that --
+     * a whole letter is missing -- so the ending is reduced to a bare
+     * "din" here, surname ending ("-dinov") included.
+     *
+     * At least three letters must stay in front of it: the root is what
+     * carries the name, and "din" alone is not one.
+     */
+    private function foldDinEnding(string $key): string
+    {
+        return (string) (preg_replace(
+            '/(?<=[a-z]{3})[aiu]?t?din(av|ava)?$/',
+            'din$1',
+            $key,
+        ) ?? $key);
     }
 }

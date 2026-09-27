@@ -729,4 +729,40 @@ final class TelegramNameMatcherTest extends TestCase
 
         $this->assertGreaterThan($patronymic['score'], $givenName['score']);
     }
+
+    /* =====================================================================
+     | Production misses: matched by eye, rejected by the engine
+     |==================================================================== */
+
+    public function test_a_din_ending_written_without_the_linking_vowel_matches(): void
+    {
+        // Check #1007: the passport drops the "i" and one "d".
+        $result = $this->matcher->match('MUMINOV KAMALDIN SAMODINOVICH', 'Камолиддин', null);
+
+        $this->assertTrue($result['matched']);
+    }
+
+    /**
+     * @return iterable<string, array{0: string}>
+     */
+    public static function dinEndingProvider(): iterable
+    {
+        yield 'full uzbek spelling' => ['Nuriddin'];
+        yield 'voiceless t' => ['Nurutdin'];
+        yield 'no linking vowel' => ['Nurdin'];
+        yield 'cyrillic' => ['Нуритдин'];
+    }
+
+    #[DataProvider('dinEndingProvider')]
+    public function test_every_spelling_of_the_din_ending_is_one_name(string $telegramName): void
+    {
+        $this->assertTrue($this->matcher->match('KARIMOV NURIDDIN', $telegramName, null)['matched']);
+    }
+
+    public function test_the_din_ending_does_not_make_different_roots_equal(): void
+    {
+        $result = $this->matcher->match('MUMINOV KAMALDIN SAMODINOVICH', 'Nuriddin', null);
+
+        $this->assertFalse($result['matched']);
+    }
 }
