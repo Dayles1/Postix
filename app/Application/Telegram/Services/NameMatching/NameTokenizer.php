@@ -33,6 +33,21 @@ final class NameTokenizer
         'qizi', 'kizi', 'qizy',
     ];
 
+    /**
+     * What one Cyrillic letter can become once transliterated: a single
+     * Latin letter, or one of these pairs (Ш -> sh, Ё -> yo, ...).
+     */
+    private const LETTER_DIGRAPHS = [
+        'sh', 'ch', 'zh', 'kh', 'yo', 'yu', 'ya', 'ts', 'gh',
+    ];
+
+    /**
+     * A word typed with a space after every letter needs at least this
+     * many letters before it is read as a word. Two single letters are
+     * initials ("I N"), and those are read elsewhere.
+     */
+    private const MIN_SPACED_LETTERS = 3;
+
     public function __construct(
         private readonly NameNormalizer $normalizer = new NameNormalizer,
     ) {}
@@ -74,7 +89,9 @@ final class NameTokenizer
             return [];
         }
 
-        $words = preg_split('/\s+/u', $normalized, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $words = $this->joinSpacedLetters(
+            preg_split('/\s+/u', $normalized, -1, PREG_SPLIT_NO_EMPTY) ?: [],
+        );
 
         $tokens = [];
         $seen = [];
@@ -103,6 +120,57 @@ final class NameTokenizer
         }
 
         return $tokens;
+    }
+
+    /**
+     * Glues a word written one letter at a time back together.
+     *
+     * "М У Р О Д" is a name, spelled out for decoration; split on
+     * whitespace it is five single letters, and single letters are
+     * dropped below, so the profile used to come back as having no name
+     * at all. A run of at least MIN_SPACED_LETTERS single letters is
+     * therefore read as one word. Shorter runs are left alone: "I N" is
+     * a pair of initials, and InitialsMatcher reads those from the
+     * display name itself.
+     *
+     * @param  list<string>  $words
+     * @return list<string>
+     */
+    private function joinSpacedLetters(array $words): array
+    {
+        $result = [];
+        $run = [];
+
+        $flush = function () use (&$result, &$run): void {
+            if (count($run) >= self::MIN_SPACED_LETTERS) {
+                $result[] = implode('', $run);
+            } else {
+                array_push($result, ...$run);
+            }
+
+            $run = [];
+        };
+
+        foreach ($words as $word) {
+            if ($this->isSingleLetter($word)) {
+                $run[] = $word;
+
+                continue;
+            }
+
+            $flush();
+            $result[] = $word;
+        }
+
+        $flush();
+
+        return $result;
+    }
+
+    private function isSingleLetter(string $word): bool
+    {
+        return preg_match('/^[a-z]$/', $word) === 1
+            || in_array($word, self::LETTER_DIGRAPHS, true);
     }
 
     /**

@@ -772,4 +772,20 @@ final class TelegramNameMatcherTest extends TestCase
         $this->assertTrue($this->matcher->match('ORTIKOV MURODJON UBAYDULLA UGLI', 'Murod', null)['matched']);
         $this->assertTrue($this->matcher->match('KARIMOV AHMADJON', 'Ахмад', null)['matched']);
     }
+
+    public function test_a_name_spelled_out_letter_by_letter_is_read_as_one_word(): void
+    {
+        // Check #975.
+        $result = $this->matcher->match('ORTIKOV MURODJON UBAYDULLA UGLI', 'М У Р О Д', null);
+
+        $this->assertTrue($result['matched']);
+    }
+
+    public function test_a_spelled_out_word_with_a_digraph_letter_is_read_as_one_word(): void
+    {
+        // Ш transliterates to two letters and must still count as one.
+        $result = $this->matcher->match('ALIYEV SHERZOD', 'Ш Е Р З О Д', null);
+
+        $this->assertTrue($result['matched']);
+    }
 }
