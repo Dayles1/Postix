@@ -37,11 +37,11 @@ final class OrthographicVariantFolder
     private const DIGRAPH_FOLDS = [
         // Uzbek/Russian "Ж" romanizes as both "zh" and "j" -- this is the
         // single most important fold for this dataset (IKRAMZHON <-> IKRAMJON).
-        // "jh" and "dj" are the same sound typed by someone reaching for an
-        // English spelling of it (JHONIBEK, DJAMSHID).
+        // "jh" is the same sound typed by someone reaching for an English
+        // spelling of it (JHONIBEK). Its sibling "dj" (DJAMSHID) is folded
+        // at the start of a word only, see WORD_INITIAL_FOLDS.
         'zh' => 'j',
         'jh' => 'j',
-        'dj' => 'j',
 
         // "Х" romanizes as "kh", "x" or (informally) "h".
         'kh' => 'h',
@@ -77,6 +77,21 @@ final class OrthographicVariantFolder
         'yevich' => 'ovich',
         'evna' => 'ovna',
         'yevna' => 'ovna',
+    ];
+
+    /**
+     * Folds that only hold at the start of a word.
+     *
+     * "DJ" is "Ж" spelled for an English reader -- DJAMSHID, DJURAEV --
+     * and that is only ever at the start of a name. Inside one it is a
+     * root ending in "d" glued to the "-jon" affix: MUROD+JON,
+     * AHMAD+JON, HAMID+JON. Folding it there turned MURODJON into
+     * "murojon", whose root no longer matched a plain "Murod".
+     *
+     * @var array<string, string>
+     */
+    private const WORD_INITIAL_FOLDS = [
+        'dj' => 'j',
     ];
 
     /**
@@ -123,6 +138,16 @@ final class OrthographicVariantFolder
     {
         foreach (self::DIGRAPH_FOLDS as $from => $to) {
             $token = str_replace($from, $to, $token);
+        }
+
+        /*
+         * After the digraphs, so the Russian-style DZHAMSHID has become
+         * "djamshid" by the time it is looked at.
+         */
+        foreach (self::WORD_INITIAL_FOLDS as $from => $to) {
+            if (str_starts_with($token, $from)) {
+                $token = $to . substr($token, strlen($from));
+            }
         }
 
         return $token;

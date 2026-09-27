@@ -765,4 +765,11 @@ final class TelegramNameMatcherTest extends TestCase
 
         $this->assertFalse($result['matched']);
     }
+
+    public function test_a_root_ending_in_d_keeps_it_before_the_jon_affix(): void
+    {
+        // MUROD+JON was folded to "murojon", whose root no longer met "Murod".
+        $this->assertTrue($this->matcher->match('ORTIKOV MURODJON UBAYDULLA UGLI', 'Murod', null)['matched']);
+        $this->assertTrue($this->matcher->match('KARIMOV AHMADJON', 'Ахмад', null)['matched']);
+    }
 }
