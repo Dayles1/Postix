@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\Telegram\TelegramAccountController;
+use App\Http\Controllers\Api\Telegram\TelegramBotWebhookController;
 use App\Http\Controllers\Api\Telegram\TelegramDriverCheckController;
 use App\Http\Controllers\TestController;
 use Illuminate\Support\Facades\Route;
@@ -10,6 +11,10 @@ Route::get('/test', [TestController::class, 'test']);
 
 // Auth
 Route::post('/login', [AuthController::class, 'login']);
+
+// Driver check bot: button presses (see telegram:bot-webhook)
+Route::post('/telegram/webhook', TelegramBotWebhookController::class)
+    ->name('telegram.bot.webhook');
 
 Route::middleware('auth:sanctum')->group(function () {
 
