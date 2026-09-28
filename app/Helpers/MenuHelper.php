@@ -100,6 +100,11 @@ class MenuHelper
                 'path' => '/driver-check/chats',
             ],
             [
+                'icon' => 'authentication',
+                'name' => 'Сессии Telegram',
+                'path' => '/driver-check/sessions',
+            ],
+            [
                 'icon' => 'user-profile',
                 'name' => 'Водители',
                 'path' => '/driver-check/drivers',
