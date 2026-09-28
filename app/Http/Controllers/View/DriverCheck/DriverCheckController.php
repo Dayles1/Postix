@@ -43,6 +43,13 @@ final class DriverCheckController extends Controller
         );
     }
 
+    public function sessions()
+    {
+        return view(
+            'pages.driver-check.sessions'
+        );
+    }
+
     public function drivers()
     {
         return view(

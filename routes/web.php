@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\Telegram\OperationUserController;
 use App\Http\Controllers\Api\Telegram\OperatorController;
 use App\Http\Controllers\Api\Telegram\ResolvedPhoneController;
 use App\Http\Controllers\Api\Telegram\TelegramDriverController;
+use App\Http\Controllers\Api\Telegram\TelegramSessionController;
 use App\Http\Controllers\ExternalApi\WareHouseController;
 use App\Http\Controllers\LogController;
 use App\Http\Controllers\View\Admin\CatalogController as AdminCatalogController;
@@ -194,6 +195,17 @@ Route::middleware(['auth', 'role:driverCheck,superadmin'])
         )->name('driver-check.chats');
 
         /*
+         * Telegram sessions
+         *
+         * Every MadelineProto account the listener and the resolver pool
+         * run on: log one in (code, then 2FA), check it, log it out.
+         */
+        Route::get(
+            '/sessions',
+            [DriverCheckController::class, 'sessions']
+        )->name('driver-check.sessions');
+
+        /*
          * Drivers
          */
         Route::get(
@@ -302,6 +314,26 @@ Route::middleware(['auth', 'role:driverCheck,superadmin'])
             '/chats/{chat}',
             [DriverCheckChatController::class, 'destroy']
         )->name('api.telegram.chats.destroy');
+
+        /*
+         * Telegram sessions
+         *
+         * Not /accounts: routes/api.php already serves the sanctum version
+         * of that path, and the later registration would shadow this one.
+         */
+        Route::prefix('/sessions')
+            ->controller(TelegramSessionController::class)
+            ->group(function () {
+                Route::get('/', 'index')->name('api.telegram.sessions.index');
+                Route::post('/', 'store')->name('api.telegram.sessions.store');
+                Route::get('/{account}', 'show')->name('api.telegram.sessions.show');
+                Route::delete('/{account}', 'destroy')->name('api.telegram.sessions.destroy');
+                Route::post('/{account}/code', 'code')->name('api.telegram.sessions.code');
+                Route::post('/{account}/password', 'password')->name('api.telegram.sessions.password');
+                Route::post('/{account}/check', 'check')->name('api.telegram.sessions.check');
+                Route::post('/{account}/logout', 'logout')->name('api.telegram.sessions.logout');
+                Route::put('/{account}/processes/{process}', 'process')->name('api.telegram.sessions.process');
+            });
 
         /*
          * Drivers
