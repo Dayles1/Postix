@@ -270,6 +270,214 @@ return [
         ],
     ],
 
+    'sessions' => [
+
+        'title' => 'Telegram sessiyalari',
+
+        'description' => 'Listener va raqam bo\'yicha qidiruv ishlaydigan barcha MadelineProto akkauntlari: kirish, tekshirish, chiqish.',
+
+        'notice' => 'MadelineProto faqat konsoldan ishlaydi, shuning uchun har bir amal fon buyrug\'ini ishga tushiradi. Holat bir necha soniyada o\'zi yangilanadi.',
+
+        'create' => 'Akkaunt qo\'shish',
+
+        'search_placeholder' => 'Telefon, ism, @username yoki Telegram ID',
+
+        'primary' => 'Listener',
+
+        'primary_hint' => 'Bu akkaunt chatlarni tinglaydi (TELEGRAM_DRIVER_CHECK_ACCOUNT_ID)',
+
+        'stats' => [
+            'authorized' => 'Faol',
+            'pending' => 'Kirish tugallanmagan',
+            'problem' => 'Muammolar',
+            'logged_out' => 'Chiqqan',
+        ],
+
+        'filters' => [
+            'state' => 'Holat',
+            'state_all' => 'Hammasi',
+        ],
+
+        'table' => [
+            'account' => 'Akkaunt',
+            'phone' => 'Telefon',
+            'status' => 'Holat',
+            'processes' => 'Jarayonlar',
+            'last_checked' => 'Tekshirilgan',
+            'authorized_at' => 'Kirgan sana',
+            'actions' => 'Amallar',
+        ],
+
+        'fields' => [
+            'telegram_id' => 'Telegram ID',
+            'name' => 'Ism',
+            'username' => 'Username',
+            'session_file' => 'Sessiya fayli',
+            'session_file_yes' => 'Diskda bor',
+            'session_file_no' => 'Diskda yo\'q',
+        ],
+
+        'state' => [
+            'listening' => 'Chatlarni tinglayapti',
+            'stopped' => 'Listener to\'xtagan',
+            'active' => 'Faol',
+            'warning' => 'Faol, xato bor',
+            'no_file' => 'Sessiya fayli yo\'q',
+            'sending_code' => 'Kod yuborilmoqda',
+            'awaiting_code' => 'Kod kutilmoqda',
+            'verifying' => 'Tekshirilmoqda',
+            'awaiting_password' => '2FA parol kutilmoqda',
+            'checking' => 'Tekshirilmoqda',
+            'logging_out' => 'Chiqilmoqda...',
+            'stale' => 'Qotib qoldi',
+            'code_invalid' => 'Kod noto\'g\'ri',
+            'failed' => 'Kirish xatosi',
+            'revoked' => 'Sessiya bekor qilingan',
+            'logged_out' => 'Chiqqan',
+            'new' => 'Avtorizatsiya qilinmagan',
+        ],
+
+        'state_hint' => [
+            'listening' => 'Listener ishlayapti va shu sessiyani ushlab turibdi. Uni paneldan tekshirib bo\'lmaydi: profil listener har safar ishga tushganda yangilanadi.',
+            'stopped' => 'Sessiya avtorizatsiyadan o\'tgan, lekin listener ishlamayapti. Chatlardagi xabarlar qayta ishlanmaydi.',
+            'active' => 'Sessiya ishlayapti va jarayonlar uchun ochiq.',
+            'warning' => 'Sessiya avtorizatsiyadan o\'tgan, lekin oxirgi so\'rov xato qaytardi. Tirikligini bilish uchun "Tekshirish"ni bosing.',
+            'no_file' => 'Bazada akkaunt avtorizatsiyadan o\'tgan, lekin diskda sessiya fayli yo\'q: har qanday jarayon unda yiqiladi. Chiqib, qayta kiring.',
+            'sending_code' => 'Fon buyrug\'i Telegramdan kod so\'ramoqda.',
+            'awaiting_code' => 'Telegram kodni yubordi. Davom etish uchun uni kiriting.',
+            'verifying' => 'Fon buyrug\'i kiritilgan ma\'lumotni tekshirmoqda.',
+            'awaiting_password' => 'Akkauntda ikki bosqichli tekshiruv yoqilgan. Bulutli parol kerak.',
+            'checking' => 'Fon buyrug\'i sessiya tirikligini Telegramdan so\'ramoqda.',
+            'logging_out' => 'Fon buyrug\'i Telegramdagi sessiyani yakunlab, faylni o\'chirmoqda.',
+            'stale' => 'Fon buyrug\'i javob bermadi. Ehtimol u yiqilgan - amalni qaytarish mumkin.',
+            'code_invalid' => 'Kod mos kelmadi. Telegram shu kod bilan qayta urinishga ruxsat bermaydi: yangi kod so\'rang.',
+            'failed' => 'Kirish muvaffaqiyatsiz. Qaytadan boshlash mumkin.',
+            'revoked' => 'Telegram bu sessiyani endi qabul qilmaydi: u telefonda yakunlangan yoki akkaunt bloklangan. Qayta kiring.',
+            'logged_out' => 'Sessiya yakunlangan. Akkauntga qayta kirish yoki uni o\'chirish mumkin.',
+            'new' => 'Kirish hali boshlanmagan.',
+        ],
+
+        'processes' => [
+            'names' => [
+                'resolver_phone' => 'Raqam bo\'yicha qidiruv',
+                'send_message' => 'Xabar yuborish',
+                'driver_check' => 'Haydovchilarni tekshirish',
+            ],
+            'states' => [
+                'ready' => 'Tayyor',
+                'busy' => 'Band',
+                'stuck' => 'Qotib qoldi',
+                'failing' => 'Xatolar bor',
+                'disabled' => 'O\'chirilgan',
+            ],
+            'none' => 'Ishlatilmagan',
+            'none_hint' => 'Hali hech bir jarayon bu akkauntni olmagan. Jarayon uni birinchi marta tanlaganda qator paydo bo\'ladi.',
+            'successes' => 'Muvaffaqiyatli',
+            'failures' => 'Xatolar',
+            'streak' => 'Ketma-ket',
+            'disabled_reason' => 'Sabab',
+            'stuck_hint' => ':time band deb belgilangan va bo\'shamagan. Belgini olib tashlash uchun jarayonni o\'chirib, qayta yoqing.',
+            'enable' => 'Yoqish',
+            'disable' => 'O\'chirish',
+            'disabled_manually' => 'Panelda qo\'lda o\'chirilgan',
+        ],
+
+        'actions' => [
+            'continue' => 'Kirishni davom ettirish',
+            'login_again' => 'Qayta kirish',
+            'check' => 'Tekshirish',
+            'logout' => 'Chiqish',
+            'delete' => 'O\'chirish',
+        ],
+
+        'login' => [
+            'title' => 'Yangi akkaunt',
+            'steps' => [
+                'phone' => 'Telefon',
+                'code' => 'Kod',
+                'password' => '2FA parol',
+            ],
+            'phone' => 'Telefon raqami',
+            'phone_hint' => 'Xalqaro formatda, mamlakat kodi bilan',
+            'send_code' => 'Kod olish',
+            'sending' => 'Kod so\'ralmoqda...',
+            'verifying' => 'Tekshirilmoqda...',
+            'waiting_hint' => 'Buyruq fonda ishlayapti. Oynani yopish mumkin - kirish ro\'yxatdan davom etadi.',
+            'code' => 'Telegramdagi kod',
+            'code_hint' => 'Shu raqamdagi Telegram ilovasiga (yoki SMS orqali) keladi',
+            'code_warning' => 'Kodni hech kimga, hatto "Saqlanganlar"ga ham yubormang: Telegram uni darhol bekor qiladi.',
+            'password' => 'Bulutli parol',
+            'password_hint' => 'Shu akkauntning ikki bosqichli tekshiruv paroli',
+            'hint' => 'Eslatma',
+            'verify' => 'Tasdiqlash',
+            'resend' => 'Kodni qayta yuborish',
+            'done' => 'Akkaunt avtorizatsiyadan o\'tdi',
+        ],
+
+        'confirm' => [
+            'logout_title' => 'Akkauntdan chiqilsinmi?',
+            'logout_text' => 'Telegramdagi sessiya yakunlanadi, sessiya fayli o\'chiriladi. Jarayonlar bu akkauntdan foydalanmay qo\'yadi.',
+            'logout_primary' => 'Bu listener akkaunti: chiqqandan keyin haydovchilarni tekshirish chatlardan xabar olmay qo\'yadi.',
+            'delete_title' => 'Akkaunt o\'chirilsinmi?',
+            'delete_text' => 'Yozuv va jarayonlar statistikasi o\'chiriladi. Akkauntda tirik sessiya yo\'q, Telegramda hech narsa o\'zgarmaydi.',
+        ],
+
+        'messages' => [
+            'authorized' => 'Akkaunt avtorizatsiyadan o\'tdi',
+            'check_started' => 'Tekshiruv boshlandi',
+            'logout_started' => 'Chiqish boshlandi',
+            'deleted' => 'Akkaunt o\'chirildi',
+            'process_enabled' => 'Jarayon yoqildi',
+            'process_disabled' => 'Jarayon o\'chirildi',
+        ],
+
+        'validation' => [
+            'phone' => 'Raqamni xalqaro formatda kiriting, masalan +998901234567',
+            'code' => 'Kod faqat raqamlardan iborat',
+        ],
+
+        'state_errors' => [
+            'listener_running' => 'Hozir bu sessiyada listener ishlayapti. Uning profili listener ishga tushganda yangilanadi.',
+            'process_busy' => 'Akkaunt hozir jarayon bilan band. U bo\'shaganda qayta urinib ko\'ring.',
+            'already_authorized' => 'Bu akkaunt allaqachon avtorizatsiyadan o\'tgan.',
+            'busy' => 'Akkaunt bilan fon buyrug\'i ishlayapti. Biroz kuting.',
+            'not_waiting_code' => 'Akkaunt hozir kod kutmayapti. Sahifani yangilang.',
+            'not_waiting_password' => 'Akkaunt hozir parol kutmayapti. Sahifani yangilang.',
+            'not_authorized' => 'Akkaunt avtorizatsiyadan o\'tmagan.',
+            'still_authorized' => 'Avval akkauntdan chiqing, keyin o\'chiring.',
+        ],
+
+        'telegram_errors' => [
+            'PHONE_CODE_INVALID' => 'Kod noto\'g\'ri. Yangisini so\'rang.',
+            'PHONE_CODE_EXPIRED' => 'Kod eskirgan. Yangisini so\'rang.',
+            'PASSWORD_HASH_INVALID' => 'Parol noto\'g\'ri. Yana urinib ko\'ring.',
+            'PASSWORD_EXPIRED' => 'Parol fon buyrug\'iga yetib bormadi. Uni qayta kiriting.',
+            'PHONE_NUMBER_INVALID' => 'Telegram bu raqamni qabul qilmaydi.',
+            'PHONE_NUMBER_BANNED' => 'Raqam Telegramda bloklangan.',
+            'PHONE_NUMBER_FLOOD' => 'Bu raqam bilan juda ko\'p urinish bo\'ldi. Keyinroq urinib ko\'ring.',
+            'FLOOD_WAIT' => 'Telegram keyingi urinishdan oldin kutishni so\'ramoqda.',
+            'FLOOD_WAIT_SECONDS' => 'Telegram :seconds soniya kutishni so\'ramoqda.',
+            'AUTH_KEY_UNREGISTERED' => 'Sessiya Telegramda yakunlangan.',
+            'SESSION_REVOKED' => 'Sessiya Telegramda yakunlangan.',
+            'USER_DEACTIVATED' => 'Akkaunt o\'chirilgan yoki bloklangan.',
+            'SESSION_NOT_FOUND' => 'Sessiya fayli diskda topilmadi.',
+            'NOT_LOGGED_IN' => 'Diskdagi sessiya avtorizatsiyadan o\'tmagan.',
+            'ACCOUNT_NOT_REGISTERED' => 'Bu raqamda Telegram ro\'yxatdan o\'tmagan.',
+        ],
+
+        'errors' => [
+            'title' => 'Xato',
+            'load' => 'Sessiyalarni yuklab bo\'lmadi',
+            'load_failed' => 'Sessiyalarni yuklab bo\'lmadi',
+            'action' => 'Amalni bajarib bo\'lmadi',
+        ],
+
+        'empty' => [
+            'title' => 'Hozircha akkauntlar yo\'q',
+            'description' => 'Telegram akkaunt qo\'shing: listener va raqam bo\'yicha qidiruv shunda ishlaydi.',
+        ],
+    ],
+
     'operation_users' => [
 
         'title' => 'Operatorlar',

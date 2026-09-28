@@ -290,6 +290,214 @@ return [
         ],
     ],
 
+    'sessions' => [
+
+        'title' => 'Telegram sessions',
+
+        'description' => 'Every MadelineProto account the listener and the phone lookup run on: log in, check, log out.',
+
+        'notice' => 'MadelineProto only runs from the console, so every action starts a background command. The status updates by itself within a few seconds.',
+
+        'create' => 'Add account',
+
+        'search_placeholder' => 'Phone, name, @username or Telegram ID',
+
+        'primary' => 'Listener',
+
+        'primary_hint' => 'This account listens to the chats (TELEGRAM_DRIVER_CHECK_ACCOUNT_ID)',
+
+        'stats' => [
+            'authorized' => 'Active',
+            'pending' => 'Login unfinished',
+            'problem' => 'Problems',
+            'logged_out' => 'Logged out',
+        ],
+
+        'filters' => [
+            'state' => 'State',
+            'state_all' => 'All',
+        ],
+
+        'table' => [
+            'account' => 'Account',
+            'phone' => 'Phone',
+            'status' => 'Status',
+            'processes' => 'Processes',
+            'last_checked' => 'Checked',
+            'authorized_at' => 'Logged in',
+            'actions' => 'Actions',
+        ],
+
+        'fields' => [
+            'telegram_id' => 'Telegram ID',
+            'name' => 'Name',
+            'username' => 'Username',
+            'session_file' => 'Session file',
+            'session_file_yes' => 'On disk',
+            'session_file_no' => 'Not on disk',
+        ],
+
+        'state' => [
+            'listening' => 'Listening to chats',
+            'stopped' => 'Listener stopped',
+            'active' => 'Active',
+            'warning' => 'Active, with an error',
+            'no_file' => 'Session file missing',
+            'sending_code' => 'Sending code',
+            'awaiting_code' => 'Waiting for code',
+            'verifying' => 'Verifying',
+            'awaiting_password' => 'Waiting for 2FA password',
+            'checking' => 'Checking',
+            'logging_out' => 'Logging out...',
+            'stale' => 'Stuck',
+            'code_invalid' => 'Wrong code',
+            'failed' => 'Login failed',
+            'revoked' => 'Session revoked',
+            'logged_out' => 'Logged out',
+            'new' => 'Not authorized',
+        ],
+
+        'state_hint' => [
+            'listening' => 'The listener is running and holds this session. It cannot be checked from the panel: its profile is refreshed every time the listener starts.',
+            'stopped' => 'The session is authorized, but the listener is not running. Messages from the chats are not processed.',
+            'active' => 'The session works and is available to the processes.',
+            'warning' => 'The session is authorized, but the last request returned an error. Press "Check" to find out whether it is still alive.',
+            'no_file' => 'The account is authorized in the database, but its session file is not on disk: every process will fail on it. Log out and log in again.',
+            'sending_code' => 'A background command is asking Telegram for the code.',
+            'awaiting_code' => 'Telegram has sent the code. Enter it to continue.',
+            'verifying' => 'A background command is checking what you entered.',
+            'awaiting_password' => 'Two-step verification is on for this account. Its cloud password is needed.',
+            'checking' => 'A background command is asking Telegram whether the session is alive.',
+            'logging_out' => 'A background command is ending the session in Telegram and deleting the file.',
+            'stale' => 'The background command never answered. It most likely crashed - the action can be repeated.',
+            'code_invalid' => 'The code did not match. Telegram does not allow another try with the same login: request a new code.',
+            'failed' => 'The login failed. You can start over.',
+            'revoked' => 'Telegram no longer accepts this session: it was ended on the phone, or the account is banned. Log in again.',
+            'logged_out' => 'The session has ended. The account can be logged in again or deleted.',
+            'new' => 'No login has been started yet.',
+        ],
+
+        'processes' => [
+            'names' => [
+                'resolver_phone' => 'Phone lookup',
+                'send_message' => 'Mailing',
+                'driver_check' => 'Driver check',
+            ],
+            'states' => [
+                'ready' => 'Ready',
+                'busy' => 'Busy',
+                'stuck' => 'Stuck',
+                'failing' => 'Failing',
+                'disabled' => 'Disabled',
+            ],
+            'none' => 'Not used yet',
+            'none_hint' => 'No process has taken this account yet. A row appears the first time a process picks it.',
+            'successes' => 'Successes',
+            'failures' => 'Failures',
+            'streak' => 'In a row',
+            'disabled_reason' => 'Reason',
+            'stuck_hint' => 'Marked busy :time and never released. Disable and enable the process to clear the flag.',
+            'enable' => 'Enable',
+            'disable' => 'Disable',
+            'disabled_manually' => 'Disabled manually in the panel',
+        ],
+
+        'actions' => [
+            'continue' => 'Continue login',
+            'login_again' => 'Log in again',
+            'check' => 'Check',
+            'logout' => 'Log out',
+            'delete' => 'Delete',
+        ],
+
+        'login' => [
+            'title' => 'New account',
+            'steps' => [
+                'phone' => 'Phone',
+                'code' => 'Code',
+                'password' => '2FA password',
+            ],
+            'phone' => 'Phone number',
+            'phone_hint' => 'International format, with the country code',
+            'send_code' => 'Get code',
+            'sending' => 'Requesting the code...',
+            'verifying' => 'Verifying...',
+            'waiting_hint' => 'The command runs in the background. You may close this window - the login continues from the list.',
+            'code' => 'Code from Telegram',
+            'code_hint' => 'Arrives in the Telegram app on this number (or by SMS)',
+            'code_warning' => 'Do not forward the code to anyone, not even to Saved Messages: Telegram invalidates it at once.',
+            'password' => 'Cloud password',
+            'password_hint' => 'The two-step verification password of this account',
+            'hint' => 'Hint',
+            'verify' => 'Confirm',
+            'resend' => 'Send the code again',
+            'done' => 'Account authorized',
+        ],
+
+        'confirm' => [
+            'logout_title' => 'Log out of this account?',
+            'logout_text' => 'The session is ended in Telegram and its file deleted. Processes stop using this account.',
+            'logout_primary' => 'This is the listener account: once logged out, the driver check stops receiving messages from the chats.',
+            'delete_title' => 'Delete this account?',
+            'delete_text' => 'The record and its process statistics are deleted. The account holds no live session, so nothing changes in Telegram.',
+        ],
+
+        'messages' => [
+            'authorized' => 'Account authorized',
+            'check_started' => 'Check started',
+            'logout_started' => 'Logout started',
+            'deleted' => 'Account deleted',
+            'process_enabled' => 'Process enabled',
+            'process_disabled' => 'Process disabled',
+        ],
+
+        'validation' => [
+            'phone' => 'Enter the number in international format, e.g. +998901234567',
+            'code' => 'The code consists of digits only',
+        ],
+
+        'state_errors' => [
+            'listener_running' => 'The listener is running on this session right now. Its profile is refreshed when the listener starts.',
+            'process_busy' => 'A process is using this account right now. Try again once it is free.',
+            'already_authorized' => 'This account is already authorized.',
+            'busy' => 'A background command is already working on this account. Please wait a moment.',
+            'not_waiting_code' => 'The account is not waiting for a code. Refresh the page.',
+            'not_waiting_password' => 'The account is not waiting for a password. Refresh the page.',
+            'not_authorized' => 'The account is not authorized.',
+            'still_authorized' => 'Log out of the account before deleting it.',
+        ],
+
+        'telegram_errors' => [
+            'PHONE_CODE_INVALID' => 'Wrong code. Request a new one.',
+            'PHONE_CODE_EXPIRED' => 'The code has expired. Request a new one.',
+            'PASSWORD_HASH_INVALID' => 'Wrong password. Try again.',
+            'PASSWORD_EXPIRED' => 'The password was not picked up in time. Enter it again.',
+            'PHONE_NUMBER_INVALID' => 'Telegram does not accept this number.',
+            'PHONE_NUMBER_BANNED' => 'This number is banned in Telegram.',
+            'PHONE_NUMBER_FLOOD' => 'Too many login attempts for this number. Try later.',
+            'FLOOD_WAIT' => 'Telegram asks to wait before the next attempt.',
+            'FLOOD_WAIT_SECONDS' => 'Telegram asks to wait :seconds s.',
+            'AUTH_KEY_UNREGISTERED' => 'The session was ended in Telegram.',
+            'SESSION_REVOKED' => 'The session was ended in Telegram.',
+            'USER_DEACTIVATED' => 'The account is deleted or banned.',
+            'SESSION_NOT_FOUND' => 'The session file is not on disk.',
+            'NOT_LOGGED_IN' => 'The session on disk is not logged in.',
+            'ACCOUNT_NOT_REGISTERED' => 'No Telegram account is registered on this number.',
+        ],
+
+        'errors' => [
+            'title' => 'Error',
+            'load' => 'Could not load the sessions',
+            'load_failed' => 'Could not load the sessions',
+            'action' => 'Could not complete the action',
+        ],
+
+        'empty' => [
+            'title' => 'No accounts yet',
+            'description' => 'Add a Telegram account: the listener and the phone lookup run on it.',
+        ],
+    ],
+
     'operation_users' => [
 
         'title' => 'Operators',
