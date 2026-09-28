@@ -15,7 +15,12 @@ use Illuminate\Support\Facades\Log;
 
 class LogoutCommand extends Command
 {
-    protected $signature = 'telegram:logout {accountId}';
+    /*
+     * Not telegram:logout - that name belongs to the UserPhone command
+     * (TelegramLogoutCommand), which won the clash and was the one
+     * LogoutTelegramAccountJob actually ran, with an account id.
+     */
+    protected $signature = 'telegram:account-logout {accountId}';
 
     protected $description = 'Logout telegram account and cleanup session';
 
@@ -74,9 +79,11 @@ class LogoutCommand extends Command
         }
 
         $account->update([
-            'status' => 'logged_out',
+            'status' => TelegramAccount::STATUS_LOGGED_OUT,
             'is_authorized' => false,
             'session_path' => null,
+            'password_hint' => null,
+            'last_error' => null,
         ]);
 
         $this->info("Telegram account {$account->phone} logged out");

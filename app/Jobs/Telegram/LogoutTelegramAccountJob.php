@@ -30,7 +30,7 @@ class LogoutTelegramAccountJob implements ShouldQueue
         $artisan = base_path('artisan');
 
         $command = sprintf(
-            'nohup %s %s telegram:logout %d > /dev/null 2>&1 &',
+            'nohup %s %s telegram:account-logout %d > /dev/null 2>&1 &',
             escapeshellarg($php),
             escapeshellarg($artisan),
             $this->accountId
