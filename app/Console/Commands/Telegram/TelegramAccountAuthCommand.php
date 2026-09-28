@@ -9,6 +9,7 @@ use danog\MadelineProto\Settings;
 use danog\MadelineProto\Settings\AppInfo as MadelineAppInfo;
 use danog\MadelineProto\Settings\Logger as LoggerSettings;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
@@ -20,28 +21,39 @@ class TelegramAccountAuthCommand extends Command
 
     public function handle(): int
     {
-        $phone = $this->normalizePhone((string) $this->argument('phone'));
-        $sessionPath = $this->sessionPath($phone);
-
-        if (! is_dir(dirname($sessionPath))) {
-            mkdir(dirname($sessionPath), 0775, true);
-        }
+        $phone = TelegramAccount::normalizePhone((string) $this->argument('phone'));
+        $sessionPath = TelegramAccount::sessionPathFor($phone);
 
         $account = TelegramAccount::firstOrCreate(
             ['phone' => $phone],
             [
                 'session_path' => $sessionPath,
-                'status' => 'created',
+                'status' => TelegramAccount::STATUS_CREATED,
                 'is_authorized' => false,
             ]
         );
 
-        if ($account->session_path !== $sessionPath) {
-            $account->update(['session_path' => $sessionPath]);
+        if ($account->is_authorized) {
+            $this->error("Account {$phone} is already authorized");
+            return self::FAILURE;
+        }
+
+        /*
+         * A session left behind by an earlier, unfinished login still
+         * carries its old phone_code_hash, and phoneLogin() on top of it
+         * fails. Nothing authorized lives in it, so it is thrown away.
+         */
+        $this->deleteSession($sessionPath);
+
+        if (! is_dir(dirname($sessionPath))) {
+            mkdir(dirname($sessionPath), 0775, true);
         }
 
         $account->update([
-            'status' => 'processing',
+            'session_path' => $sessionPath,
+            'status' => TelegramAccount::STATUS_PROCESSING,
+            'password_hint' => null,
+            'last_error' => null,
         ]);
 
         try {
@@ -56,7 +68,7 @@ class TelegramAccountAuthCommand extends Command
             $madeline->phoneLogin($phone);
 
             $account->update([
-                'status' => 'code_sent',
+                'status' => TelegramAccount::STATUS_CODE_SENT,
             ]);
 
             $this->info("✅ SMS code sent to {$phone}");
@@ -65,7 +77,8 @@ class TelegramAccountAuthCommand extends Command
             $message = Str::limit($e->getMessage(), 1000);
 
             $account->update([
-                'status' => 'failed',
+                'status' => TelegramAccount::STATUS_FAILED,
+                'last_error' => $message,
             ]);
 
             Log::error('telegram:auth failed', [
@@ -142,21 +155,13 @@ class TelegramAccountAuthCommand extends Command
         return 'en';
     }
 
-    protected function sessionPath(string $phone): string
+    protected function deleteSession(string $sessionPath): void
     {
-        $safePhone = preg_replace('/\D+/', '', $phone);
-        return storage_path("app/telegraSessions/telegram_{$safePhone}.madeline");
-    }
-
-    protected function normalizePhone(string $phone): string
-    {
-        $phone = trim($phone);
-
-        if ($phone !== '' && $phone[0] !== '+') {
-            $phone = '+' . $phone;
+        if (is_dir($sessionPath)) {
+            File::deleteDirectory($sessionPath);
+        } elseif (file_exists($sessionPath)) {
+            @unlink($sessionPath);
         }
-
-        return $phone;
     }
 
     protected function detectDeviceModel(): string
