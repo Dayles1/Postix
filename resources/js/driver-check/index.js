@@ -9,6 +9,7 @@
 */
 
 import { createListPage } from './list-page';
+import { sessionsPage } from './sessions';
 import { statusType } from './status';
 
 /*
@@ -1070,4 +1071,5 @@ export function registerDriverCheck(Alpine) {
     Alpine.data('dcDrivers', driversPage);
     Alpine.data('dcResolvedPhones', resolvedPhonesPage);
     Alpine.data('dcChats', chatsPage);
+    Alpine.data('dcSessions', sessionsPage);
 }
