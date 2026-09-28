@@ -79,7 +79,16 @@ final class TelegramDriverCheckStarter
                 );
             }
 
+            /*
+             * The only process that may touch this session while it runs,
+             * so the sessions page gets the profile from here rather than
+             * from telegram:account-check.
+             */
+            $self = $telegram->getSelf();
+
             $account->update([
+                ...(is_array($self) ? TelegramAccount::profileFrom($self) : []),
+                'last_checked_at' => now(),
                 'status' => 'running',
                 'last_ping' => now(),
                 'last_activity_at' => now(),
