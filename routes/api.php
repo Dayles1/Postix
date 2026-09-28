@@ -24,6 +24,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/', [TelegramAccountController::class, 'index']);
         Route::post('/auth', [TelegramAccountController::class, 'auth']);
         Route::post('/verify-code', [TelegramAccountController::class, 'verifyCode']);
+        Route::post('/password', [TelegramAccountController::class, 'password']);
         Route::post('/logout', [TelegramAccountController::class, 'logout']);
         Route::get('/{id}', [TelegramAccountController::class, 'show']);
         Route::post('/manage-failures', [TelegramAccountController::class, 'manageFailures']);
