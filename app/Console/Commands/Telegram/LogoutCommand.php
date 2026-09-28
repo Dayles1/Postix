@@ -48,9 +48,15 @@ class LogoutCommand extends Command
             try {
                 $api = $this->madeline($sessionPath);
 
-                $api->start();
-
-                $api->logOut();
+                /*
+                 * start() on a session that is not logged in (revoked, or
+                 * an abandoned login) prompts for a phone on stdin, and
+                 * under nohup nobody ever answers. Such a session has
+                 * nothing to end in Telegram anyway.
+                 */
+                if ($api->getAuthorization() === API::LOGGED_IN) {
+                    $api->logOut();
+                }
 
                 Log::info('Telegram logout successful', [
                     'account_id' => $account->id,
