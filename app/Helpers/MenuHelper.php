@@ -79,40 +79,53 @@ class MenuHelper
     /**
      * Menu for driverCheck role.
      *
-     * This role works independently from departments.
+     * This role works independently from departments. What the checks
+     * produced comes first; the pages that configure them (who gets the
+     * reports, which chats are watched, which accounts do the work) are
+     * kept apart underneath, since they are opened far less often.
      */
-    public static function getDriverCheckItems(): array
+    public static function getDriverCheckGroups(): array
     {
         return [
             [
-                'icon' => 'operation',
-                'name' => 'Операторы',
-                'path' => '/driver-check/operation-users',
+                'title' => 'Проверка водителей',
+                'items' => [
+                    [
+                        'icon' => 'statistics',
+                        'name' => 'Операторы',
+                        'path' => '/driver-check/operation-users',
+                    ],
+                    [
+                        'icon' => 'user-profile',
+                        'name' => 'Водители',
+                        'path' => '/driver-check/drivers',
+                    ],
+                    [
+                        'icon' => 'phone',
+                        'name' => 'Telegram номера',
+                        'path' => '/driver-check/resolved-phones',
+                    ],
+                ],
             ],
             [
-                'icon' => 'operators',
-                'name' => 'Управление операторами',
-                'path' => '/driver-check/operators',
-            ],
-            [
-                'icon' => 'chat',
-                'name' => 'Чаты',
-                'path' => '/driver-check/chats',
-            ],
-            [
-                'icon' => 'authentication',
-                'name' => 'Сессии Telegram',
-                'path' => '/driver-check/sessions',
-            ],
-            [
-                'icon' => 'user-profile',
-                'name' => 'Водители',
-                'path' => '/driver-check/drivers',
-            ],
-            [
-                'icon' => 'chat',
-                'name' => 'Telegram номера',
-                'path' => '/driver-check/resolved-phones',
+                'title' => 'Настройки',
+                'items' => [
+                    [
+                        'icon' => 'operators',
+                        'name' => 'Управление операторами',
+                        'path' => '/driver-check/operators',
+                    ],
+                    [
+                        'icon' => 'chat',
+                        'name' => 'Чаты',
+                        'path' => '/driver-check/chats',
+                    ],
+                    [
+                        'icon' => 'authentication',
+                        'name' => 'Сессии Telegram',
+                        'path' => '/driver-check/sessions',
+                    ],
+                ],
             ],
         ];
     }
@@ -141,12 +154,7 @@ class MenuHelper
             ($user->role->name ?? null)
             === 'driverCheck'
         ) {
-            return [
-                [
-                    'title' => 'Проверка водителей',
-                    'items' => self::getDriverCheckItems(),
-                ],
-            ];
+            return self::getDriverCheckGroups();
         }
 
         /*
@@ -224,6 +232,7 @@ class MenuHelper
     {
         $icons = [
             'turkey' => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10.5" fill="currentColor" opacity="0.12"/><circle cx="12" cy="12" r="8.5" fill="currentColor" opacity="0.08"/><!-- Crescent --><path d="M13.8 12a4.8 4.8 0 1 1-2.2-4.1 3.7 3.7 0 1 0 0 8.2A4.8 4.8 0 0 1 13.8 12z"fill="currentColor"/><path d="M18 12l.9 1.7 1.9.3-1.4 1.3.3 1.9-1.7-.9-1.7.9.3-1.9-1.4-1.3 1.9-.3L18 12z"fill="currentColor"/></svg>',
+            'phone' => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6.5 3.5H9.5L11 7.5L9 9C10.2 11.6 12.4 13.8 15 15L16.5 13L20.5 14.5V17.5C20.5 18.6 19.6 19.5 18.5 19.5C10.8 19 5 13.2 4.5 5.5C4.5 4.4 5.4 3.5 6.5 3.5Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
             'send' => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 3L10 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 3L14 21L10 14L3 10L21 3Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
             'catalog' => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.5" /><path d="M7 8H17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 12H15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 16H13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
             'statistics' => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13V19C3 19.5523 3.44772 20 4 20H8C8.55228 20 9 19.5523 9 19V13C9 12.4477 8.55228 12 8 12H4C3.44772 12 3 12.4477 3 13Z" /><path d="M15 9V19C15 19.5523 15.4477 20 16 20H20C20.5523 20 21 19.5523 21 19V9C21 8.44772 20.5523 8 20 8H16C15.4477 8 15 8.44772 15 9Z" /><path d="M9 5V19C9 19.5523 9.44772 20 10 20H14C14.5523 20 15 19.5523 15 19V5C15 4.44772 14.5523 4 14 4H10C9.44772 4 9 4.44772 9 5Z" /></svg>',
