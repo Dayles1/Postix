@@ -442,6 +442,50 @@ final class DriverCheckBotFlowTest extends TestCase
         ])->assertOk();
     }
 
+    public function test_the_buttons_go_out_right_after_the_report_not_through_the_queue(): void
+    {
+        Queue::fake();
+
+        $api = $this->fakeBotApi();
+
+        // Just reported: no bot message under it yet.
+        $check = $this->reportedCheck([
+            'status' => TelegramDriverCheckStatus::NotConfirmed,
+            'bot_message_id' => null,
+        ]);
+
+        $api->shouldReceive('sendMessage')
+            ->once()
+            ->withArgs(fn (array $params): bool => $params['chat_id'] === self::CHAT)
+            ->andReturn(new \Telegram\Bot\Objects\Message(['message_id' => 77]));
+
+        app(DriverCheckBot::class)->syncNow($check);
+
+        $this->assertSame(77, (int) $check->bot_message_id);
+        $this->assertSame(77, (int) $check->fresh()->bot_message_id);
+        Queue::assertNotPushed(\App\Jobs\Telegram\SyncDriverCheckBotMessage::class);
+    }
+
+    public function test_buttons_the_bot_api_refused_are_left_to_the_queue(): void
+    {
+        Queue::fake();
+
+        $api = $this->fakeBotApi();
+
+        // Just reported: no bot message under it yet.
+        $check = $this->reportedCheck([
+            'status' => TelegramDriverCheckStatus::NotConfirmed,
+            'bot_message_id' => null,
+        ]);
+
+        $api->shouldReceive('sendMessage')->once()->andThrow(new \RuntimeException('Bad Gateway'));
+
+        app(DriverCheckBot::class)->syncNow($check);
+
+        $this->assertNull($check->fresh()->bot_message_id);
+        Queue::assertPushedOn('telegram', \App\Jobs\Telegram\SyncDriverCheckBotMessage::class);
+    }
+
     public function test_reports_still_work_when_the_bot_sdk_is_missing(): void
     {
         // A server where composer install has not pulled the SDK in yet.
