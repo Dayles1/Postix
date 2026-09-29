@@ -53,6 +53,13 @@ return [
         'show_more' => 'Show more',
         'show_less' => 'Show less',
         'results' => 'results',
+
+        'duration' => [
+            'd' => 'd',
+            'h' => 'h',
+            'm' => 'min',
+            's' => 's',
+        ],
     ],
 
     'operators' => [
@@ -496,6 +503,247 @@ return [
             'title' => 'No accounts yet',
             'description' => 'Add a Telegram account: the listener and the phone lookup run on it.',
         ],
+    ],
+
+    'watchdog' => [
+
+        'title' => 'Watchdog',
+
+        'description' => 'The driver check listener under its watchdog: whether it runs, on which account, and what it did last.',
+
+        'actions' => [
+            'start' => 'Start',
+            'restart' => 'Restart listener',
+            'stop' => 'Stop',
+        ],
+
+        'state' => [
+            'ok' => 'Running',
+            'unsupervised' => 'Listener unsupervised',
+            'restarting' => 'Listener restarting',
+            'down' => 'Stopped',
+            'misconfigured' => 'Main account not ready',
+            'unknown' => 'State unknown',
+        ],
+
+        'state_hint' => [
+            'ok' => 'The watchdog is supervising the listener and the main account is authorized.',
+            'unsupervised' => 'The listener runs, but no watchdog does: if the listener dies, nothing brings it back. Press "Start".',
+            'restarting' => 'The watchdog runs, but the listener does not right now: it has just died or is waiting out a pause before the next attempt.',
+            'down' => 'Neither the watchdog nor the listener runs. Messages from the chats are not processed.',
+            'misconfigured' => 'TELEGRAM_DRIVER_CHECK_ACCOUNT_ID is not set, or the account is missing or not authorized. Check it on the Telegram sessions page.',
+            'unknown' => 'The lock files in storage/app/telegram cannot be read by the web server.',
+        ],
+
+        'processes' => [
+            'title' => 'Processes',
+            'watchdog' => 'Watchdog',
+            'watchdog_hint' => 'Starts the listener and brings it back after a crash',
+            'spare' => 'Spare watchdog',
+            'spare_hint' => 'Waits, and takes over if the main one dies',
+            'listener' => 'Listener',
+            'listener_hint' => 'telegram:start-loop: listens to the chats as the main account',
+            'running' => 'Running',
+            'stopped' => 'Not running',
+            'unknown' => 'Unknown',
+            'pid' => 'PID',
+        ],
+
+        'account' => [
+            'title' => 'Main account',
+            'missing' => 'No account configured',
+            'missing_hint' => 'Set TELEGRAM_DRIVER_CHECK_ACCOUNT_ID in .env.',
+            'not_found' => 'The account in TELEGRAM_DRIVER_CHECK_ACCOUNT_ID does not exist',
+            'authorized' => 'Authorized',
+            'not_authorized' => 'Not authorized',
+            'session_missing' => 'Session file missing on disk',
+            'status' => 'Status',
+            'open_sessions' => 'Sessions',
+        ],
+
+        'activity' => [
+            'title' => 'Activity',
+            'last_check' => 'Last message',
+            'last_report' => 'Last report',
+            'checks_today' => 'Checks today',
+            'pending' => 'In progress',
+        ],
+
+        'worker' => [
+            'title' => 'Queue worker',
+            'alive' => 'Responding',
+            'dead' => 'Not responding',
+            'dead_hint' => '"Start" puts a job on the queue. While the worker does not respond, nobody runs it.',
+            'start_queued' => 'Start waiting in the queue: :count',
+            'open_queue' => 'Queue',
+        ],
+
+        'restart' => [
+            'title' => 'Last crash',
+            'reason' => 'Reason',
+            'exit_code' => 'Exit code',
+            'uptime' => 'Ran for',
+            'restarts' => 'Restart #',
+            'at' => 'When',
+            'detail' => 'Details',
+            'marker' => 'The listener reported a problem',
+        ],
+
+        'signals_unavailable' => 'Restart and stop only work on the Linux server the watchdog runs on.',
+
+        'auto_refresh' => 'Refreshes every 5 seconds',
+
+        'confirm' => [
+            'restart_title' => 'Restart the listener?',
+            'restart_text' => 'The listener gets SIGTERM and shuts down cleanly; the watchdog starts a new one within seconds. No messages are processed meanwhile.',
+            'stop_title' => 'Stop the watchdog and the listener?',
+            'stop_text' => 'The watchdog stops the listener, then itself. The driver check stays off until it is started again.',
+            'confirm' => 'Yes, continue',
+        ],
+
+        'messages' => [
+            'restart_queued' => 'Restart handed to the queue worker; the listener restarts within seconds',
+            'stop_queued' => 'Stop handed to the queue worker; the watchdog stops within seconds',
+            'start_queued' => 'Watchdog start queued',
+            'restart_sent' => 'The listener is restarting',
+            'stop_sent' => 'The watchdog is stopping',
+        ],
+
+        'errors' => [
+            'title' => 'Error',
+            'load_failed' => 'Could not load the state',
+            'action' => 'Could not complete the action',
+            'no_watchdog' => 'No watchdog runs: a stopped listener would stay down. Start the watchdog first.',
+            'not_running' => 'The process is not running.',
+            'pid_unknown' => 'The process PID could not be confirmed. No signal was sent.',
+            'signal_failed' => 'No signal sent: the process sending it has no rights over the watchdog. It was most likely started by hand as another user.',
+        ],
+    ],
+
+    'queue' => [
+
+        'title' => 'Queue',
+
+        'description' => 'The panel\'s background jobs: the bot, the resolver, account logins, mailings. Everything goes through the telegram queue.',
+
+        'worker' => [
+            'alive' => 'Worker running',
+            'dead' => 'Worker not responding',
+            'never' => 'The worker has never reported in',
+            'dead_hint' => 'Jobs pile up and nothing runs them. On the server: php artisan queue:work --queue=telegram',
+            'never_hint' => 'The pulse appears once the worker restarts with the new code (php artisan queue:restart).',
+            'pulse' => 'Last pulse',
+            'listens' => 'Listens to',
+            'last_processed' => 'Last processed',
+            'last_failed' => 'Last failed',
+        ],
+
+        'stats' => [
+            'ready' => 'Ready',
+            'delayed' => 'Delayed',
+            'reserved' => 'Running',
+            'failed' => 'Failed',
+            'failed_day' => 'last 24h: :count',
+        ],
+
+        'queues' => [
+            'title' => 'Queues',
+            'queue' => 'Queue',
+            'stuck' => 'Stuck',
+            'oldest' => 'Longest wait',
+            'main' => 'Main',
+            'not_listened' => 'Nobody listens',
+            'not_listened_hint' => 'Nobody will run the jobs in this queue. Move them to telegram.',
+            'move' => 'Move to telegram',
+        ],
+
+        'classes' => [
+            'title' => 'Waiting to run',
+            'job' => 'Job',
+            'total' => 'Total',
+            'empty' => 'The queue is empty',
+        ],
+
+        'tabs' => [
+            'pending' => 'Waiting',
+            'failed' => 'Failed',
+        ],
+
+        'filters' => [
+            'search' => 'Job name',
+            'search_failed' => 'Job or error text',
+            'queue' => 'Queue',
+            'queue_all' => 'All queues',
+            'state' => 'State',
+            'state_all' => 'All',
+        ],
+
+        'state' => [
+            'ready' => 'Ready',
+            'delayed' => 'Delayed',
+            'reserved' => 'Running',
+            'stuck' => 'Stuck',
+        ],
+
+        'table' => [
+            'job' => 'Job',
+            'queue' => 'Queue',
+            'state' => 'State',
+            'attempts' => 'Attempts',
+            'created' => 'Queued',
+            'available' => 'Runs at',
+            'error' => 'Error',
+            'failed_at' => 'Failed',
+            'actions' => 'Actions',
+        ],
+
+        'actions' => [
+            'retry' => 'Retry',
+            'retry_all' => 'Retry all',
+            'delete' => 'Delete',
+            'flush' => 'Delete all',
+            'details' => 'Details',
+        ],
+
+        'detail' => [
+            'title' => 'Failed job',
+            'exception' => 'Error',
+            'uuid' => 'UUID',
+        ],
+
+        'confirm' => [
+            'move_title' => 'Move the jobs to telegram?',
+            'move_text' => 'Every waiting job in the ":queue" queue moves to telegram and gets run by the worker.',
+            'retry_all_title' => 'Retry every failed job?',
+            'retry_all_text' => 'Every failed job goes back onto the telegram queue. A job that failed on bad data will most likely fail again.',
+            'delete_title' => 'Delete this failed job?',
+            'delete_text' => 'The job is deleted without being run again.',
+            'flush_title' => 'Delete every failed job?',
+            'flush_text' => 'Every failed job is deleted without being run again. This cannot be undone.',
+            'confirm' => 'Yes, continue',
+        ],
+
+        'messages' => [
+            'retried' => 'Back on the queue: :count',
+            'deleted' => 'Deleted: :count',
+            'moved' => 'Moved to telegram: :count',
+        ],
+
+        'errors' => [
+            'title' => 'Error',
+            'load_failed' => 'Could not load the queue',
+            'action' => 'Could not complete the action',
+            'retry' => 'The job could not be rebuilt: :error',
+        ],
+
+        'empty' => [
+            'pending_title' => 'No waiting jobs',
+            'pending_description' => 'Everything that was queued has run.',
+            'failed_title' => 'No failed jobs',
+            'failed_description' => 'Every job ran without an error.',
+        ],
+
+        'auto_refresh' => 'The summary refreshes every 10 seconds',
     ],
 
     'operation_users' => [
