@@ -46,7 +46,7 @@ final class TelegramDriverCheckReporter
             $this->editMessage($telegram, $check, (int) $check->report_message_id, $message);
         }
 
-        $this->bot->queueSync($check);
+        $this->bot->syncNow($check);
     }
 
     /**
@@ -233,7 +233,12 @@ final class TelegramDriverCheckReporter
                 'report_dirty_at' => null,
             ])->save();
 
-            $this->bot->queueSync($check);
+            /*
+             * The buttons go out straight after the report, from this
+             * process - the bot has nothing to watch in the group, it only
+             * follows the reports this listener posts.
+             */
+            $this->bot->syncNow($check);
 
             /*
              * The same report is copied into the operator's private chat.

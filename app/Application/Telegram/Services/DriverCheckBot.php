@@ -7,6 +7,7 @@ namespace App\Application\Telegram\Services;
 use App\Enums\Drivers\TelegramDriverCheckStatus;
 use App\Jobs\Telegram\SyncDriverCheckBotMessage;
 use App\Models\Driver\TelegramDriverCheck;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Telegram\Bot\Api;
 use Telegram\Bot\BotsManager;
@@ -76,6 +77,38 @@ final class DriverCheckBot
     }
 
     /**
+     * Posts or edits the bot message right away, from whoever just
+     * changed the check - normally the listener, straight after it sent
+     * the report, so the buttons appear under it at once instead of
+     * whenever the queue worker gets to it.
+     *
+     * The report is already in the group by then and must never be undone
+     * by the bot: any failure here (Telegram down, lock busy) hands the
+     * message to the queue, which retries it.
+     */
+    public function syncNow(TelegramDriverCheck $check): void
+    {
+        if (! $this->enabled()) {
+            return;
+        }
+
+        try {
+            $this->sync($check);
+        } catch (Throwable $e) {
+            Log::warning(
+                'Driver check bot message not sent right away, queued instead',
+                [
+                    'check_id' => $check->id,
+                    'error' => $e->getMessage(),
+                    'exception' => $e::class,
+                ],
+            );
+
+            $this->queueSync($check);
+        }
+    }
+
+    /**
      * Posts the bot message under the report, or edits it to match the
      * check.
      */
@@ -85,6 +118,27 @@ final class DriverCheckBot
             return;
         }
 
+        /*
+         * The listener, the queue and a button press can all reach one
+         * check at the same moment; two of them seeing no bot message yet
+         * would both post one. The row is re-read inside the lock, so the
+         * second one finds the first one's message and edits it.
+         */
+        Cache::lock('driver-check-bot:' . $check->id, 30)->block(10, function () use ($check): void {
+            $fresh = $check->fresh() ?? $check;
+
+            $this->syncLocked($fresh);
+
+            // The caller keeps working with its own copy of the row.
+            if ($fresh !== $check) {
+                $check->forceFill(['bot_message_id' => $fresh->bot_message_id]);
+                $check->syncOriginalAttribute('bot_message_id');
+            }
+        });
+    }
+
+    private function syncLocked(TelegramDriverCheck $check): void
+    {
         if ($check->reported_at === null && $check->bot_message_id === null) {
             // Nothing in the group to put buttons under yet.
             return;
