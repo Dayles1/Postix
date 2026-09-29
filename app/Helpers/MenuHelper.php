@@ -82,7 +82,8 @@ class MenuHelper
      * This role works independently from departments. What the checks
      * produced comes first; the pages that configure them (who gets the
      * reports, which chats are watched, which accounts do the work) are
-     * kept apart underneath, since they are opened far less often.
+     * kept apart underneath, since they are opened far less often, and
+     * the ones that show whether the machinery runs at all come last.
      */
     public static function getDriverCheckGroups(): array
     {
@@ -124,6 +125,21 @@ class MenuHelper
                         'icon' => 'authentication',
                         'name' => 'Сессии Telegram',
                         'path' => '/driver-check/sessions',
+                    ],
+                ],
+            ],
+            [
+                'title' => 'Мониторинг',
+                'items' => [
+                    [
+                        'icon' => 'dashboard',
+                        'name' => 'Watchdog',
+                        'path' => '/driver-check/watchdog',
+                    ],
+                    [
+                        'icon' => 'task',
+                        'name' => 'Очередь',
+                        'path' => '/driver-check/queue',
                     ],
                 ],
             ],
