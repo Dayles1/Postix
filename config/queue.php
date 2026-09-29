@@ -39,7 +39,12 @@ return [
             'driver' => 'database',
             'connection' => env('DB_QUEUE_CONNECTION'),
             'table' => env('DB_QUEUE_TABLE', 'jobs'),
-            'queue' => env('DB_QUEUE', 'default'),
+            /*
+             * The only queue the worker listens to (queue:work
+             * --queue=telegram). A job dispatched without onQueue() used to
+             * land in 'default' and wait there forever.
+             */
+            'queue' => env('DB_QUEUE', 'telegram'),
             'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 90),
             'after_commit' => false,
         ],
