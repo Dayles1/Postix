@@ -2,7 +2,12 @@
 
 namespace App\Providers;
 
+use App\Telegram\QueueWorkerHeartbeat;
+use Illuminate\Queue\Events\JobFailed;
+use Illuminate\Queue\Events\JobProcessed;
+use Illuminate\Queue\Events\Looping;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -22,6 +27,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot()
     {
+        /*
+         * The queue page reads these to tell whether a worker is running
+         * at all - see QueueWorkerHeartbeat.
+         */
+        Event::listen(Looping::class, [QueueWorkerHeartbeat::class, 'looping']);
+        Event::listen(JobProcessed::class, [QueueWorkerHeartbeat::class, 'processed']);
+        Event::listen(JobFailed::class, [QueueWorkerHeartbeat::class, 'failed']);
+
         View::composer('layouts.app', function ($view) {
             $user = Auth::user();
 
