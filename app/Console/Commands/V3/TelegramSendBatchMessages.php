@@ -259,7 +259,7 @@ class TelegramSendBatchMessages extends Command
 
     private function dispatchLogoutJob(UserPhone $userPhone): void
     {
-        TelegramLogoutJob::dispatch($userPhone->id);
+        TelegramLogoutJob::dispatch($userPhone->id)->onQueue('telegram');
     }
 
     private function advanceGroupProgress(MessageGroup $group, int $batchNo): void

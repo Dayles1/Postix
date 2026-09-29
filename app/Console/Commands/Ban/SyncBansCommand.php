@@ -48,7 +48,7 @@ class SyncBansCommand extends Command
 
             foreach ($user->phones as $phone) {
                 if ($phone->is_active) {
-                    TelegramLogoutJob::dispatch($phone->id)->afterCommit();
+                    TelegramLogoutJob::dispatch($phone->id)->onQueue('telegram')->afterCommit();
                     Log::info("Dispatch TelegramLogoutJob for Phone ID: {$phone->id}");
                 }
             }
