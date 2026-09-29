@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\Telegram\DriverCheckChatController;
 use App\Http\Controllers\Api\Telegram\DriverCheckExportController;
+use App\Http\Controllers\Api\Telegram\DriverCheckQueueController;
 use App\Http\Controllers\Api\Telegram\OperationUserController;
 use App\Http\Controllers\Api\Telegram\OperatorController;
 use App\Http\Controllers\Api\Telegram\ResolvedPhoneController;
@@ -314,6 +315,23 @@ Route::middleware(['auth', 'role:driverCheck,superadmin'])
             '/chats/{chat}',
             [DriverCheckChatController::class, 'destroy']
         )->name('api.telegram.chats.destroy');
+
+        /*
+         * Queue
+         */
+        Route::prefix('/queue')
+            ->controller(DriverCheckQueueController::class)
+            ->group(function () {
+                Route::get('/', 'summary')->name('api.telegram.queue.summary');
+                Route::get('/jobs', 'jobs')->name('api.telegram.queue.jobs');
+                Route::post('/move', 'move')->name('api.telegram.queue.move');
+                Route::get('/failed', 'failed')->name('api.telegram.queue.failed');
+                Route::post('/failed/retry', 'retryAll')->name('api.telegram.queue.retry-all');
+                Route::delete('/failed', 'flush')->name('api.telegram.queue.flush');
+                Route::get('/failed/{uuid}', 'failedJob')->name('api.telegram.queue.failed.show');
+                Route::post('/failed/{uuid}/retry', 'retry')->name('api.telegram.queue.retry');
+                Route::delete('/failed/{uuid}', 'forget')->name('api.telegram.queue.forget');
+            });
 
         /*
          * Telegram sessions
