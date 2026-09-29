@@ -197,6 +197,20 @@ Route::middleware(['auth', 'role:driverCheck,superadmin'])
         )->name('driver-check.chats');
 
         /*
+         * Monitoring: the listener under its watchdog, and the queue
+         * every background step of the panel goes through.
+         */
+        Route::get(
+            '/watchdog',
+            [DriverCheckController::class, 'watchdog']
+        )->name('driver-check.watchdog');
+
+        Route::get(
+            '/queue',
+            [DriverCheckController::class, 'queue']
+        )->name('driver-check.queue');
+
+        /*
          * Telegram sessions
          *
          * Every MadelineProto account the listener and the resolver pool

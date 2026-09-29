@@ -50,6 +50,20 @@ final class DriverCheckController extends Controller
         );
     }
 
+    public function watchdog()
+    {
+        return view(
+            'pages.driver-check.watchdog'
+        );
+    }
+
+    public function queue()
+    {
+        return view(
+            'pages.driver-check.queue'
+        );
+    }
+
     public function drivers()
     {
         return view(
