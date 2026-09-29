@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Telegram\DriverCheckChatController;
 use App\Http\Controllers\Api\Telegram\DriverCheckExportController;
 use App\Http\Controllers\Api\Telegram\DriverCheckQueueController;
+use App\Http\Controllers\Api\Telegram\DriverCheckWatchdogController;
 use App\Http\Controllers\Api\Telegram\OperationUserController;
 use App\Http\Controllers\Api\Telegram\OperatorController;
 use App\Http\Controllers\Api\Telegram\ResolvedPhoneController;
@@ -315,6 +316,18 @@ Route::middleware(['auth', 'role:driverCheck,superadmin'])
             '/chats/{chat}',
             [DriverCheckChatController::class, 'destroy']
         )->name('api.telegram.chats.destroy');
+
+        /*
+         * Watchdog
+         */
+        Route::prefix('/watchdog')
+            ->controller(DriverCheckWatchdogController::class)
+            ->group(function () {
+                Route::get('/', 'show')->name('api.telegram.watchdog.show');
+                Route::post('/start', 'start')->name('api.telegram.watchdog.start');
+                Route::post('/restart-listener', 'restartListener')->name('api.telegram.watchdog.restart-listener');
+                Route::post('/stop', 'stop')->name('api.telegram.watchdog.stop');
+            });
 
         /*
          * Queue
