@@ -53,6 +53,13 @@ return [
         'show_more' => 'Ko\'proq',
         'show_less' => 'Yig\'ish',
         'results' => 'ta natija',
+
+        'duration' => [
+            'd' => 'kun',
+            'h' => 'soat',
+            'm' => 'daq',
+            's' => 's',
+        ],
     ],
 
     'operators' => [
@@ -476,6 +483,247 @@ return [
             'title' => 'Hozircha akkauntlar yo\'q',
             'description' => 'Telegram akkaunt qo\'shing: listener va raqam bo\'yicha qidiruv shunda ishlaydi.',
         ],
+    ],
+
+    'watchdog' => [
+
+        'title' => 'Watchdog',
+
+        'description' => 'Haydovchilarni tekshirish listeneri watchdog nazoratida: ishlayaptimi, qaysi akkauntda va oxirgi marta nima qildi.',
+
+        'actions' => [
+            'start' => 'Ishga tushirish',
+            'restart' => 'Listenerni qayta ishga tushirish',
+            'stop' => 'To\'xtatish',
+        ],
+
+        'state' => [
+            'ok' => 'Ishlayapti',
+            'unsupervised' => 'Listener nazoratsiz',
+            'restarting' => 'Listener qayta ishga tushmoqda',
+            'down' => 'To\'xtagan',
+            'misconfigured' => 'Asosiy akkaunt tayyor emas',
+            'unknown' => 'Holat noma\'lum',
+        ],
+
+        'state_hint' => [
+            'ok' => 'Watchdog listenerni nazorat qilyapti, asosiy akkaunt avtorizatsiyadan o\'tgan.',
+            'unsupervised' => 'Listener ishlayapti, lekin watchdog ishga tushmagan: listener yiqilsa, uni hech kim ko\'tarmaydi. "Ishga tushirish"ni bosing.',
+            'restarting' => 'Watchdog ishlayapti, lekin listener hozir ishlamayapti: u hozirgina yiqilgan yoki keyingi urinishdan oldin pauzani kutyapti.',
+            'down' => 'Na watchdog, na listener ishlayapti. Chatlardagi xabarlar qayta ishlanmaydi.',
+            'misconfigured' => 'TELEGRAM_DRIVER_CHECK_ACCOUNT_ID berilmagan, akkaunt topilmadi yoki avtorizatsiyadan o\'tmagan. Uni "Telegram sessiyalari" sahifasida tekshiring.',
+            'unknown' => 'Veb-server storage/app/telegram dagi lock-fayllarni o\'qiy olmayapti.',
+        ],
+
+        'processes' => [
+            'title' => 'Jarayonlar',
+            'watchdog' => 'Watchdog',
+            'watchdog_hint' => 'Listenerni ishga tushiradi va yiqilgandan keyin ko\'taradi',
+            'spare' => 'Zaxira watchdog',
+            'spare_hint' => 'Kutib turadi va asosiysi yiqilsa, nazoratni o\'z qo\'liga oladi',
+            'listener' => 'Listener',
+            'listener_hint' => 'telegram:start-loop: asosiy akkaunt nomidan chatlarni tinglaydi',
+            'running' => 'Ishlayapti',
+            'stopped' => 'Ishlamayapti',
+            'unknown' => 'Noma\'lum',
+            'pid' => 'PID',
+        ],
+
+        'account' => [
+            'title' => 'Asosiy akkaunt',
+            'missing' => 'Akkaunt berilmagan',
+            'missing_hint' => '.env da TELEGRAM_DRIVER_CHECK_ACCOUNT_ID ni ko\'rsating.',
+            'not_found' => 'TELEGRAM_DRIVER_CHECK_ACCOUNT_ID dagi akkaunt topilmadi',
+            'authorized' => 'Avtorizatsiyadan o\'tgan',
+            'not_authorized' => 'Avtorizatsiyadan o\'tmagan',
+            'session_missing' => 'Sessiya fayli diskda yo\'q',
+            'status' => 'Holat',
+            'open_sessions' => 'Sessiyalar',
+        ],
+
+        'activity' => [
+            'title' => 'Faollik',
+            'last_check' => 'Oxirgi xabar',
+            'last_report' => 'Oxirgi hisobot',
+            'checks_today' => 'Bugungi tekshiruvlar',
+            'pending' => 'Jarayonda',
+        ],
+
+        'worker' => [
+            'title' => 'Navbat workeri',
+            'alive' => 'Javob beryapti',
+            'dead' => 'Javob bermayapti',
+            'dead_hint' => '"Ishga tushirish" navbatga vazifa qo\'yadi. Worker javob bermaguncha, uni hech kim bajarmaydi.',
+            'start_queued' => 'Navbatda ishga tushirish kutyapti: :count',
+            'open_queue' => 'Navbat',
+        ],
+
+        'restart' => [
+            'title' => 'Oxirgi yiqilish',
+            'reason' => 'Sabab',
+            'exit_code' => 'Chiqish kodi',
+            'uptime' => 'Ishladi',
+            'restarts' => 'Qayta ishga tushirish №',
+            'at' => 'Qachon',
+            'detail' => 'Tafsilotlar',
+            'marker' => 'Listener muammo haqida xabar berdi',
+        ],
+
+        'signals_unavailable' => 'Qayta ishga tushirish va to\'xtatish faqat watchdog ishlaydigan Linux serverda ishlaydi.',
+
+        'auto_refresh' => 'Har 5 soniyada yangilanadi',
+
+        'confirm' => [
+            'restart_title' => 'Listener qayta ishga tushirilsinmi?',
+            'restart_text' => 'Listener SIGTERM oladi va to\'g\'ri yakunlanadi, watchdog bir necha soniyada yangisini ishga tushiradi. Bu vaqtda xabarlar qayta ishlanmaydi.',
+            'stop_title' => 'Watchdog va listener to\'xtatilsinmi?',
+            'stop_text' => 'Watchdog listenerni to\'xtatadi va o\'zi ham yakunlanadi. Qayta ishga tushirilmaguncha haydovchilarni tekshirish ishlamaydi.',
+            'confirm' => 'Ha, davom etish',
+        ],
+
+        'messages' => [
+            'restart_queued' => 'Qayta ishga tushirish navbat workeriga topshirildi, listener bir necha soniyada qayta ishga tushadi',
+            'stop_queued' => 'To\'xtatish navbat workeriga topshirildi, watchdog bir necha soniyada to\'xtaydi',
+            'start_queued' => 'Watchdogni ishga tushirish navbatga qo\'yildi',
+            'restart_sent' => 'Listener qayta ishga tushmoqda',
+            'stop_sent' => 'Watchdog to\'xtamoqda',
+        ],
+
+        'errors' => [
+            'title' => 'Xato',
+            'load_failed' => 'Holatni olib bo\'lmadi',
+            'action' => 'Amalni bajarib bo\'lmadi',
+            'no_watchdog' => 'Watchdog ishlamayapti: to\'xtatilgan listenerni hech kim ko\'tarmaydi. Avval watchdogni ishga tushiring.',
+            'not_running' => 'Jarayon ishlamayapti.',
+            'pid_unknown' => 'Jarayon PID sini tasdiqlab bo\'lmadi. Signal yuborilmadi.',
+            'signal_failed' => 'Signal yuborilmadi: uni yuborayotgan jarayonda watchdogga huquq yo\'q. Ehtimol, watchdog boshqa foydalanuvchi nomidan qo\'lda ishga tushirilgan.',
+        ],
+    ],
+
+    'queue' => [
+
+        'title' => 'Navbat',
+
+        'description' => 'Panelning fon vazifalari: bot, resolver, akkauntlarga kirish, xabar yuborish. Hammasi telegram navbati orqali o\'tishi kerak.',
+
+        'worker' => [
+            'alive' => 'Worker ishlayapti',
+            'dead' => 'Worker javob bermayapti',
+            'never' => 'Worker hali bir marta ham javob bermagan',
+            'dead_hint' => 'Vazifalar yig\'ilib qolyapti va bajarilmayapti. Serverda tekshiring: php artisan queue:work --queue=telegram',
+            'never_hint' => 'Worker yangi kod bilan qayta ishga tushganda puls paydo bo\'ladi (php artisan queue:restart).',
+            'pulse' => 'Oxirgi puls',
+            'listens' => 'Tinglaydi',
+            'last_processed' => 'Oxirgi bajarilgan',
+            'last_failed' => 'Oxirgi yiqilgan',
+        ],
+
+        'stats' => [
+            'ready' => 'Tayyor',
+            'delayed' => 'Kechiktirilgan',
+            'reserved' => 'Bajarilmoqda',
+            'failed' => 'Yiqilgan',
+            'failed_day' => 'bir kunda: :count',
+        ],
+
+        'queues' => [
+            'title' => 'Navbatlar',
+            'queue' => 'Navbat',
+            'stuck' => 'Qotib qolgan',
+            'oldest' => 'Eng uzoq kutgan',
+            'main' => 'Asosiy',
+            'not_listened' => 'Hech kim tinglamaydi',
+            'not_listened_hint' => 'Bu navbatdagi vazifalarni hech kim bajarmaydi. Ularni telegram ga o\'tkazing.',
+            'move' => 'telegram ga o\'tkazish',
+        ],
+
+        'classes' => [
+            'title' => 'Bajarilishini kutayotganlar',
+            'job' => 'Vazifa',
+            'total' => 'Jami',
+            'empty' => 'Navbat bo\'sh',
+        ],
+
+        'tabs' => [
+            'pending' => 'Kutayotganlar',
+            'failed' => 'Yiqilganlar',
+        ],
+
+        'filters' => [
+            'search' => 'Vazifa nomi',
+            'search_failed' => 'Vazifa yoki xato matni',
+            'queue' => 'Navbat',
+            'queue_all' => 'Barcha navbatlar',
+            'state' => 'Holat',
+            'state_all' => 'Hammasi',
+        ],
+
+        'state' => [
+            'ready' => 'Tayyor',
+            'delayed' => 'Kechiktirilgan',
+            'reserved' => 'Bajarilmoqda',
+            'stuck' => 'Qotib qolgan',
+        ],
+
+        'table' => [
+            'job' => 'Vazifa',
+            'queue' => 'Navbat',
+            'state' => 'Holat',
+            'attempts' => 'Urinishlar',
+            'created' => 'Qo\'yilgan',
+            'available' => 'Ishga tushadi',
+            'error' => 'Xato',
+            'failed_at' => 'Yiqilgan',
+            'actions' => 'Amallar',
+        ],
+
+        'actions' => [
+            'retry' => 'Qayta urinish',
+            'retry_all' => 'Hammasini qayta',
+            'delete' => 'O\'chirish',
+            'flush' => 'Hammasini o\'chirish',
+            'details' => 'Batafsil',
+        ],
+
+        'detail' => [
+            'title' => 'Yiqilgan vazifa',
+            'exception' => 'Xato',
+            'uuid' => 'UUID',
+        ],
+
+        'confirm' => [
+            'move_title' => 'Vazifalar telegram ga o\'tkazilsinmi?',
+            'move_text' => '":queue" navbatidagi barcha kutayotgan vazifalar telegram ga o\'tadi va worker tomonidan bajariladi.',
+            'retry_all_title' => 'Barcha yiqilgan vazifalar qayta ishga tushirilsinmi?',
+            'retry_all_text' => 'Barcha yiqilgan vazifalar telegram navbatiga qaytadi. Ma\'lumotdagi xato sabab yiqilgan vazifa, ehtimol, yana yiqiladi.',
+            'delete_title' => 'Yiqilgan vazifa o\'chirilsinmi?',
+            'delete_text' => 'Vazifa qayta ishga tushirilmasdan o\'chiriladi.',
+            'flush_title' => 'Barcha yiqilgan vazifalar o\'chirilsinmi?',
+            'flush_text' => 'Barcha yiqilgan vazifalar qayta ishga tushirilmasdan o\'chiriladi. Buni bekor qilib bo\'lmaydi.',
+            'confirm' => 'Ha, davom etish',
+        ],
+
+        'messages' => [
+            'retried' => 'Navbatga qaytarildi: :count',
+            'deleted' => 'O\'chirildi: :count',
+            'moved' => 'telegram ga o\'tkazildi: :count',
+        ],
+
+        'errors' => [
+            'title' => 'Xato',
+            'load_failed' => 'Navbatni yuklab bo\'lmadi',
+            'action' => 'Amalni bajarib bo\'lmadi',
+            'retry' => 'Vazifani tiklab bo\'lmadi: :error',
+        ],
+
+        'empty' => [
+            'pending_title' => 'Kutayotgan vazifalar yo\'q',
+            'pending_description' => 'Navbatga qo\'yilgan hamma narsa bajarib bo\'lingan.',
+            'failed_title' => 'Yiqilgan vazifalar yo\'q',
+            'failed_description' => 'Barcha vazifalar xatosiz bajarildi.',
+        ],
+
+        'auto_refresh' => 'Umumiy ma\'lumot har 10 soniyada yangilanadi',
     ],
 
     'operation_users' => [
