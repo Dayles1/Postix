@@ -10,6 +10,7 @@
 
 import { createListPage } from './list-page';
 import { sessionsPage } from './sessions';
+import { queuePage, watchdogPage } from './monitoring';
 import { statusType } from './status';
 
 /*
@@ -1072,4 +1073,6 @@ export function registerDriverCheck(Alpine) {
     Alpine.data('dcResolvedPhones', resolvedPhonesPage);
     Alpine.data('dcChats', chatsPage);
     Alpine.data('dcSessions', sessionsPage);
+    Alpine.data('dcWatchdog', watchdogPage);
+    Alpine.data('dcQueue', queuePage);
 }
