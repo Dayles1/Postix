@@ -8,6 +8,7 @@ use App\Models\MessageGroup;
 use App\Models\TelegramMessage;
 use App\Models\User;
 use App\Models\UserPhone;
+use App\Services\ErrorKeyService;
 use Illuminate\Support\Facades\Log;
 use Telegram\Bot\Api;
 use Telegram\Bot\Exceptions\TelegramResponseException;
@@ -516,22 +517,6 @@ class TelegramService
         return;
     }
 
-    // local uzbek explanations
-    $uzExpl = [
-        'flood_wait' => "Juda ko‘p so‘rov yuborildi — Telegram sizni vaqtincha chekladi. Birozdan keyin qayta urinib ko‘ring.",
-        'slowmode_wait'=>"Siz bu guruhga yana habar jonatish uchun kutushiz kerek",
-        'chat_write_forbidden' => "Bu chatga xabar yuborish uchun ruxsat yo‘q.",
-        'user_blocked' => "Foydalanuvchi sizni bloklagan yoki akkaunt o‘chirilgan — yuborish imkoni yo‘q.",
-        'peer_flood' => "Ushbu chat/foydalanuvchiga yuborishda vaqtincha cheklov mavjud (flood).",
-        'phone_migrate' => "Telefon sessiyasi migratsiya qilinmoqda — sozlamalarni tekshiring.",
-        'session_password_needed' => "Sessiya paroli talab qilinadi — seans sozlanishi kerak.",
-        'network_error' => "Tarmoq xatosi yuz berdi — internet aloqasini tekshiring.",
-        'peer_not_found' => "Foydalanuvchi yoki guruh topilmadi — username yoki link noto‘g‘ri bo‘lishi mumkin.",
-        'chat_guest_send_forbidden' => "Guruhga xabar yuborish uchun avval guruhga qo‘shiling yoki administratsiyadan ruxsat oling.",
-        'SCHEDULE_TOO_MUCH' => "Juda ko'p rejalashtirilgan xabarlar mavjud — iltimos, biroz kuting yoki rejalashtirilgan xabarlarni kamaytiring.",
-        'unknown_error' => "Noma'lum xatolik yuz berdi.",
-    ];
-
     // Faqat failed statusdagi message larni olib, peerni normalizatsiya qilib guruhlaymiz
     $groups = $group->messages
         ->where('status', 'failed')
@@ -566,20 +551,7 @@ class TelegramService
                 ->keys()
                 ->first() ?: 'unknown_error';
 
-            // Dynamic flood_wait_{seconds} va slowmode_wait_{seconds} qo'llash
-            if (preg_match('/^(flood_wait|slowmode_wait)_(\d+)$/', $mostKey, $matches)) {
-                $type = $matches[1]; // flood_wait yoki slowmode_wait
-                $seconds = (int)$matches[2];
-                $min = intdiv($seconds, 60);
-                $sec = $seconds % 60;
-
-                $timeStr = $min > 0 ? "$min daqiqa" . ($sec > 0 ? " $sec soniya" : "") : "$sec soniya";
-
-                $baseMsg = $uzExpl[$type] ?? $uzExpl['unknown_error'];
-                $explanation = $baseMsg . " (Kutish vaqti: $timeStr)";
-            } else {
-                $explanation = $uzExpl[$mostKey] ?? $uzExpl['unknown_error'];
-            }
+            $explanation = app(ErrorKeyService::class)->translateErrorKey($mostKey, 'uz');
 
             $text .= "• {$peer} — ❌ {$count}\n";
             $text .= $explanation . "\n\n";

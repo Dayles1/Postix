@@ -7,7 +7,7 @@ class ErrorKeyService
 
     public function __construct() {}
 
-    public function translateErrorKey(?string $errorKey): string
+    public function translateErrorKey(?string $errorKey, ?string $locale = null): string
     {
         if (!$errorKey) {
             return '';
@@ -22,24 +22,30 @@ class ErrorKeyService
                 return __('messages.errors.' . $matches[1] . '_minutes_seconds', [
                     'minutes' => $minutes,
                     'seconds' => $seconds,
-                ]);
+                ], $locale);
             }
 
             if ($minutes > 0) {
                 return __('messages.errors.' . $matches[1] . '_minutes', [
                     'minutes' => $minutes,
-                ]);
+                ], $locale);
             }
 
             return __('messages.errors.' . $matches[1] . '_seconds', [
                 'seconds' => $seconds,
-            ]);
+            ], $locale);
         }
 
-        $translated = __("messages.errors.$errorKey");
+        $translated = __("messages.errors.$errorKey", [], $locale);
 
-        return $translated !== "messages.errors.$errorKey"
-            ? $translated
-            : __('messages.errors.unknown_error');
+        if ($translated !== "messages.errors.$errorKey") {
+            return $translated;
+        }
+
+        // Untranslated Telegram RPC code (or raw error text from older rows) —
+        // show it as-is rather than "unknown error"
+        $code = preg_match('/^[a-z0-9_]+$/', $errorKey) ? strtoupper($errorKey) : $errorKey;
+
+        return __('messages.errors.telegram_error', ['code' => $code], $locale);
     }
 }

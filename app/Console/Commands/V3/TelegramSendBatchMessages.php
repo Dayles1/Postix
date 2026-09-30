@@ -145,7 +145,7 @@ class TelegramSendBatchMessages extends Command
                         break;
                     }
                 } catch (Throwable $e) {
-                    $errorKey = $this->telegramService->mapErrorToKey($e->getMessage());
+                    $errorKey = $this->telegramService->mapErrorToKey($e);
 
                     if ($errorKey === 'unknown_error') {
                         Log::error('telegram_unknown_error', [
@@ -290,7 +290,7 @@ class TelegramSendBatchMessages extends Command
                 $group->update($update);
             }
         } catch (Throwable $e) {
-            $err = $this->telegramService->mapErrorToKey($e->getMessage());
+            $err = $this->telegramService->mapErrorToKey($e);
 
             if ($err === 'unknown_error') {
                 Log::error('telegram_unknown_error', [

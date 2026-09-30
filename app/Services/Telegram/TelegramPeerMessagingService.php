@@ -4,6 +4,8 @@ namespace App\Services\Telegram;
 
 use App\Models\UserPhone;
 use danog\MadelineProto\API;
+use danog\MadelineProto\RPCError\RateLimitError;
+use danog\MadelineProto\RPCErrorException;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -50,7 +52,7 @@ class TelegramPeerMessagingService
             $this->madeline = null;
 
             $err = $this->cleanError($e->getMessage());
-            $key = $this->mapErrorToKey($err);
+            $key = $this->mapErrorToKey($e);
 
             Log::error('telegram_unknown_error', [
                 'stage' => 'init_madeline',
@@ -216,7 +218,7 @@ class TelegramPeerMessagingService
             return $result;
         } catch (Throwable $e) {
             $err = $this->cleanError($e->getMessage());
-            $key = $this->mapErrorToKey($err);
+            $key = $this->mapErrorToKey($e);
 
             if ($key === 'unknown_error') {
                 $this->logUnknownError('inspect_peer', $e, [
@@ -337,7 +339,7 @@ class TelegramPeerMessagingService
             ];
         } catch (Throwable $e) {
             $err = $this->cleanError($e->getMessage());
-            $key = $this->mapErrorToKey($err);
+            $key = $this->mapErrorToKey($e);
 
             if ($key === 'unknown_error') {
                 $this->logUnknownError('after_send_message', $e, [
@@ -379,7 +381,7 @@ class TelegramPeerMessagingService
                     ];
                 } catch (Throwable $e2) {
                     $err2 = $this->cleanError($e2->getMessage());
-                    $key2 = $this->mapErrorToKey($err2);
+                    $key2 = $this->mapErrorToKey($e2);
 
                     if ($key2 === 'unknown_error') {
                         Log::error('telegram_unknown_error', [
@@ -439,7 +441,7 @@ class TelegramPeerMessagingService
             ]);
         } catch (Throwable $e) {
             $err = $this->cleanError($e->getMessage());
-            $key = $this->mapErrorToKey($err);
+            $key = $this->mapErrorToKey($e);
 
             if ($key === 'unknown_error') {
                 $this->logUnknownError('inspect_username', $e, [
@@ -484,7 +486,7 @@ class TelegramPeerMessagingService
             ]);
         } catch (Throwable $e) {
             $err = $this->cleanError($e->getMessage());
-            $key = $this->mapErrorToKey($err);
+            $key = $this->mapErrorToKey($e);
 
             if ($key === 'unknown_error') {
                 $this->logUnknownError('inspect_id', $e, [
@@ -531,7 +533,7 @@ class TelegramPeerMessagingService
             ]);
         } catch (Throwable $e) {
             $err = $this->cleanError($e->getMessage());
-            $key = $this->mapErrorToKey($err);
+            $key = $this->mapErrorToKey($e);
 
             if ($key === 'unknown_error') {
                 $this->logUnknownError('inspect_internal_link', $e, [
@@ -570,7 +572,7 @@ class TelegramPeerMessagingService
            
         } catch (Throwable $e) {
             $err = $this->cleanError($e->getMessage());
-            $key = $this->mapErrorToKey($err);
+            $key = $this->mapErrorToKey($e);
 
             if ($key === 'unknown_error') {
                 $this->logUnknownError('inspect_invite_link', $e, [
@@ -1018,75 +1020,81 @@ class TelegramPeerMessagingService
         return preg_replace('/\s+/', '', $phone);
     }
 
-    public function mapErrorToKey(string $err): string
-    {
-        $e = strtolower($err);
+    /**
+     * Telegram RPC error code => error_key saved to telegram_messages.error_key
+     * (translated via messages.errors.*). Unlisted RPC codes are stored as-is
+     * in lowercase so the web can still show the real reason.
+     */
+    private const RPC_ERROR_KEYS = [
+        'PEER_FLOOD' => 'peer_flood',
+        'CHAT_WRITE_FORBIDDEN' => 'chat_write_forbidden',
+        'CHAT_SEND_PLAIN_FORBIDDEN' => 'chat_write_forbidden',
+        'CHAT_ADMIN_REQUIRED' => 'chat_write_forbidden',
+        'CHAT_RESTRICTED' => 'chat_restricted',
+        'CHAT_GUEST_SEND_FORBIDDEN' => 'chat_guest_send_forbidden',
+        'CHANNEL_PRIVATE' => 'channel_private',
+        'CHAT_FORBIDDEN' => 'channel_private',
+        'USER_NOT_PARTICIPANT' => 'not_member',
+        'USER_BANNED_IN_CHANNEL' => 'user_banned_in_channel',
+        'USER_IS_BLOCKED' => 'user_is_blocked',
+        'YOU_BLOCKED_USER' => 'you_blocked_user',
+        'USER_PRIVACY_RESTRICTED' => 'user_privacy_restricted',
+        'PRIVACY_PREMIUM_REQUIRED' => 'privacy_premium_required',
+        'ALLOW_PAYMENT_REQUIRED' => 'allow_payment_required',
+        'INPUT_USER_DEACTIVATED' => 'input_user_deactivated',
+        'TOPIC_CLOSED' => 'topic_closed',
+        'TOPIC_DELETED' => 'topic_deleted',
+        'PEER_ID_INVALID' => 'peer_not_found',
+        'CHANNEL_INVALID' => 'peer_not_found',
+        'CHAT_ID_INVALID' => 'peer_not_found',
+        'USERNAME_NOT_OCCUPIED' => 'peer_not_found',
+        'USERNAME_INVALID' => 'peer_invalid',
+        'INVITE_HASH_EXPIRED' => 'invite_invalid',
+        'INVITE_HASH_INVALID' => 'invite_invalid',
+        'INVITE_HASH_EMPTY' => 'invite_invalid',
+        'MESSAGE_TOO_LONG' => 'message_too_long',
+        'MESSAGE_EMPTY' => 'message_empty',
+        'SCHEDULE_TOO_MUCH' => 'schedule_too_much',
+        'FROZEN_METHOD_INVALID' => 'account_frozen',
+        'FROZEN_PARTICIPANT_MISSING' => 'account_frozen',
+        'AUTH_KEY_UNREGISTERED' => 'auth_key_invalid',
+        'AUTH_KEY_INVALID' => 'auth_key_invalid',
+        'SESSION_REVOKED' => 'auth_key_invalid',
+        'SESSION_EXPIRED' => 'auth_key_invalid',
+        'USER_DEACTIVATED' => 'account_deactivated',
+        'USER_DEACTIVATED_BAN' => 'account_deactivated',
+        'PHONE_NUMBER_INVALID' => 'phone_not_supported_directly',
+        'TIMEOUT' => 'network_error',
+    ];
 
-        if (preg_match('/flood[_ ]?wait[_ ]?(\d+)/i', $err, $m)) {
-            return !empty($m[1]) ? "flood_wait_{$m[1]}" : 'flood_wait';
+    public function mapErrorToKey(Throwable|string $error): string
+    {
+        if ($error instanceof RateLimitError) {
+            return 'flood_wait_' . $error->getWaitTime();
+        }
+
+        $err = $error instanceof RPCErrorException
+            ? $error->rpc
+            : $this->cleanError($error instanceof Throwable ? $error->getMessage() : $error);
+
+        if (preg_match('/(?:flood|flood_premium)[_ ]?wait[_ ]?(\d+)/i', $err, $m)) {
+            return "flood_wait_{$m[1]}";
         }
 
         if (preg_match('/slowmode[_ ]?wait[_ ]?(\d+)/i', $err, $m)) {
-            return !empty($m[1]) ? "slowmode_wait_{$m[1]}" : 'slowmode_wait';
+            return "slowmode_wait_{$m[1]}";
         }
 
-        if (str_contains($e, 'peer flood')) {
-            return 'peer_flood';
+        $code = strtoupper(trim($err));
+
+        if (isset(self::RPC_ERROR_KEYS[$code])) {
+            return self::RPC_ERROR_KEYS[$code];
         }
 
-        if (
-            str_contains($e, 'not member') ||
-            str_contains($e, 'not_member') ||
-            str_contains($e, 'member is not a participant') ||
-            str_contains($e, 'user not participant') ||
-            str_contains($e, 'participant not found') ||
-            str_contains($e, 'user is not a participant')
-        ) {
-            return 'not_member';
-        }
+        // MadelineProto's own (non-RPC) exceptions come as plain text
+        $e = strtolower($err);
 
-        if (
-            str_contains($e, 'chat_write_forbidden') ||
-            str_contains($e, 'chat write forbidden') ||
-            str_contains($e, 'chat admin required') ||
-            str_contains($e, 'CHAT_SEND_PLAIN_FORBIDDEN') ||
-            str_contains($e, 'chat_send_plain_forbidden') ||
-            str_contains($e, 'send plain') ||
-            str_contains($e, 'write forbidden')
-        ) {
-            return 'chat_write_forbidden';
-        }
-
-        if (str_contains($e, 'user_banned_in_channel')) {
-            return 'user_banned_in_channel';
-        }
-
-        if (str_contains($e, 'user is blocked') || str_contains($e, 'user_is_blocked') || str_contains($e, 'bot was blocked')) {
-            return 'user_is_blocked';
-        }
-
-        if (str_contains($e, 'topic closed')) {
-            return 'topic_closed';
-        }
-
-        if (str_contains($e, 'topic deleted')) {
-            return 'topic_deleted';
-        }
-
-        if (str_contains($e, 'auth_key_unregistered') || str_contains($e, 'session_revoked') || str_contains($e, 'auth_key_invalid')) {
-            return 'auth_key_invalid';
-        }
-
-        if (preg_match('/timeout|timed out|connection.*reset|broken pipe|could not connect/i', $e)) {
-            return 'network_error';
-        }
-
-        if (
-            str_contains($e, 'peer is not present in the internal peer database') ||
-            str_contains($e, 'peer not found') ||
-            str_contains($e, 'chat not found') ||
-            str_contains($e, 'group not found')
-        ) {
+        if (str_contains($e, 'peer is not present in the internal peer database')) {
             return 'peer_not_found';
         }
 
@@ -1094,12 +1102,17 @@ class TelegramPeerMessagingService
             return 'madeline_not_initialized';
         }
 
-        if (str_contains($e, 'invite hash invalid') || str_contains($e, 'invite link')) {
-            return 'invite_invalid';
+        if (str_contains($e, 'has been banned') || str_contains($e, 'deactivated')) {
+            return 'account_deactivated';
         }
 
-        if (str_contains($e, 'phone number invalid') || str_contains($e, 'phone not supported')) {
-            return 'phone_not_supported_directly';
+        if (preg_match('/timeout|timed out|connection.*reset|broken pipe|could not connect/i', $e)) {
+            return 'network_error';
+        }
+
+        // Unmapped Telegram RPC code (e.g. CHAT_SEND_MEDIA_FORBIDDEN) — keep it as the key
+        if (preg_match('/^[A-Z][A-Z0-9_]{2,}$/', $code)) {
+            return substr(strtolower($code), 0, 100);
         }
 
         return 'unknown_error';
@@ -1112,6 +1125,7 @@ class TelegramPeerMessagingService
             'phone_code_expired',
             'auth_key_unregistered',
             'session_revoked',
+            'account_deactivated',
             'network_error',
             'madeline_not_initialized',
         ], true);
