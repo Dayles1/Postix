@@ -66,25 +66,31 @@ final class OperationUserController extends Controller
             'operation_user_id' => $operationUser->id,
         ]);
 
-        return TelegramDriverResource::collection(
-            $query->execute($filters)
-                ->loadMissing([
-                    'resolvedPhones' => function ($query) {
-                        $query
-                            ->select([
-                                'id',
-                                'driver_id',
-                                'phone_normalized',
-                                'telegram_user_id',
-                                'telegram_username',
-                                'telegram_first_name',
-                                'telegram_last_name',
-                                'telegram_account_id',
-                                'resolved_at',
-                            ])
-                            ->latest('resolved_at');
-                    },
-                ]),
-        );
+        $drivers = $query->execute($filters);
+
+        /*
+         * On the page's collection, not on the paginator: a call the
+         * paginator forwards hands back the bare collection, and the
+         * response then lost its meta - no total, no paging.
+         */
+        $drivers->getCollection()->loadMissing([
+            'resolvedPhones' => function ($query) {
+                $query
+                    ->select([
+                        'id',
+                        'driver_id',
+                        'phone_normalized',
+                        'telegram_user_id',
+                        'telegram_username',
+                        'telegram_first_name',
+                        'telegram_last_name',
+                        'telegram_account_id',
+                        'resolved_at',
+                    ])
+                    ->latest('resolved_at');
+            },
+        ]);
+
+        return TelegramDriverResource::collection($drivers);
     }
 }
