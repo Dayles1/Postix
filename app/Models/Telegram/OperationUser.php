@@ -12,9 +12,25 @@ use Illuminate\Support\Str;
 
 class OperationUser extends Model
 {
+    /**
+     * An operator: everyone the driver-check flow knows.
+     */
+    public const ROLE_OPERATION = 'operation';
+
+    /**
+     * A sales manager, named as responsible in the CRM penalty alerts.
+     */
+    public const ROLE_SALES = 'sales';
+
+    public const ROLES = [
+        self::ROLE_OPERATION,
+        self::ROLE_SALES,
+    ];
+
     protected $fillable = [
         'name',
         'name_normalized',
+        'role',
         'telegram_username',
         'telegram_id',
         'is_active',
@@ -47,6 +63,39 @@ class OperationUser extends Model
             TelegramDriverCheck::class,
             'operation_user_id',
         );
+    }
+
+    /**
+     * CRM penalties this person was named responsible for. Both roles get
+     * them: "Ответственный (Operation|Sales)".
+     */
+    public function clientChecks(): HasMany
+    {
+        return $this->hasMany(
+            TelegramClientCheck::class,
+            'operation_user_id',
+        );
+    }
+
+    public static function isRole(mixed $role): bool
+    {
+        return is_string($role) && in_array($role, self::ROLES, true);
+    }
+
+    public function isSales(): bool
+    {
+        return $this->role === self::ROLE_SALES;
+    }
+
+    /**
+     * Rows written before the role column existed read as operators, the
+     * same as the column default.
+     */
+    public function roleOrDefault(): string
+    {
+        return self::isRole($this->role)
+            ? $this->role
+            : self::ROLE_OPERATION;
     }
 
     /**

@@ -8,8 +8,13 @@ use App\Models\Telegram\OperationUser;
 
 final class ResolveOperationUser
 {
+    /**
+     * The role is only used when the person has to be created: an existing
+     * row is matched by name alone and keeps the role it has.
+     */
     public function execute(
         string $name,
+        string $role = OperationUser::ROLE_OPERATION,
     ): OperationUser {
         $name = trim($name);
 
@@ -26,6 +31,7 @@ final class ResolveOperationUser
             ],
             [
                 'name' => $name,
+                'role' => $role,
             ],
         );
     }

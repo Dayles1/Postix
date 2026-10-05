@@ -55,6 +55,19 @@ final class TelegramMessageTypeDetector
             return TelegramDriverMessageType::UPDATED_TRANSPORT;
         }
 
+        /*
+         * "⚠️ Штраф по запросу #…" the first time,
+         * "🆘 Повторное отправление штрафа №N по запросу #…" after that.
+         */
+        if (
+            preg_match(
+                '/(?:^|\R)\s*\S*\s*(?:Штраф по запросу|Повторное отправление штрафа\s*№\s*\d+\s*по запросу)\s*#/u',
+                $text,
+            ) === 1
+        ) {
+            return TelegramDriverMessageType::PENALTY;
+        }
+
         return TelegramDriverMessageType::UNKNOWN;
     }
 }

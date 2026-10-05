@@ -58,6 +58,7 @@ final class DriverCheckBotFlowTest extends TestCase
             $table->id();
             $table->string('name');
             $table->string('name_normalized')->index();
+            $table->string('role', 16)->default('operation');
             $table->string('telegram_username')->nullable();
             $table->unsignedBigInteger('telegram_id')->nullable();
             $table->boolean('is_active')->default(true);

@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Telegram;
 
 use App\Application\Telegram\Actions\NotifyTelegramResolverExhaustion;
+use App\Application\Telegram\Actions\ProcessClientCheckMessage;
 use App\Application\Telegram\Actions\ProcessCreatedDriverMessage;
 use App\Application\Telegram\Actions\ProcessTelegramDriverCheckResults;
 use App\Application\Telegram\Actions\ProcessUpdatedDriverMessage;
 use App\Application\Telegram\Actions\TelegramDriverCheckStarter;
+use App\Application\Telegram\Services\ClientCheckSender;
 use App\Application\Telegram\Services\TelegramDriverCheckChats;
 use App\Application\Telegram\Services\TelegramDriverCheckRecorder;
 use App\Application\Telegram\Services\TelegramMessageTypeDetector;
@@ -46,6 +48,12 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
      * without restarting the listener.
      */
     private const CHAT_REFRESH_PERIOD = 30.0;
+
+    /**
+     * How often client check comments and retries are looked at, seconds.
+     * Short, because a comment waits for its batch to go quiet first.
+     */
+    private const CLIENT_CHECK_PERIOD = 10.0;
 
     /**
      * Chats to watch, or null when onStart() could not run at all.
@@ -159,6 +167,31 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
                     'type' => $type?->value ?? null,
                 ],
             );
+
+            /*
+             * A CRM penalty is a client check, not a driver check: it has
+             * its own table and flow and never reaches the recorder below.
+             */
+            if ($type === TelegramDriverMessageType::PENALTY) {
+                app(
+                    ProcessClientCheckMessage::class,
+                )->execute(
+                    telegram: $this,
+                    chatId: (int) $chatId,
+                    messageId: $messageId,
+                    text: $text,
+                    raw: [
+                        'class' => $message::class,
+                        'id' => $message->id ?? null,
+                        'chat_id' => $message->chatId ?? null,
+                        'sender_id' => $message->senderId ?? null,
+                        'message' => $message->message ?? null,
+                        'date' => $message->date ?? null,
+                    ],
+                );
+
+                return;
+            }
 
             $check = app(
                 TelegramDriverCheckRecorder::class,
@@ -311,6 +344,32 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
          */
             Log::error(
                 'TelegramDriverCheckHandler: watch list refresh failed',
+                [
+                    'error' => $e->getMessage(),
+                    'exception' => $e::class,
+                ],
+            );
+        }
+    }
+
+    /**
+     * Client checks: the one comment per batch once the bot's burst is
+     * over, and the retries of what Telegram refused.
+     */
+    #[Cron(period: self::CLIENT_CHECK_PERIOD)]
+    public function flushClientChecks(): void
+    {
+        if ($this->targetChatIds === null || $this->restartRequested) {
+            return;
+        }
+
+        try {
+            app(
+                ClientCheckSender::class,
+            )->flush($this);
+        } catch (Throwable $e) {
+            Log::error(
+                'TelegramDriverCheckHandler: client check flush failed',
                 [
                     'error' => $e->getMessage(),
                     'exception' => $e::class,
