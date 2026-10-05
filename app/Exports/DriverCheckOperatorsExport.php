@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Exports;
 
+use App\Models\Telegram\OperationUser;
 use Illuminate\Support\Enumerable;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\FromCollection;
@@ -88,6 +89,10 @@ final class DriverCheckOperatorsExport implements FromCollection, ShouldAutoSize
                 'stats.best_score',
                 'stats.last_check_at',
             ])
+            /*
+             * Same people as the statistics page: operators only.
+             */
+            ->where('ou.role', OperationUser::ROLE_OPERATION)
             ->when($search, function ($q) use ($search) {
                 $like = '%'.$search.'%';
 

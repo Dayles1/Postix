@@ -64,7 +64,32 @@ final class ListOperators
             'failing' => (clone $base)
                 ->whereNotNull('dm_last_error')
                 ->count(),
+
+            /*
+             * The tab counters: how many people each role has, whatever
+             * the other filters say.
+             */
+            'roles' => $this->roleTotals(),
         ];
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    public function roleTotals(): array
+    {
+        $counts = OperationUser::query()
+            ->selectRaw('role, COUNT(*) as aggregate')
+            ->groupBy('role')
+            ->pluck('aggregate', 'role');
+
+        $totals = [];
+
+        foreach (OperationUser::ROLES as $role) {
+            $totals[$role] = (int) ($counts[$role] ?? 0);
+        }
+
+        return $totals;
     }
 
     /**
@@ -78,7 +103,9 @@ final class ListOperators
             ->withCount([
                 'drivers',
                 'checks',
-            ]);
+                'clientChecks as penalties_count',
+            ])
+            ->withMax('clientChecks as last_penalty_at', 'created_at');
 
         $search = trim(
             (string) ($filters['search'] ?? ''),
@@ -107,6 +134,17 @@ final class ListOperators
                 (bool) $filters['dm_enabled'],
             );
         }
+
+        /*
+         * Operators and sales managers are two lists on two pages; one
+         * without a role would mix them, so it never goes out unfiltered.
+         */
+        $query->where(
+            'role',
+            OperationUser::isRole($filters['role'] ?? null)
+                ? $filters['role']
+                : OperationUser::ROLE_OPERATION,
+        );
 
         /*
          * "Linked" means the operator can actually be reached: a username or
@@ -164,6 +202,8 @@ final class ListOperators
             'dm_last_sent_at',
             'drivers',
             'checks',
+            'penalties',
+            'last_penalty_at',
         ];
 
         $sort = (string) ($filters['sort'] ?? 'name');
@@ -181,6 +221,7 @@ final class ListOperators
         $column = match ($sort) {
             'drivers' => 'drivers_count',
             'checks' => 'checks_count',
+            'penalties' => 'penalties_count',
             default => $sort,
         };
 

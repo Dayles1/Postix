@@ -48,6 +48,12 @@ class OperatorStoreRequest extends FormRequest
             ],
 
             'dm_enabled' => ['nullable', 'boolean'],
+
+            'role' => [
+                'nullable',
+                'string',
+                Rule::in(OperationUser::ROLES),
+            ],
         ];
     }
 

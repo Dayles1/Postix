@@ -106,6 +106,11 @@ class MenuHelper
                         'name' => 'Telegram номера',
                         'path' => '/driver-check/resolved-phones',
                     ],
+                    [
+                        'icon' => 'support-ticket',
+                        'name' => 'Штрафы CRM',
+                        'path' => '/driver-check/penalties',
+                    ],
                 ],
             ],
             [
@@ -113,8 +118,18 @@ class MenuHelper
                 'items' => [
                     [
                         'icon' => 'operators',
-                        'name' => 'Управление операторами',
+                        'name' => 'Операторы (Operation)',
                         'path' => '/driver-check/operators',
+                    ],
+                    [
+                        'icon' => 'ecommerce',
+                        'name' => 'Sales',
+                        'path' => '/driver-check/sales',
+                    ],
+                    [
+                        'icon' => 'support-ticket',
+                        'name' => 'Настройки штрафов',
+                        'path' => '/driver-check/penalties/settings',
                     ],
                     [
                         'icon' => 'chat',

@@ -1,15 +1,27 @@
 @extends('layouts.app')
 
-@section('title', __('telegram.operators.title'))
+{{--
+    One page, two lists: operators (/driver-check/operators) and sales
+    managers (/driver-check/sales). $role is fixed by the route; the tabs on
+    top are links between the two, so each has its own menu entry and URL.
+--}}
+@php
+    $page = __("telegram.operators.pages.{$role}");
+    $isSales = $role === \App\Models\Telegram\OperationUser::ROLE_SALES;
+@endphp
+
+@section('title', $page['title'])
 
 @section('content')
 
 <div
     x-data="dcOperators({
+        role: @js($role),
         endpoints: {
             index: @js(route('api.telegram.operators.index')),
             store: @js(route('api.telegram.operators.store')),
             base: @js(url('/api/telegram/operators')),
+            penalties: @js(route('driver-check.penalties')),
         },
         translations: @js(__('telegram.operators')),
         ui: @js(__('telegram.ui')),
@@ -24,8 +36,8 @@
             icon="operator"
             tone="brand"
             eyebrow="Telegram"
-            :title="__('telegram.operators.title')"
-            :description="__('telegram.operators.description')"
+            :title="$page['title']"
+            :description="$page['description']"
         >
             <x-slot:actions>
                 <x-driver-check.button x-on:click="load()" ::disabled="loading">
@@ -38,17 +50,48 @@
                 </x-driver-check.button>
 
                 <x-driver-check.button variant="primary" icon="plus" x-on:click="openCreate()">
-                    {{ __('telegram.operators.create') }}
+                    {{ $page['create'] }}
                 </x-driver-check.button>
             </x-slot:actions>
         </x-driver-check.page-header>
+
+        {{-- ============================================================
+             Operation | Sales
+        ============================================================= --}}
+        <nav
+            class="inline-flex w-full gap-1 rounded-2xl border border-gray-200 bg-white p-1 sm:w-auto
+                   dark:border-gray-800 dark:bg-white/[0.03]"
+            aria-label="{{ __('telegram.operators.form.role') }}"
+        >
+            @foreach (\App\Models\Telegram\OperationUser::ROLES as $tab)
+                <a
+                    href="{{ $tab === \App\Models\Telegram\OperationUser::ROLE_SALES ? route('driver-check.sales') : route('driver-check.operators') }}"
+                    @if ($tab === $role) aria-current="page" @endif
+                    class="dc-tap inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl px-4 text-sm font-medium
+                           transition sm:flex-none
+                           {{ $tab === $role
+                               ? 'bg-brand-500 text-white shadow-sm shadow-brand-500/25'
+                               : 'text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-white/[0.06]' }}"
+                >
+                    {{ __("telegram.operators.tabs.{$tab}") }}
+
+                    <span
+                        class="inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold tabular-nums
+                               {{ $tab === $role
+                                   ? 'bg-white/20 text-white'
+                                   : 'bg-gray-100 text-gray-600 dark:bg-white/[0.08] dark:text-gray-300' }}"
+                        x-text="number(stats.roles[@js($tab)])"
+                    >0</span>
+                </a>
+            @endforeach
+        </nav>
 
         {{-- ============================================================
              Counters
         ============================================================= --}}
         <section class="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
             <x-driver-check.stat-card
-                :label="__('telegram.operators.stats.total')"
+                :label="$page['total']"
                 icon="users"
             >
                 <span x-text="number(stats.total)">0</span>
@@ -116,14 +159,23 @@
         ============================================================= --}}
         <x-driver-check.surface class="overflow-hidden" x-ref="listTop">
             <x-driver-check.list-toolbar
-                :title="__('telegram.operators.title')"
-                :sort-options="[
-                    'name' => __('telegram.operators.table.operator'),
-                    'drivers' => __('telegram.operators.table.drivers'),
-                    'checks' => __('telegram.operators.table.checks'),
-                    'dm_last_sent_at' => __('telegram.operators.table.last_sent'),
-                    'created_at' => __('telegram.ui.created'),
-                ]"
+                :title="$page['title']"
+                :sort-options="$isSales
+                    ? [
+                        'name' => __('telegram.operators.table.operator'),
+                        'penalties' => __('telegram.operators.table.penalties'),
+                        'last_penalty_at' => __('telegram.operators.table.last_penalty'),
+                        'dm_last_sent_at' => __('telegram.operators.table.last_sent'),
+                        'created_at' => __('telegram.ui.created'),
+                    ]
+                    : [
+                        'name' => __('telegram.operators.table.operator'),
+                        'drivers' => __('telegram.operators.table.drivers'),
+                        'checks' => __('telegram.operators.table.checks'),
+                        'penalties' => __('telegram.operators.table.penalties'),
+                        'dm_last_sent_at' => __('telegram.operators.table.last_sent'),
+                        'created_at' => __('telegram.ui.created'),
+                    ]"
             />
 
             {{-- Table (lg and up) --}}
@@ -131,13 +183,24 @@
                 <div class="overflow-x-auto">
                     <table class="w-full min-w-[960px] table-fixed text-left">
                         <colgroup>
-                            <col class="w-[24%]">
-                            <col class="w-[20%]">
-                            <col class="w-[14%]">
-                            <col class="w-[8%]">
-                            <col class="w-[8%]">
-                            <col class="w-[16%]">
-                            <col class="w-[10%]">
+                            @if ($isSales)
+                                <col class="w-[25%]">
+                                <col class="w-[19%]">
+                                <col class="w-[13%]">
+                                <col class="w-[9%]">
+                                <col class="w-[13%]">
+                                <col class="w-[13%]">
+                                <col class="w-[8%]">
+                            @else
+                                <col class="w-[22%]">
+                                <col class="w-[18%]">
+                                <col class="w-[13%]">
+                                <col class="w-[8%]">
+                                <col class="w-[8%]">
+                                <col class="w-[8%]">
+                                <col class="w-[15%]">
+                                <col class="w-[8%]">
+                            @endif
                         </colgroup>
 
                         <thead class="border-b border-gray-200 bg-gray-50/70 dark:border-gray-800 dark:bg-white/[0.02]">
@@ -145,15 +208,21 @@
                                 <th scope="col" class="px-4 py-2.5 font-semibold">{{ __('telegram.operators.table.operator') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.operators.table.telegram') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.operators.table.dm') }}</th>
-                                <th scope="col" class="px-3 py-2.5 text-right font-semibold">{{ __('telegram.operators.table.drivers') }}</th>
-                                <th scope="col" class="px-3 py-2.5 text-right font-semibold">{{ __('telegram.operators.table.checks') }}</th>
+                                @unless ($isSales)
+                                    <th scope="col" class="px-3 py-2.5 text-right font-semibold">{{ __('telegram.operators.table.drivers') }}</th>
+                                    <th scope="col" class="px-3 py-2.5 text-right font-semibold">{{ __('telegram.operators.table.checks') }}</th>
+                                @endunless
+                                <th scope="col" class="px-3 py-2.5 text-right font-semibold">{{ __('telegram.operators.table.penalties') }}</th>
+                                @if ($isSales)
+                                    <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.operators.table.last_penalty') }}</th>
+                                @endif
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.operators.table.last_sent') }}</th>
                                 <th scope="col" class="px-4 py-2.5 text-right font-semibold">{{ __('telegram.operators.table.actions') }}</th>
                             </tr>
                         </thead>
 
                         <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                            <x-driver-check.skeleton-rows :cols="7" />
+                            <x-driver-check.skeleton-rows :cols="$isSales ? 7 : 8" />
 
                             <template x-for="row in rows" :key="row.id">
                                 <tr class="group align-middle transition hover:bg-gray-50/70 dark:hover:bg-white/[0.02]">
@@ -223,15 +292,44 @@
                                         </x-driver-check.badge>
                                     </td>
 
-                                    <td
-                                        class="px-3 py-3 text-right text-sm tabular-nums text-gray-700 dark:text-gray-300"
-                                        x-text="number(row.drivers_count)"
-                                    ></td>
+                                    @unless ($isSales)
+                                        <td
+                                            class="px-3 py-3 text-right text-sm tabular-nums text-gray-700 dark:text-gray-300"
+                                            x-text="number(row.drivers_count)"
+                                        ></td>
 
-                                    <td
-                                        class="px-3 py-3 text-right text-sm tabular-nums text-gray-700 dark:text-gray-300"
-                                        x-text="number(row.checks_count)"
-                                    ></td>
+                                        <td
+                                            class="px-3 py-3 text-right text-sm tabular-nums text-gray-700 dark:text-gray-300"
+                                            x-text="number(row.checks_count)"
+                                        ></td>
+                                    @endunless
+
+                                    {{-- Penalties: a link to the penalties page, narrowed to this person --}}
+                                    <td class="px-3 py-3 text-right text-sm tabular-nums">
+                                        <a
+                                            x-show="row.penalties_count > 0"
+                                            :href="penaltiesUrl(row)"
+                                            class="font-medium text-brand-600 hover:underline dark:text-brand-400"
+                                            :title="translations.table.open_penalties"
+                                            x-text="number(row.penalties_count)"
+                                        ></a>
+                                        <span
+                                            x-show="row.penalties_count === 0"
+                                            class="text-gray-400 dark:text-gray-500"
+                                        >0</span>
+                                    </td>
+
+                                    @if ($isSales)
+                                        <td class="px-3 py-3">
+                                            <p
+                                                class="text-[13px] text-gray-700 dark:text-gray-300"
+                                                :title="row.last_penalty_at ? date(row.last_penalty_at) : ''"
+                                                x-text="row.last_penalty_at
+                                                    ? relative(row.last_penalty_at)
+                                                    : translations.table.no_penalties"
+                                            ></p>
+                                        </td>
+                                    @endif
 
                                     {{-- Last delivery --}}
                                     <td class="px-3 py-3">
@@ -300,13 +398,33 @@
                                 ></span>
                             </x-driver-check.kv>
 
-                            <x-driver-check.kv :label="__('telegram.operators.table.drivers')">
-                                <span class="tabular-nums" x-text="number(row.drivers_count)"></span>
+                            @unless ($isSales)
+                                <x-driver-check.kv :label="__('telegram.operators.table.drivers')">
+                                    <span class="tabular-nums" x-text="number(row.drivers_count)"></span>
+                                </x-driver-check.kv>
+
+                                <x-driver-check.kv :label="__('telegram.operators.table.checks')">
+                                    <span class="tabular-nums" x-text="number(row.checks_count)"></span>
+                                </x-driver-check.kv>
+                            @endunless
+
+                            <x-driver-check.kv :label="__('telegram.operators.table.penalties')">
+                                <a
+                                    x-show="row.penalties_count > 0"
+                                    :href="penaltiesUrl(row)"
+                                    class="tabular-nums font-medium text-brand-600 dark:text-brand-400"
+                                    x-text="number(row.penalties_count)"
+                                ></a>
+                                <span x-show="row.penalties_count === 0" class="tabular-nums">0</span>
                             </x-driver-check.kv>
 
-                            <x-driver-check.kv :label="__('telegram.operators.table.checks')">
-                                <span class="tabular-nums" x-text="number(row.checks_count)"></span>
-                            </x-driver-check.kv>
+                            @if ($isSales)
+                                <x-driver-check.kv :label="__('telegram.operators.table.last_penalty')">
+                                    <span x-text="row.last_penalty_at
+                                        ? relative(row.last_penalty_at)
+                                        : translations.table.no_penalties"></span>
+                                </x-driver-check.kv>
+                            @endif
 
                             <x-driver-check.kv :label="__('telegram.operators.table.last_sent')" class="col-span-2">
                                 <span x-text="row.dm_last_sent_at
@@ -334,12 +452,12 @@
 
             <x-driver-check.empty-state
                 icon="operator"
-                :title="__('telegram.operators.empty.title')"
-                :description="__('telegram.operators.empty.description')"
+                :title="$page['empty_title']"
+                :description="$page['empty_description']"
             >
                 <div class="mt-3">
                     <x-driver-check.button variant="primary" size="sm" icon="plus" x-on:click="openCreate()">
-                        {{ __('telegram.operators.create') }}
+                        {{ $page['create'] }}
                     </x-driver-check.button>
                 </div>
             </x-driver-check.empty-state>
@@ -357,7 +475,7 @@
         size="sm:max-w-lg"
     >
         <x-slot:heading>
-            <span x-text="form.id ? translations.form.edit_title : translations.form.create_title"></span>
+            <span x-text="form.id ? @js($page['edit_title']) : @js($page['create'])"></span>
         </x-slot:heading>
 
         <form id="operator-form" x-on:submit.prevent="save()" class="flex flex-col gap-4">
@@ -365,7 +483,7 @@
             {{-- Name --}}
             <x-driver-check.field
                 :label="__('telegram.operators.form.name')"
-                :hint="__('telegram.operators.form.name_hint')"
+                :hint="$page['name_hint']"
                 for="operator-name"
             >
                 <x-driver-check.input
@@ -454,6 +572,27 @@
                 </x-slot:error>
             </x-driver-check.field>
 
+            {{-- Operation or Sales --}}
+            <x-driver-check.field
+                :label="__('telegram.operators.form.role')"
+                :hint="__('telegram.operators.form.role_hint')"
+                for="operator-role"
+            >
+                <x-driver-check.select id="operator-role" x-model="form.role">
+                    <option value="operation">{{ __('telegram.operators.roles.operation') }}</option>
+                    <option value="sales">{{ __('telegram.operators.roles.sales') }}</option>
+                </x-driver-check.select>
+
+                <x-slot:error>
+                    <p
+                        x-show="fieldError('role')"
+                        x-cloak
+                        class="mt-1 text-[11px] font-medium text-error-600 dark:text-error-400"
+                        x-text="fieldError('role')"
+                    ></p>
+                </x-slot:error>
+            </x-driver-check.field>
+
             {{-- The only switch: copy the report into the operator's private chat --}}
             <label
                 class="dc-tap flex cursor-pointer items-start gap-3 rounded-2xl border p-3.5 transition"
@@ -473,7 +612,7 @@
                         {{ __('telegram.operators.form.dm_enabled') }}
                     </span>
                     <span class="mt-0.5 block text-[11px] leading-snug text-gray-500 dark:text-gray-400">
-                        {{ __('telegram.operators.form.dm_enabled_hint') }}
+                        {{ $page['dm_enabled_hint'] }}
                     </span>
                 </span>
             </label>
@@ -485,6 +624,41 @@
                        dark:bg-error-500/10 dark:text-error-400"
                 x-text="formError"
             ></p>
+
+            {{-- Delete: only a row nothing points at yet --}}
+            <div
+                x-show="form.id && form.deletable"
+                x-cloak
+                class="flex flex-col gap-2 rounded-2xl border border-gray-200 p-3.5 sm:flex-row sm:items-center sm:justify-between
+                       dark:border-gray-800"
+            >
+                <p
+                    class="text-[11px] leading-snug text-gray-500 dark:text-gray-400"
+                    x-text="deleteArmed ? translations.confirm.delete_text : translations.form.delete_hint"
+                ></p>
+
+                <div class="flex shrink-0 gap-2">
+                    <x-driver-check.button
+                        size="sm"
+                        variant="ghost"
+                        x-show="deleteArmed"
+                        x-cloak
+                        x-on:click="deleteArmed = false"
+                        ::disabled="saving"
+                    >
+                        {{ __('telegram.operators.confirm.cancel') }}
+                    </x-driver-check.button>
+
+                    <x-driver-check.button
+                        size="sm"
+                        variant="danger"
+                        x-on:click="remove()"
+                        ::disabled="saving"
+                    >
+                        <span x-text="deleteArmed ? translations.confirm.delete : translations.form.delete"></span>
+                    </x-driver-check.button>
+                </div>
+            </div>
         </form>
 
         <x-slot:footer>

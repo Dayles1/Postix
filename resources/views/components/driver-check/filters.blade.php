@@ -13,6 +13,10 @@
 
 <x-driver-check.surface class="p-3 sm:p-4">
     <div class="flex flex-col gap-3">
+        {{-- Optional: what narrows the list before anything is typed (tabs, an active chip). --}}
+        @isset($leading)
+            {{ $leading }}
+        @endisset
 
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
             @if ($searchPlaceholder !== null)

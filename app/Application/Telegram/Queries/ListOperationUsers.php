@@ -181,7 +181,16 @@ final class ListOperationUsers
              * =====================================================
              */
 
-            ->withCount('checks');
+            ->withCount('checks')
+
+            /*
+             * The driver-check statistics are about operators; sales
+             * managers only ever get CRM penalties.
+             */
+            ->where(
+                'operation_users.role',
+                OperationUser::ROLE_OPERATION,
+            );
 
         /*
          * =========================================================

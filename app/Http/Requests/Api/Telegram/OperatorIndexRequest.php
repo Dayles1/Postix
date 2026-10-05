@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Api\Telegram;
 
+use App\Models\Telegram\OperationUser;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -20,6 +21,7 @@ class OperatorIndexRequest extends FormRequest
             'search' => ['nullable', 'string', 'max:255'],
             'dm_enabled' => ['nullable', 'boolean'],
             'linked' => ['nullable', 'boolean'],
+            'role' => ['nullable', 'string', Rule::in(OperationUser::ROLES)],
             'sort' => [
                 'nullable',
                 'string',
@@ -30,6 +32,8 @@ class OperatorIndexRequest extends FormRequest
                     'dm_last_sent_at',
                     'drivers',
                     'checks',
+                    'penalties',
+                    'last_penalty_at',
                 ]),
             ],
             'direction' => ['nullable', 'in:asc,desc'],

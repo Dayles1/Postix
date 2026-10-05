@@ -98,6 +98,7 @@ class OperatorNotificationTest extends TestCase
                 $table->id();
                 $table->string('name');
                 $table->string('name_normalized')->index();
+                $table->string('role', 16)->default('operation');
                 $table->string('telegram_username')->nullable();
                 $table->unsignedBigInteger('telegram_id')->nullable();
                 $table->boolean('is_active')->default(true);
@@ -275,7 +276,11 @@ class OperatorNotificationTest extends TestCase
         $this->assertSame([], $this->messages->sent);
     }
 
-    public function test_inactive_operator_is_skipped(): void
+    /**
+     * The active/inactive switch was dropped in favour of dm_enabled alone;
+     * a row still carrying is_active = false must not be silently muted.
+     */
+    public function test_the_retired_active_flag_does_not_mute_an_operator(): void
     {
         $operator = $this->operator([
             'is_active' => false,
@@ -287,7 +292,7 @@ class OperatorNotificationTest extends TestCase
             'REPORT BODY',
         );
 
-        $this->assertSame([], $this->messages->sent);
+        $this->assertSame(['@fazliddin'], $this->messages->peers());
     }
 
     public function test_check_without_an_operator_is_skipped(): void

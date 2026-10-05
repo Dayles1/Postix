@@ -10,6 +10,8 @@
 
 import { createListPage } from './list-page';
 import { sessionsPage } from './sessions';
+import { penaltiesPage } from './penalties';
+import { penaltySettingsPage } from './penalty-settings';
 import { queuePage, watchdogPage } from './monitoring';
 import { statusType } from './status';
 
@@ -23,8 +25,26 @@ function operatorsPage(config) {
     const t = config.translations;
     const ui = config.ui;
 
+    /*
+     * Fixed by the page: /driver-check/operators lists operators,
+     * /driver-check/sales lists sales managers. Never a filter.
+     */
+    const role = config.role === 'sales' ? 'sales' : 'operation';
+
+    const emptyForm = () => ({
+        id: null,
+        name: '',
+        telegram_username: '',
+        telegram_id: '',
+        dm_enabled: true,
+        role,
+        deletable: false,
+    });
+
     return {
         ui,
+
+        role,
 
         ...createListPage({
             endpoint: config.endpoints.index,
@@ -35,6 +55,7 @@ function operatorsPage(config) {
                 search: '',
                 dm_enabled: '',
                 linked: '',
+                role,
                 sort: 'name',
                 direction: 'asc',
                 per_page: 20,
@@ -47,6 +68,10 @@ function operatorsPage(config) {
                     linked: Number(json.stats?.linked ?? 0),
                     dm_enabled: Number(json.stats?.dm_enabled ?? 0),
                     failing: Number(json.stats?.failing ?? 0),
+                    roles: {
+                        operation: Number(json.stats?.roles?.operation ?? 0),
+                        sales: Number(json.stats?.roles?.sales ?? 0),
+                    },
                 };
             },
         }),
@@ -55,7 +80,7 @@ function operatorsPage(config) {
 
         csrf: document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
 
-        stats: { total: 0, linked: 0, dm_enabled: 0, failing: 0 },
+        stats: { total: 0, linked: 0, dm_enabled: 0, failing: 0, roles: { operation: 0, sales: 0 } },
 
         formOpen: false,
 
@@ -65,16 +90,25 @@ function operatorsPage(config) {
 
         formErrors: {},
 
-        form: {
-            id: null,
-            name: '',
-            telegram_username: '',
-            telegram_id: '',
-            dm_enabled: true,
-        },
+        /** Delete takes two clicks: the first one only asks. */
+        deleteArmed: false,
+
+        form: emptyForm(),
 
         init() {
-            this.initList();
+            this.readUrl();
+
+            /* A ?role= in a hand-edited URL must not swap the page's list. */
+            this.filters.role = role;
+
+            this.load();
+        },
+
+        /**
+         * The penalties page, narrowed to one person.
+         */
+        penaltiesUrl(row) {
+            return `${this.endpoints.penalties}?operation_user_id=${encodeURIComponent(row.id)}`;
         },
 
         /*
@@ -143,13 +177,7 @@ function operatorsPage(config) {
         */
 
         openCreate() {
-            this.form = {
-                id: null,
-                name: '',
-                telegram_username: '',
-                telegram_id: '',
-                dm_enabled: true,
-            };
+            this.form = emptyForm();
 
             this.openForm();
         },
@@ -161,6 +189,8 @@ function operatorsPage(config) {
                 telegram_username: row.telegram_username || '',
                 telegram_id: row.telegram_id ?? '',
                 dm_enabled: !!row.dm_enabled,
+                role: row.role || role,
+                deletable: !!row.deletable,
             };
 
             this.openForm();
@@ -176,6 +206,7 @@ function operatorsPage(config) {
         openForm() {
             this.formError = null;
             this.formErrors = {};
+            this.deleteArmed = false;
             this.formOpen = true;
 
             this.$nextTick(() => {
@@ -240,6 +271,7 @@ function operatorsPage(config) {
                             ? null
                             : Number(this.form.telegram_id),
                         dm_enabled: this.form.dm_enabled,
+                        role: this.form.role,
                     }),
                 });
 
@@ -256,11 +288,59 @@ function operatorsPage(config) {
 
                 this.formOpen = false;
 
-                this.notify(editing ? t.messages.updated : t.messages.created);
+                /*
+                 * Saved under the other role, the row leaves this list:
+                 * say where it went rather than let it vanish.
+                 */
+                this.notify(
+                    this.form.role !== role
+                        ? t.messages.moved.replace(':role', t.tabs[this.form.role] ?? this.form.role)
+                        : (editing ? t.messages.updated : t.messages.created),
+                );
 
                 this.load();
             } catch (error) {
                 this.formError = error?.message || t.errors.save;
+            } finally {
+                this.saving = false;
+            }
+        },
+
+        async remove() {
+            if (this.saving || !this.form.id) {
+                return;
+            }
+
+            if (!this.deleteArmed) {
+                this.deleteArmed = true;
+
+                return;
+            }
+
+            this.saving = true;
+            this.formError = null;
+
+            try {
+                const response = await fetch(`${this.endpoints.base}/${this.form.id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': this.csrf,
+                    },
+                    credentials: 'same-origin',
+                });
+
+                await this.readJson(response);
+
+                this.formOpen = false;
+
+                this.notify(t.messages.deleted);
+
+                this.load();
+            } catch (error) {
+                this.formError = error?.message || t.errors.delete;
+                this.deleteArmed = false;
             } finally {
                 this.saving = false;
             }
@@ -1073,6 +1153,8 @@ export function registerDriverCheck(Alpine) {
     Alpine.data('dcResolvedPhones', resolvedPhonesPage);
     Alpine.data('dcChats', chatsPage);
     Alpine.data('dcSessions', sessionsPage);
+    Alpine.data('dcPenalties', penaltiesPage);
+    Alpine.data('dcPenaltySettings', penaltySettingsPage);
     Alpine.data('dcWatchdog', watchdogPage);
     Alpine.data('dcQueue', queuePage);
 }

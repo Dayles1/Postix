@@ -32,7 +32,33 @@ final class DriverCheckController extends Controller
     public function operators()
     {
         return view(
-            'pages.driver-check.operators'
+            'pages.driver-check.operators',
+            ['role' => OperationUser::ROLE_OPERATION],
+        );
+    }
+
+    /**
+     * Same page as operators(), fixed to the other role.
+     */
+    public function sales()
+    {
+        return view(
+            'pages.driver-check.operators',
+            ['role' => OperationUser::ROLE_SALES],
+        );
+    }
+
+    public function penalties()
+    {
+        return view(
+            'pages.driver-check.penalties'
+        );
+    }
+
+    public function penaltySettings()
+    {
+        return view(
+            'pages.driver-check.penalty-settings'
         );
     }
 

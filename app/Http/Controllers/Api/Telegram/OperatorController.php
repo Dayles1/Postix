@@ -44,7 +44,7 @@ final class OperatorController extends Controller
         );
 
         return (new OperatorResource(
-            $operator->loadCount(['drivers', 'checks']),
+            $this->withCounts($operator),
         ))
             ->response()
             ->setStatusCode(201);
@@ -73,23 +73,25 @@ final class OperatorController extends Controller
         $operationUser->update($attributes);
 
         return new OperatorResource(
-            $operationUser->loadCount(['drivers', 'checks']),
+            $this->withCounts($operationUser),
         );
     }
 
     /**
-     * Operators accumulate history, and the driver/check foreign keys are
-     * nullOnDelete - deleting one would silently detach every driver and check
-     * it ever produced. So a used operator can only be deactivated.
+     * People accumulate history, and the driver, check and penalty foreign
+     * keys are nullOnDelete - deleting one would silently detach everything
+     * they ever produced. So only a row nothing points at can go; a used one
+     * is muted with dm_enabled instead.
      */
     public function destroy(
         OperationUser $operationUser,
     ): JsonResponse {
-        $operationUser->loadCount(['drivers', 'checks']);
+        $this->withCounts($operationUser);
 
         if (
             $operationUser->drivers_count > 0
             || $operationUser->checks_count > 0
+            || $operationUser->penalties_count > 0
         ) {
             return response()->json(
                 [
@@ -109,6 +111,21 @@ final class OperatorController extends Controller
     }
 
     /**
+     * The same counters the list shows, so a saved row comes back looking
+     * like the one it replaces.
+     */
+    private function withCounts(OperationUser $operationUser): OperationUser
+    {
+        return $operationUser
+            ->loadCount([
+                'drivers',
+                'checks',
+                'clientChecks as penalties_count',
+            ])
+            ->loadMax('clientChecks as last_penalty_at', 'created_at');
+    }
+
+    /**
      * @param  array<string, mixed> $validated
      * @return array<string, mixed>
      */
@@ -124,6 +141,12 @@ final class OperatorController extends Controller
             'telegram_id' => $validated['telegram_id'] ?? null,
 
             'dm_enabled' => (bool) ($validated['dm_enabled'] ?? true),
+
+            /*
+             * Left out when not submitted, so an edit that does not touch it
+             * never turns a sales manager back into an operator.
+             */
+            ...(isset($validated['role']) ? ['role' => $validated['role']] : []),
         ];
     }
 }

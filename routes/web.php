@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Api\Telegram\ClientCheckController;
+use App\Http\Controllers\Api\Telegram\ClientCheckRulesController;
 use App\Http\Controllers\Api\Telegram\DriverCheckChatController;
 use App\Http\Controllers\Api\Telegram\DriverCheckExportController;
 use App\Http\Controllers\Api\Telegram\DriverCheckQueueController;
@@ -186,6 +188,29 @@ Route::middleware(['auth', 'role:driverCheck,superadmin'])
         )->name('driver-check.operators');
 
         /*
+         * Sales managers: the same people page, the other role. They come
+         * from the CRM penalties, never from the driver-check groups.
+         */
+        Route::get(
+            '/sales',
+            [DriverCheckController::class, 'sales']
+        )->name('driver-check.sales');
+
+        /*
+         * CRM penalties (client checks): what was forwarded to whom, and
+         * whether it arrived.
+         */
+        Route::get(
+            '/penalties',
+            [DriverCheckController::class, 'penalties']
+        )->name('driver-check.penalties');
+
+        Route::get(
+            '/penalties/settings',
+            [DriverCheckController::class, 'penaltySettings']
+        )->name('driver-check.penalties.settings');
+
+        /*
          * Watched chats
          *
          * The groups the listener follows. Editable here so a new group can
@@ -307,6 +332,45 @@ Route::middleware(['auth', 'role:driverCheck,superadmin'])
             '/operators/{operationUser}',
             [OperatorController::class, 'destroy']
         )->name('api.telegram.operators.destroy');
+
+        /*
+         * CRM penalties (read only)
+         */
+        Route::get(
+            '/client-checks',
+            [ClientCheckController::class, 'index']
+        )->name('api.telegram.client-checks.index');
+
+        /*
+         * The on/off switches of the penalty flow
+         */
+        Route::get(
+            '/client-checks/settings',
+            [ClientCheckController::class, 'settings']
+        )->name('api.telegram.client-checks.settings');
+
+        Route::put(
+            '/client-checks/settings',
+            [ClientCheckController::class, 'updateSettings']
+        )->name('api.telegram.client-checks.settings.update');
+
+        /*
+         * Levels, conditions, phrases and timings of the penalty flow
+         */
+        Route::get(
+            '/client-checks/rules',
+            [ClientCheckRulesController::class, 'show']
+        )->name('api.telegram.client-checks.rules');
+
+        Route::put(
+            '/client-checks/rules',
+            [ClientCheckRulesController::class, 'update']
+        )->name('api.telegram.client-checks.rules.update');
+
+        Route::delete(
+            '/client-checks/rules',
+            [ClientCheckRulesController::class, 'destroy']
+        )->name('api.telegram.client-checks.rules.reset');
 
         /*
          * Watched chats (management CRUD)

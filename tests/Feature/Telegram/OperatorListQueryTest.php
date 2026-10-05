@@ -5,6 +5,7 @@ namespace Tests\Feature\Telegram;
 use App\Application\Telegram\Queries\ListOperators;
 use App\Models\Telegram\OperationUser;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
@@ -18,6 +19,7 @@ class OperatorListQueryTest extends TestCase
          * The project migrations are MySQL-only (duplicate index names across
          * tables), so only the tables this query touches are created here.
          */
+        Schema::dropIfExists('telegram_client_checks');
         Schema::dropIfExists('telegram_driver_checks');
         Schema::dropIfExists('telegram_drivers');
         Schema::dropIfExists('operation_users');
@@ -28,6 +30,7 @@ class OperatorListQueryTest extends TestCase
                 $table->id();
                 $table->string('name');
                 $table->string('name_normalized')->index();
+                $table->string('role', 16)->default('operation');
                 $table->string('telegram_username')->nullable();
                 $table->unsignedBigInteger('telegram_id')->nullable();
                 $table->boolean('is_active')->default(true);
@@ -56,6 +59,16 @@ class OperatorListQueryTest extends TestCase
                 $table->id();
                 $table->unsignedBigInteger('operation_user_id')->nullable();
                 $table->string('status')->nullable();
+                $table->timestamps();
+            }
+        );
+
+        Schema::create(
+            'telegram_client_checks',
+            function (Blueprint $table): void {
+                $table->id();
+                $table->unsignedBigInteger('operation_user_id')->nullable();
+                $table->string('status', 16)->default('pending');
                 $table->timestamps();
             }
         );
@@ -178,17 +191,18 @@ class OperatorListQueryTest extends TestCase
         );
     }
 
-    public function test_status_and_dm_filters(): void
+    public function test_dm_filter(): void
     {
-        $this->assertSame(
-            ['EPSILON OPERATOR'],
-            $this->names(['is_active' => false]),
-        );
-
         $this->assertSame(
             ['DELTA OPERATOR'],
             $this->names(['dm_enabled' => false]),
         );
+
+        /*
+         * The active/inactive switch is gone (dm_enabled is the one switch),
+         * so the old filter is ignored rather than narrowing the list.
+         */
+        $this->assertCount(5, $this->names(['is_active' => false]));
     }
 
     public function test_stats_count_the_whole_filtered_set(): void
@@ -196,16 +210,92 @@ class OperatorListQueryTest extends TestCase
         $stats = (new ListOperators())->stats([]);
 
         $this->assertSame(5, $stats['total']);
-        $this->assertSame(4, $stats['active']);
+        $this->assertArrayNotHasKey('active', $stats);
         $this->assertSame(4, $stats['linked']);
 
         /*
-         * Only ALPHA and BETA pass all three conditions: active, dm_enabled
-         * and reachable. DELTA is muted, EPSILON is deactivated, GAMMA has no
-         * contact.
+         * dm_enabled and reachable: ALPHA, BETA and EPSILON. DELTA is muted,
+         * GAMMA has no contact. EPSILON's leftover is_active = false no
+         * longer counts.
          */
-        $this->assertSame(2, $stats['dm_enabled']);
+        $this->assertSame(3, $stats['dm_enabled']);
         $this->assertSame(1, $stats['failing']);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Operation | Sales
+    |--------------------------------------------------------------------------
+    */
+
+    private function sales(string $name, array $attributes = []): OperationUser
+    {
+        return OperationUser::query()->create([
+            'name' => $name,
+            'name_normalized' => OperationUser::normalizeName($name),
+            'role' => OperationUser::ROLE_SALES,
+            ...$attributes,
+        ]);
+    }
+
+    public function test_the_two_roles_are_never_listed_together(): void
+    {
+        $this->sales('ZETA SALES', ['telegram_username' => 'zeta']);
+
+        /* No role means operators - the list is never mixed. */
+        $this->assertNotContains('ZETA SALES', $this->names([]));
+        $this->assertCount(5, $this->names(['role' => OperationUser::ROLE_OPERATION]));
+
+        $this->assertSame(['ZETA SALES'], $this->names(['role' => OperationUser::ROLE_SALES]));
+
+        /* An unknown role falls back to operators instead of listing everyone. */
+        $this->assertCount(5, $this->names(['role' => 'boss']));
+    }
+
+    public function test_stats_follow_the_role_and_the_tabs_count_both(): void
+    {
+        $this->sales('ZETA SALES', ['telegram_username' => 'zeta']);
+        $this->sales('ETA SALES');
+
+        $sales = (new ListOperators())->stats(['role' => OperationUser::ROLE_SALES]);
+
+        $this->assertSame(2, $sales['total']);
+        $this->assertSame(1, $sales['linked']);
+        $this->assertSame(
+            [OperationUser::ROLE_OPERATION => 5, OperationUser::ROLE_SALES => 2],
+            $sales['roles'],
+        );
+
+        /* The tab counters ignore the other filters too. */
+        $filtered = (new ListOperators())->stats(['search' => 'alpha']);
+
+        $this->assertSame(1, $filtered['total']);
+        $this->assertSame(5, $filtered['roles'][OperationUser::ROLE_OPERATION]);
+    }
+
+    public function test_penalties_are_counted_and_sortable(): void
+    {
+        $zeta = $this->sales('ZETA SALES');
+        $eta = $this->sales('ETA SALES');
+
+        foreach ([$zeta, $zeta, $eta] as $person) {
+            DB::table('telegram_client_checks')->insert([
+                'operation_user_id' => $person->id,
+                'status' => 'sent',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $rows = (new ListOperators())->execute([
+            'role' => OperationUser::ROLE_SALES,
+            'sort' => 'penalties',
+            'direction' => 'desc',
+        ]);
+
+        $this->assertSame(['ZETA SALES', 'ETA SALES'], $rows->pluck('name')->all());
+        $this->assertSame([2, 1], $rows->pluck('penalties_count')->map(fn ($n) => (int) $n)->all());
+        $this->assertNotNull($rows->first()->last_penalty_at);
     }
 
     public function test_per_page_is_honoured(): void
