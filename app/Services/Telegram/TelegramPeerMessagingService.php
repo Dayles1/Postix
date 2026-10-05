@@ -726,15 +726,15 @@ class TelegramPeerMessagingService
 
         $participant = $this->safeGetParticipant($resolvedPeer);
 
-        Log::info('telegram_inspect_chat_peer_participant', [
-            'raw_peer' => $rawPeer,
-            'resolved_peer' => $resolvedPeer,
-            'participant_is_null' => $participant === null,
-            'participant_type' => is_array($participant)
-                ? ($participant['participant']['_'] ?? $participant['_'] ?? null)
-                : null,
-            'participant_keys' => is_array($participant) ? array_keys($participant) : null,
-        ]);
+        // Log::info('telegram_inspect_chat_peer_participant', [
+        //     'raw_peer' => $rawPeer,
+        //     'resolved_peer' => $resolvedPeer,
+        //     'participant_is_null' => $participant === null,
+        //     'participant_type' => is_array($participant)
+        //         ? ($participant['participant']['_'] ?? $participant['_'] ?? null)
+        //         : null,
+        //     'participant_keys' => is_array($participant) ? array_keys($participant) : null,
+        // ]);
 
         if (!$fromInviteAlready) {
             if ($participant === null) {

@@ -234,25 +234,25 @@ class MessageGroupController extends Controller
     {
         $user = $request->user();
         $isSuperadmin = optional($user->role)->name === 'superadmin';
-        
-        
 
-            $operation = MessageGroup::with([
-                'phone' => function ($q) {
-                    $q->withTrashed()
-                        ->with(['user' => function ($q2) {
-                            $q2->withTrashed()
-                                ->with(['department' => function ($q3) {
-                                    $q3->withTrashed();
-                                }]);
-                        }]);
-                },
-                'messages' => function ($q) {
-                    $q->orderBy('send_at');
-                }
-            ])->findOrFail($operationId);
-            
-        $department=$operation->phone->user->department->id;
+
+
+        $operation = MessageGroup::with([
+            'phone' => function ($q) {
+                $q->withTrashed()
+                    ->with(['user' => function ($q2) {
+                        $q2->withTrashed()
+                            ->with(['department' => function ($q3) {
+                                $q3->withTrashed();
+                            }]);
+                    }]);
+            },
+            'messages' => function ($q) {
+                $q->orderBy('send_at');
+            }
+        ])->findOrFail($operationId);
+
+        $department = $operation->phone->user->department->id;
         $department = $isSuperadmin
             ? Department::with('users.phones')->findOrFail($department)
             : $user->department;
@@ -663,12 +663,7 @@ class MessageGroupController extends Controller
                         ->addSeconds($randomSeconds);
                 }
 
-                Log::info('Dispatching ExecJob', [
-                    'batch_no' => $batchNo,
-                    'interval_min' => $interval,
-                    'random_sec' => $randomSeconds,
-                    'dispatch_at' => $dispatchAt->format('Y-m-d H:i:s'),
-                ]);
+
 
                 ExecJob::dispatch($group->id, $batchNo)
                     ->onQueue('telegram')
@@ -697,12 +692,12 @@ class MessageGroupController extends Controller
         }
     }
     private function getRandomSeconds(int $interval): int
-{
-    return match (true) {
-        $interval <= 1  => rand(5, 10),
-        $interval <= 5  => rand(10, 20),
-        $interval <= 60 => rand(15, 30),
-        default         => rand(30, 70),
-    };
-}
+    {
+        return match (true) {
+            $interval <= 1  => rand(5, 10),
+            $interval <= 5  => rand(10, 20),
+            $interval <= 60 => rand(15, 30),
+            default         => rand(30, 70),
+        };
+    }
 }
