@@ -54,6 +54,17 @@ class OperatorStoreRequest extends FormRequest
                 'string',
                 Rule::in(OperationUser::ROLES),
             ],
+
+            /*
+             * Empty means "as the role says" (OperationUser::messageLanguage()).
+             */
+            'language' => [
+                'nullable',
+                'string',
+                Rule::in(OperationUser::LANGUAGES),
+            ],
+
+            'respectful' => ['nullable', 'boolean'],
         ];
     }
 

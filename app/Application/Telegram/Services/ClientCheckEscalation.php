@@ -6,17 +6,18 @@ namespace App\Application\Telegram\Services;
 
 use App\Models\Telegram\OperationUser;
 use App\Models\Telegram\TelegramClientCheck;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
 /**
- * How hard to lean on someone for a penalty (ClientCheckRules, edited in
- * the panel).
+ * What to tell someone about a penalty (ClientCheckRules, edited in the
+ * panel).
  *
- * Two signals, the higher wins: the bot's own repeat number, and the
- * person's history - how many penalties in the last hour, today and this
- * week, and how soon after the previous batch. No counters are stored: the
- * history is the state, so it cools down by itself.
+ * The level is the bot's own count - the first penalty, the second
+ * ("Повторное отправление штрафа №2"), and so on - nothing is counted
+ * here - read on the ladder of the person's role: operators and sales
+ * managers have their own. The phrase set is the person's too: their
+ * language, and the respectful tone for people older than the one
+ * writing.
  */
 final class ClientCheckEscalation
 {
@@ -35,137 +36,98 @@ final class ClientCheckEscalation
      */
     public function apply(TelegramClientCheck $check, OperationUser $person): void
     {
-        $rules = $this->rules();
-
-        $metrics = $this->metrics($check, $person, $rules);
-
         $check->update([
-            'level' => max(
-                $rules->repeatLevel($check->repeat_number),
-                $rules->historyLevel($metrics),
+            'level' => $this->rules()->levelFor(
+                $person->roleOrDefault(),
+                max(1, (int) $check->repeat_number),
             ),
-            'metrics' => $metrics,
         ]);
     }
 
     /**
-     * The one comment for a batch, chosen and stored on its last penalty.
+     * What goes out for this penalty to this person (ClientCheckRules::MODE_*),
+     * as the rules say right now.
+     */
+    public function mode(TelegramClientCheck $check, OperationUser $person): string
+    {
+        $rules = $this->rules();
+        $role = $person->roleOrDefault();
+
+        return $rules->mode($role, $rules->levelFor($role, max(1, (int) $check->repeat_number)));
+    }
+
+    /**
+     * The one comment for a batch - penalties of one person for one
+     * request - chosen and stored on its last penalty.
      *
      * @param Collection<int, TelegramClientCheck> $batch oldest first
      */
     public function comment(Collection $batch, OperationUser $person): ?string
     {
         /** @var TelegramClientCheck $last */
-        $last = $batch->last();
+        $last = $batch->sortBy('repeat_number')->last();
 
         $rules = $this->rules();
+        $role = $person->roleOrDefault();
 
         /*
-         * Levels may have been removed since these penalties came in.
+         * The highest repeat in the batch decides; levels may also have
+         * been removed since the penalty came in.
          */
-        $level = min((int) $batch->max('level'), $rules->topLevel());
+        $level = $rules->levelFor($role, max(1, (int) $batch->max('repeat_number')));
 
-        $phrases = $rules->phrases($level);
-
-        if ($phrases === []) {
+        if (! $this->commentAllowed($batch, $person)) {
             return null;
         }
 
-        $index = $this->pick($last, $person, $level, count($phrases));
+        $variant = $rules->variant(
+            $role,
+            $level,
+            $person->messageLanguage(),
+            $person->respectful ? ClientCheckRules::TONE_RESPECTFUL : ClientCheckRules::TONE_PLAIN,
+        );
 
-        $comment = $this->render($phrases[$index], $last, $person, $batch->count());
-
-        if ($batch->count() > 1) {
-            $line = $rules->batchLine;
-
-            if ($line !== '') {
-                $comment .= "\n\n" . $this->render($line, $last, $person, $batch->count());
-            }
+        if ($variant['phrases'] === []) {
+            return null;
         }
+
+        $index = $this->pick($last, $person, $variant);
+
+        $comment = $this->render($variant['phrases'][$index], $last, $person, $variant['language']);
 
         $last->update([
             'phrase_index' => $index,
             'comment_level' => $level,
             'comment' => $comment,
             'batch_count' => $batch->count(),
+            /*
+             * Which set the phrase came from, for the panel and so the next
+             * pick can tell "the same phrase" from "the same index".
+             */
+            'metrics' => [
+                'language' => $variant['language'],
+                'tone' => $variant['tone'],
+                'phrase_level' => $variant['level'],
+            ],
         ]);
 
         return $comment;
     }
 
     /**
-     * Counts include the penalty itself.
+     * Whether a comment follows this batch at all: its level - the highest
+     * repeat in it - may say "forward only" (or nothing) for the role.
      *
-     * @return array{hour_count: int, today_count: int, week_count: int, minutes_since_last: int|null}
+     * @param Collection<int, TelegramClientCheck> $batch
      */
-    public function metrics(
-        TelegramClientCheck $check,
-        OperationUser $person,
-        ?ClientCheckRules $rules = null,
-    ): array {
-        $rules ??= $this->rules();
-
-        $at = $check->created_at ?? now();
-
-        $days = $rules->historyDays;
-
-        /** @var list<Carbon> $history newest first */
-        $history = TelegramClientCheck::query()
-            ->where('operation_user_id', $person->id)
-            ->where('id', '<=', $check->id)
-            ->where('created_at', '>=', $at->copy()->subDays($days))
-            ->orderByDesc('id')
-            ->pluck('created_at')
-            ->all();
-
-        $hourFrom = $at->copy()->subHour();
-        $todayFrom = $at->copy()->startOfDay();
-
-        /*
-         * "How soon did it happen again" is measured against the previous
-         * batch: penalties the bot sent in the same burst are one event.
-         */
-        $batchFrom = $at->copy()->subSeconds($rules->batchQuietSeconds);
-
-        $hour = 0;
-        $today = 0;
-        $previous = null;
-
-        foreach ($history as $createdAt) {
-            if ($createdAt >= $hourFrom) {
-                $hour++;
-            }
-
-            if ($createdAt >= $todayFrom) {
-                $today++;
-            }
-
-            if ($previous === null && $createdAt < $batchFrom) {
-                $previous = $createdAt;
-            }
-        }
-
-        return [
-            'hour_count' => $hour,
-            'today_count' => $today,
-            'week_count' => count($history),
-            'minutes_since_last' => $previous !== null
-                ? (int) $previous->diffInMinutes($at, true)
-                : null,
-        ];
-    }
-
-    public function repeatLevel(int $repeat): int
+    public function commentAllowed(Collection $batch, OperationUser $person): bool
     {
-        return $this->rules()->repeatLevel($repeat);
-    }
+        $rules = $this->rules();
+        $role = $person->roleOrDefault();
 
-    /**
-     * @param array{hour_count: int, today_count: int, week_count: int, minutes_since_last: int|null} $metrics
-     */
-    public function historyLevel(array $metrics): int
-    {
-        return $this->rules()->historyLevel($metrics);
+        $level = $rules->levelFor($role, max(1, (int) $batch->max('repeat_number')));
+
+        return $rules->mode($role, $level) === ClientCheckRules::MODE_ALL;
     }
 
     public function quietSeconds(): int
@@ -174,14 +136,15 @@ final class ClientCheckEscalation
     }
 
     /**
-     * Random, but not the phrase this person got last time on this level.
+     * Random, but not the phrase this person got last time from the same
+     * set.
+     *
+     * @param array{phrases: list<string>, language: string, tone: string, level: int} $variant
      */
-    private function pick(
-        TelegramClientCheck $last,
-        OperationUser $person,
-        int $level,
-        int $count,
-    ): int {
+    private function pick(TelegramClientCheck $last, OperationUser $person, array $variant): int
+    {
+        $count = count($variant['phrases']);
+
         if ($count === 1) {
             return 0;
         }
@@ -192,13 +155,19 @@ final class ClientCheckEscalation
             ->whereNotNull('phrase_index')
             ->whereNotNull('comment')
             ->orderByDesc('id')
-            ->first(['comment_level', 'phrase_index']);
+            ->first(['phrase_index', 'metrics']);
 
-        $exclude = $previous !== null && (int) $previous->comment_level === $level
-            ? [(int) $previous->phrase_index]
-            : [];
+        $metrics = (array) ($previous?->metrics ?? []);
 
-        $choices = array_values(array_diff(range(0, $count - 1), $exclude));
+        $sameSet = $previous !== null
+            && ($metrics['language'] ?? null) === $variant['language']
+            && ($metrics['tone'] ?? null) === $variant['tone']
+            && (int) ($metrics['phrase_level'] ?? -1) === $variant['level'];
+
+        $choices = array_values(array_diff(
+            range(0, $count - 1),
+            $sameSet ? [(int) $previous->phrase_index] : [],
+        ));
 
         return $choices[array_rand($choices)];
     }
@@ -207,9 +176,9 @@ final class ClientCheckEscalation
         string $template,
         TelegramClientCheck $last,
         OperationUser $person,
-        int $batchCount,
+        string $language,
     ): string {
-        $metrics = (array) ($last->metrics ?? []);
+        $parsed = (array) ($last->parsed ?? []);
 
         $e = static fn (?string $v): string => htmlspecialchars(
             (string) $v,
@@ -220,13 +189,44 @@ final class ClientCheckEscalation
         $name = trim((string) $person->name);
 
         return strtr($template, [
-            '{name}' => $e($name !== '' ? $name : 'Коллега'),
+            '{name}' => $e($name !== '' ? $name : ($language === OperationUser::LANGUAGE_UZ ? 'Hamkasb' : 'Коллега')),
             '{request}' => $e($last->request_number ?? '—'),
             '{repeat_number}' => (string) $last->repeat_number,
-            '{batch_count}' => (string) $batchCount,
-            '{hour_count}' => (string) ($metrics['hour_count'] ?? 0),
-            '{today_count}' => (string) ($metrics['today_count'] ?? 0),
-            '{week_count}' => (string) ($metrics['week_count'] ?? 0),
+            '{status_limit}' => $e(self::duration($parsed['status_limit'] ?? null, $language)),
+            '{time_in_status}' => $e(self::duration($parsed['time_in_status'] ?? null, $language)),
+            '{crm_status}' => $e($last->crm_status ?? '—'),
         ]);
+    }
+
+    /**
+     * The bot writes durations in Russian ("2 ч 3 мин"); an Uzbek phrase
+     * gets them in Uzbek ("2 soat 3 daqiqa").
+     */
+    public static function duration(?string $value, string $language): string
+    {
+        $value = trim((string) $value);
+
+        if ($value === '') {
+            return '—';
+        }
+
+        if ($language !== OperationUser::LANGUAGE_UZ) {
+            return $value;
+        }
+
+        return (string) preg_replace_callback(
+            '/(\d+)\s*(дн(?:ей|я)?|д|час(?:а|ов)?|ч|мин(?:ут[аы]?)?|сек(?:унд[аы]?)?)\.?/u',
+            static function (array $m): string {
+                $unit = mb_substr($m[2], 0, 1);
+
+                return $m[1] . ' ' . match (true) {
+                    $unit === 'д' => 'kun',
+                    $unit === 'ч' => 'soat',
+                    str_starts_with($m[2], 'мин') => 'daqiqa',
+                    default => 'soniya',
+                };
+            },
+            $value,
+        );
     }
 }

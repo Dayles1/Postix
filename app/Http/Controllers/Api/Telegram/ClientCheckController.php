@@ -8,6 +8,7 @@ use App\Application\Telegram\Queries\ListClientChecks;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\Telegram\ClientCheckIndexRequest;
 use App\Http\Resources\Telegram\ClientCheckResource;
+use App\Models\Telegram\OperationUser;
 use App\Models\Telegram\TelegramSetting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -53,6 +54,8 @@ final class ClientCheckController extends Controller
         $validated = $request->validate([
             'enabled' => ['sometimes', 'required', 'boolean'],
             'comments_enabled' => ['sometimes', 'required', 'boolean'],
+            'operation_enabled' => ['sometimes', 'required', 'boolean'],
+            'sales_enabled' => ['sometimes', 'required', 'boolean'],
         ]);
 
         if (array_key_exists('enabled', $validated)) {
@@ -69,6 +72,15 @@ final class ClientCheckController extends Controller
             );
         }
 
+        foreach (OperationUser::ROLES as $role) {
+            if (array_key_exists("{$role}_enabled", $validated)) {
+                TelegramSetting::set(
+                    TelegramSetting::roleKey($role),
+                    (bool) $validated["{$role}_enabled"],
+                );
+            }
+        }
+
         return response()->json([
             'data' => $this->currentSettings(),
             'message' => __('telegram.penalties.settings.saved'),
@@ -76,13 +88,15 @@ final class ClientCheckController extends Controller
     }
 
     /**
-     * @return array{enabled: bool, comments_enabled: bool}
+     * @return array{enabled: bool, comments_enabled: bool, operation_enabled: bool, sales_enabled: bool}
      */
     private function currentSettings(): array
     {
         return [
             'enabled' => TelegramSetting::clientChecksEnabled(),
             'comments_enabled' => TelegramSetting::clientCheckCommentsEnabled(),
+            'operation_enabled' => TelegramSetting::clientChecksEnabledFor(OperationUser::ROLE_OPERATION),
+            'sales_enabled' => TelegramSetting::clientChecksEnabledFor(OperationUser::ROLE_SALES),
         ];
     }
 }

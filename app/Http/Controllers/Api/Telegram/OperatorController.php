@@ -147,6 +147,13 @@ final class OperatorController extends Controller
              * never turns a sales manager back into an operator.
              */
             ...(isset($validated['role']) ? ['role' => $validated['role']] : []),
+
+            /*
+             * Same for the message style: an edit that does not send it
+             * keeps what the person has.
+             */
+            ...(array_key_exists('language', $validated) ? ['language' => $validated['language']] : []),
+            ...(array_key_exists('respectful', $validated) ? ['respectful' => (bool) $validated['respectful']] : []),
         ];
     }
 }

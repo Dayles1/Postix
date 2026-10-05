@@ -47,6 +47,8 @@ final class ClientCheckResource extends JsonResource
                     'telegram_username' => $person->telegramUsername(),
                     'has_telegram_peer' => $person->hasTelegramPeer(),
                     'dm_enabled' => (bool) $person->dm_enabled,
+                    'message_language' => $person->messageLanguage(),
+                    'respectful' => (bool) $person->respectful,
                 ]
                 : null,
 

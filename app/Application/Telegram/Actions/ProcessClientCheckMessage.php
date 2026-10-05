@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Application\Telegram\Actions;
 
 use App\Application\Telegram\Services\ClientCheckEscalation;
+use App\Application\Telegram\Services\ClientCheckRules;
 use App\Application\Telegram\Services\ClientCheckSender;
 use App\Application\Telegram\Services\TelegramPenaltyMessageParser;
 use App\Enums\Telegram\TelegramClientCheckStatus;
@@ -97,6 +98,31 @@ final class ProcessClientCheckMessage
             $check->update([
                 'status' => TelegramClientCheckStatus::Skipped,
                 'reason' => TelegramClientCheck::REASON_DISABLED,
+            ]);
+
+            return $check;
+        }
+
+        /*
+         * The same, for this person's role only: operators and sales
+         * managers are switched on and off apart.
+         */
+        if (! TelegramSetting::clientChecksEnabledFor($person->roleOrDefault())) {
+            $check->update([
+                'status' => TelegramClientCheckStatus::Skipped,
+                'reason' => TelegramClientCheck::REASON_ROLE_DISABLED,
+            ]);
+
+            return $check;
+        }
+
+        /*
+         * And at this level: some penalties are for one role only.
+         */
+        if ($this->escalation->mode($check, $person) === ClientCheckRules::MODE_OFF) {
+            $check->update([
+                'status' => TelegramClientCheckStatus::Skipped,
+                'reason' => TelegramClientCheck::REASON_LEVEL_OFF,
             ]);
 
             return $check;

@@ -35,6 +35,14 @@ class TelegramSetting extends Model
      */
     public const CLIENT_CHECK_RULES = 'client_checks.rules';
 
+    /**
+     * Penalties go out to operators / to sales managers at all. Under the
+     * main switch: off there is off for everyone.
+     */
+    public const CLIENT_CHECKS_OPERATION_ENABLED = 'client_checks.operation_enabled';
+
+    public const CLIENT_CHECKS_SALES_ENABLED = 'client_checks.sales_enabled';
+
     protected $fillable = [
         'key',
         'value',
@@ -88,5 +96,20 @@ class TelegramSetting extends Model
     public static function clientCheckCommentsEnabled(): bool
     {
         return (bool) self::get(self::CLIENT_CHECK_COMMENTS_ENABLED, true);
+    }
+
+    /**
+     * The role's own switch; on until somebody turns it off.
+     */
+    public static function clientChecksEnabledFor(string $role): bool
+    {
+        return (bool) self::get(self::roleKey($role), true);
+    }
+
+    public static function roleKey(string $role): string
+    {
+        return $role === OperationUser::ROLE_SALES
+            ? self::CLIENT_CHECKS_SALES_ENABLED
+            : self::CLIENT_CHECKS_OPERATION_ENABLED;
     }
 }

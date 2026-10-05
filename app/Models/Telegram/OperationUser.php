@@ -27,10 +27,24 @@ class OperationUser extends Model
         self::ROLE_SALES,
     ];
 
+    public const LANGUAGE_UZ = 'uz';
+
+    public const LANGUAGE_RU = 'ru';
+
+    /**
+     * The languages a penalty comment can be written in.
+     */
+    public const LANGUAGES = [
+        self::LANGUAGE_UZ,
+        self::LANGUAGE_RU,
+    ];
+
     protected $fillable = [
         'name',
         'name_normalized',
         'role',
+        'language',
+        'respectful',
         'telegram_username',
         'telegram_id',
         'is_active',
@@ -45,6 +59,7 @@ class OperationUser extends Model
             'telegram_id' => 'integer',
             'is_active' => 'boolean',
             'dm_enabled' => 'boolean',
+            'respectful' => 'boolean',
             'dm_last_sent_at' => 'datetime',
         ];
     }
@@ -85,6 +100,24 @@ class OperationUser extends Model
     public function isSales(): bool
     {
         return $this->role === self::ROLE_SALES;
+    }
+
+    /**
+     * The language this person is written to in: the one picked for them,
+     * or the role's - Russian for sales, Uzbek for operators.
+     */
+    public function messageLanguage(): string
+    {
+        return in_array($this->language, self::LANGUAGES, true)
+            ? $this->language
+            : self::defaultLanguageFor($this->roleOrDefault());
+    }
+
+    public static function defaultLanguageFor(string $role): string
+    {
+        return $role === self::ROLE_SALES
+            ? self::LANGUAGE_RU
+            : self::LANGUAGE_UZ;
     }
 
     /**

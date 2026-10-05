@@ -3,6 +3,7 @@
 namespace Tests\Feature\Telegram;
 
 use App\Application\Telegram\Actions\ProcessClientCheckMessage;
+use App\Application\Telegram\Services\ClientCheckEscalation;
 use App\Application\Telegram\Services\ClientCheckRules;
 use App\Application\Telegram\Services\ClientCheckRulesStore;
 use App\Application\Telegram\Services\ClientCheckSender;
@@ -146,14 +147,27 @@ class ClientCheckTest extends TestCase
 
         $this->telegram = $handler;
 
-        config()->set('client_checks.phrases', [
-            0 => ['L0 {name} #{request}'],
-            1 => ['L1 {today_count}'],
-            2 => ['L2a №{repeat_number}', 'L2b №{repeat_number}'],
-            3 => ['L3 №{repeat_number} {today_count}'],
+        /*
+         * 1st, 2nd, 3rd and 4+ penalty. Gaps on purpose, to see the
+         * fallbacks: no respectful text from the 2nd on, no Russian on
+         * the 3rd and 4th.
+         */
+        config()->set('client_checks.levels', [
+            ['from' => 1, 'phrases' => [
+                'uz' => ['plain' => ['U1 {name} #{request} {status_limit}'], 'respectful' => ['U1R {name}']],
+                'ru' => ['plain' => ['R1 {name} #{request} {status_limit}'], 'respectful' => ['R1R {name}']],
+            ]],
+            ['from' => 2, 'phrases' => [
+                'uz' => ['plain' => ['U2 №{repeat_number}']],
+                'ru' => ['plain' => ['R2 №{repeat_number}']],
+            ]],
+            ['from' => 3, 'phrases' => [
+                'uz' => ['plain' => ['U3a №{repeat_number}', 'U3b №{repeat_number}']],
+            ]],
+            ['from' => 4, 'phrases' => [
+                'uz' => ['plain' => ['U4+ №{repeat_number}']],
+            ]],
         ]);
-
-        config()->set('client_checks.batch_line', 'batch {batch_count}');
 
         Carbon::setTestNow('2026-10-02 10:00:00');
     }
@@ -183,6 +197,8 @@ class ClientCheckTest extends TestCase
             $table->string('name');
             $table->string('name_normalized')->index();
             $table->string('role', 16)->default('operation');
+            $table->string('language', 5)->nullable();
+            $table->boolean('respectful')->default(false);
             $table->string('telegram_username')->nullable();
             $table->unsignedBigInteger('telegram_id')->nullable();
             $table->boolean('is_active')->default(true);
@@ -390,15 +406,20 @@ class ClientCheckTest extends TestCase
         $this->flushAfterQuiet();
 
         $this->assertSame(['forward', 'send'], $this->messages->kinds());
+        /* An operator: Uzbek, and the bot's "2 ч" in Uzbek too. */
         $this->assertSame(
-            "L0 PULATOV AFZAL AHMADJON O&#039;G&#039;LI #TLS04834",
+            "U1 PULATOV AFZAL AHMADJON O&#039;G&#039;LI #TLS04834 2 soat",
             $this->messages->sent()[0]['message'],
         );
         $this->assertSame('@afzal', $this->messages->sent()[0]['peer']);
         $this->assertSame(TelegramClientCheckStatus::Sent, $check->refresh()->status);
     }
 
-    public function test_a_burst_gets_one_comment_at_the_highest_level(): void
+    /**
+     * The bot's number already says how many times a request was sent:
+     * only a re-send of the same request is stacked, never two requests.
+     */
+    public function test_only_the_same_request_is_stacked(): void
     {
         $this->person();
 
@@ -406,25 +427,92 @@ class ClientCheckTest extends TestCase
         Carbon::setTestNow(now()->addSecond());
         $this->penalty(repeat: 5, request: 'EGS2');
         Carbon::setTestNow(now()->addSecond());
-        $last = $this->penalty(repeat: 2, request: 'EGS3');
+        $again = $this->penalty(repeat: 2, request: 'EGS1');
 
         $this->flushAfterQuiet();
 
-        $this->assertSame(['forward', 'forward', 'forward', 'send'], $this->messages->kinds());
+        $this->assertSame(['forward', 'forward', 'forward', 'send', 'send'], $this->messages->kinds());
 
-        $comment = $this->messages->sent()[0]['message'];
-        $this->assertStringStartsWith('L2', $comment);
-        $this->assertStringEndsWith('batch 3', $comment);
+        $comments = array_column($this->messages->sent(), 'message');
+        sort($comments);
 
-        $last->refresh();
-        $this->assertSame(2, $last->comment_level);
-        $this->assertSame(3, $last->batch_count);
-        $this->assertSame($comment, $last->comment);
+        /* EGS1 once, at its higher number; EGS2 on its own. */
+        $this->assertSame(['U2 №2', 'U4+ №5'], $comments);
+
+        $this->assertSame(2, $again->refresh()->batch_count);
         $this->assertNull($first->refresh()->comment);
         $this->assertSame(
             3,
             TelegramClientCheck::query()->where('status', TelegramClientCheckStatus::Sent)->count(),
         );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Language and respect
+    |--------------------------------------------------------------------------
+    */
+
+    public function test_sales_are_written_to_in_russian(): void
+    {
+        $this->person('BELYAKOVA ANNA VLADIMIROVNA', [
+            'telegram_username' => 'anna',
+            'telegram_id' => 777,
+            'role' => OperationUser::ROLE_SALES,
+        ]);
+
+        $check = $this->penalty(text: str_replace('№7', '№1', self::SALES));
+        $this->flushAfterQuiet();
+
+        $this->assertSame('R1 BELYAKOVA ANNA VLADIMIROVNA #LOG00663 1 ч', $this->messages->sent()[0]['message']);
+        $this->assertSame(['language' => 'ru', 'tone' => 'plain', 'phrase_level' => 0], $check->refresh()->metrics);
+    }
+
+    public function test_a_language_picked_on_the_card_beats_the_role(): void
+    {
+        $this->person(attributes: ['language' => OperationUser::LANGUAGE_RU]);
+
+        $this->penalty();
+        $this->flushAfterQuiet();
+
+        $this->assertStringStartsWith('R1 PULATOV', $this->messages->sent()[0]['message']);
+    }
+
+    public function test_older_people_get_the_respectful_text(): void
+    {
+        $this->person(attributes: ['respectful' => true]);
+
+        $this->penalty(repeat: 1, request: 'A1');
+        $this->flushAfterQuiet();
+
+        /* From the 2nd on there is no respectful text: the plain one stands in. */
+        $this->penalty(repeat: 2, request: 'A2');
+        $this->flushAfterQuiet();
+
+        $this->assertSame(
+            ["U1R PULATOV AFZAL AHMADJON O&#039;G&#039;LI", 'U2 №2'],
+            array_column($this->messages->sent(), 'message'),
+        );
+    }
+
+    public function test_a_missing_language_borrows_its_own_lower_level_first(): void
+    {
+        $rules = app(ClientCheckRulesStore::class)->current();
+
+        /* No Russian on the 4th: the 2nd's Russian, not the 4th's Uzbek. */
+        $variant = $rules->variant('operation', 3, 'ru', 'plain');
+        $this->assertSame(['R2 №{repeat_number}'], $variant['phrases']);
+        $this->assertSame(['language' => 'ru', 'tone' => 'plain', 'level' => 1], array_diff_key($variant, ['phrases' => 1]));
+
+        $this->assertSame([0, 1, 2, 3, 3], array_map(fn (int $n) => $rules->levelFor('operation', $n), [1, 2, 3, 4, 9]));
+    }
+
+    public function test_the_bot_durations_come_out_in_uzbek(): void
+    {
+        $this->assertSame('2 soat 3 daqiqa', ClientCheckEscalation::duration('2 ч 3 мин', 'uz'));
+        $this->assertSame('1 kun 5 soat', ClientCheckEscalation::duration('1 д 5 ч', 'uz'));
+        $this->assertSame('2 ч 3 мин', ClientCheckEscalation::duration('2 ч 3 мин', 'ru'));
+        $this->assertSame('—', ClientCheckEscalation::duration(null, 'uz'));
     }
 
     public function test_different_people_get_separate_comments(): void
@@ -582,10 +670,8 @@ class ClientCheckTest extends TestCase
         app(ClientCheckRulesStore::class)->save(ClientCheckRules::fromArray([
             'levels' => $levels,
             'batch_quiet_seconds' => 20,
-            'history_days' => 7,
             'max_attempts' => 3,
             'retry_minutes' => 30,
-            'batch_line' => '',
             ...$extra,
         ]));
     }
@@ -595,8 +681,8 @@ class ClientCheckTest extends TestCase
         $this->person();
 
         $this->saveRules([
-            ['name' => 'Calm', 'phrases' => ['DB0 {name}']],
-            ['name' => 'Loud', 'repeat_from' => 2, 'phrases' => ['DB1 №{repeat_number}']],
+            ['name' => 'Calm', 'phrases' => ['uz' => ['plain' => ['DB0 {name}']]]],
+            ['name' => 'Loud', 'from' => 2, 'phrases' => ['uz' => ['plain' => ['DB1 №{repeat_number}']]]],
         ]);
 
         $check = $this->penalty(repeat: 9);
@@ -615,7 +701,7 @@ class ClientCheckTest extends TestCase
         $this->assertSame(3, $check->refresh()->level);
 
         $this->saveRules([
-            ['phrases' => ['ONLY {request}']],
+            ['phrases' => ['uz' => ['plain' => ['ONLY {request}']]]],
         ]);
 
         $this->flushAfterQuiet();
@@ -624,25 +710,110 @@ class ClientCheckTest extends TestCase
         $this->assertSame(0, $check->refresh()->comment_level);
     }
 
-    public function test_the_old_config_layout_reads_as_the_same_ladder(): void
+    /**
+     * Rules saved before languages existed: one list of Russian phrases
+     * per level, and repeat_from.
+     */
+    public function test_rules_saved_before_languages_still_read(): void
     {
-        $rules = ClientCheckRules::fromConfig([
-            'repeat_levels' => [3 => 7, 2 => 4, 1 => 2],
-            'levels' => [3 => ['today' => 8, 'hour' => 5], 2 => ['today' => 5, 'repeat_within' => 30], 1 => ['today' => 3, 'week' => 8]],
-            'phrases' => [0 => ['a'], 1 => ['b'], 2 => [], 3 => ['d']],
+        $rules = ClientCheckRules::fromArray([
+            'levels' => [
+                ['phrases' => ['old a']],
+                ['repeat_from' => 3, 'phrases' => ['old b']],
+            ],
         ]);
 
-        $this->assertSame(3, $rules->topLevel());
-        $this->assertSame(0, $rules->repeatLevel(1));
-        $this->assertSame(2, $rules->repeatLevel(5));
-        $this->assertSame(3, $rules->repeatLevel(7));
-        $this->assertSame(
-            2,
-            $rules->historyLevel(['hour_count' => 1, 'today_count' => 5, 'week_count' => 5, 'minutes_since_last' => null]),
-        );
-        /* A level without phrases borrows the one below. */
-        $this->assertSame(['b'], $rules->phrases(2));
-        $this->assertNull($rules->levels[0]['repeat_from']);
+        /* ...and, from before the roles were split, both roles get them. */
+        foreach (['operation', 'sales'] as $role) {
+            $this->assertSame(3, $rules->levels($role)[1]['from']);
+            $this->assertSame(['old b'], $rules->levels($role)[1]['phrases']['ru']['plain']);
+            $this->assertSame([], $rules->levels($role)[1]['phrases']['uz']['plain']);
+            $this->assertSame('all', $rules->levels($role)[1]['mode']);
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Operators and sales apart
+    |--------------------------------------------------------------------------
+    */
+
+    private function anna(): OperationUser
+    {
+        return $this->person('BELYAKOVA ANNA VLADIMIROVNA', [
+            'telegram_username' => 'anna',
+            'telegram_id' => 777,
+            'role' => OperationUser::ROLE_SALES,
+        ]);
+    }
+
+    public function test_each_role_has_its_own_texts(): void
+    {
+        $this->person();
+        $this->anna();
+
+        $this->saveRules([], ['roles' => [
+            'operation' => ['levels' => [['phrases' => ['uz' => ['plain' => ['OPER {request}']]]]]],
+            'sales' => ['levels' => [['phrases' => ['ru' => ['plain' => ['SALES {request}']]]]]],
+        ]]);
+
+        $this->penalty(request: 'TLS1');
+        $this->penalty(text: str_replace('№7', '№1', self::SALES));
+        $this->flushAfterQuiet();
+
+        $comments = array_column($this->messages->sent(), 'message');
+        sort($comments);
+
+        $this->assertSame(['OPER TLS1', 'SALES LOG00663'], $comments);
+    }
+
+    public function test_a_role_switched_off_gets_nothing_the_other_still_does(): void
+    {
+        $this->person();
+        $this->anna();
+
+        TelegramSetting::set(TelegramSetting::CLIENT_CHECKS_SALES_ENABLED, false);
+
+        $sales = $this->penalty(text: self::SALES);
+        $operation = $this->penalty();
+        $this->flushAfterQuiet();
+
+        $this->assertSame(TelegramClientCheckStatus::Skipped, $sales->refresh()->status);
+        $this->assertSame(TelegramClientCheck::REASON_ROLE_DISABLED, $sales->reason);
+        $this->assertSame(TelegramClientCheckStatus::Sent, $operation->refresh()->status);
+        $this->assertSame(['@afzal', '@afzal'], array_map(
+            static fn (array $call) => $call[1]['to_peer'] ?? $call[1]['peer'],
+            $this->messages->calls,
+        ));
+    }
+
+    public function test_a_level_can_send_nothing_or_only_the_forward(): void
+    {
+        $this->person();
+
+        $this->saveRules([], ['roles' => [
+            'operation' => ['levels' => [
+                ['mode' => 'all', 'phrases' => ['uz' => ['plain' => ['ONE']]]],
+                ['from' => 2, 'mode' => 'forward', 'phrases' => []],
+                ['from' => 3, 'mode' => 'off', 'phrases' => []],
+            ]],
+            'sales' => ['levels' => [['phrases' => ['ru' => ['plain' => ['x']]]]]],
+        ]]);
+
+        $second = $this->penalty(repeat: 2, request: 'R2');
+        $third = $this->penalty(repeat: 5, request: 'R5');
+        $this->flushAfterQuiet();
+
+        /* №2: forwarded, no comment after it. */
+        $this->assertSame(['forward'], $this->messages->kinds());
+        $this->assertSame(TelegramClientCheckStatus::Sent, $second->refresh()->status);
+        $this->assertSame(TelegramClientCheck::REASON_FORWARD_ONLY, $second->reason);
+        $this->assertNull($second->comment);
+
+        /* №5: nothing at all, kept and counted. */
+        $this->assertSame(TelegramClientCheckStatus::Skipped, $third->refresh()->status);
+        $this->assertSame(TelegramClientCheck::REASON_LEVEL_OFF, $third->reason);
+        $this->assertSame(2, $third->level);
     }
 
     public function test_failed_forwards_stop_after_the_limit(): void
@@ -690,64 +861,12 @@ class ClientCheckTest extends TestCase
 
         $levels = [];
 
-        foreach ([1, 2, 4, 7] as $i => $repeat) {
-            /* hours apart, so the history alone stays at 0 */
-            Carbon::setTestNow(Carbon::parse('2026-09-28 09:00:00')->addDays($i));
+        foreach ([1, 2, 3, 4, 7] as $i => $repeat) {
             $levels[] = $this->penalty(repeat: $repeat, request: 'R' . $i)->level;
         }
 
-        $this->assertSame([0, 1, 2, 3], $levels);
-    }
-
-    public function test_level_grows_with_history_even_on_first_penalties(): void
-    {
-        $this->person();
-
-        $levels = [];
-
-        foreach (['09:00', '09:45', '10:30', '11:15', '12:00'] as $i => $time) {
-            $this->at($time . ':00');
-            $levels[] = $this->penalty(repeat: 1, request: 'R' . $i)->level;
-        }
-
-        /* 3rd today -> 1, 5th today -> 2 */
-        $this->assertSame([0, 0, 1, 1, 2], $levels);
-    }
-
-    public function test_a_burst_is_not_a_quick_repeat(): void
-    {
-        $this->person();
-
-        $this->at('09:00:00');
-        $this->penalty(request: 'A');
-
-        $this->at('09:00:01');
-        $burst = $this->penalty(request: 'B');
-
-        $this->assertNull($burst->metrics['minutes_since_last']);
-        $this->assertSame(0, $burst->level);
-
-        $this->at('09:20:01');
-        $again = $this->penalty(request: 'C');
-
-        $this->assertSame(20, $again->metrics['minutes_since_last']);
-        $this->assertSame(2, $again->level);
-    }
-
-    public function test_old_penalties_cool_down(): void
-    {
-        $this->person();
-
-        Carbon::setTestNow('2026-09-20 09:00:00');
-        foreach (range(1, 6) as $i) {
-            $this->penalty(request: 'OLD' . $i);
-        }
-
-        Carbon::setTestNow('2026-10-02 09:00:00');
-        $check = $this->penalty(request: 'NEW');
-
-        $this->assertSame(0, $check->level);
-        $this->assertSame(1, $check->metrics['week_count']);
+        /* 4 and everything after it is the last level. */
+        $this->assertSame([0, 1, 2, 3, 3], $levels);
     }
 
     public function test_the_same_phrase_is_not_given_twice_in_a_row(): void
@@ -758,7 +877,7 @@ class ClientCheckTest extends TestCase
 
         foreach (range(0, 3) as $i) {
             Carbon::setTestNow(Carbon::parse('2026-09-28 09:00:00')->addDays($i));
-            $this->penalty(repeat: 5, request: 'R' . $i);
+            $this->penalty(repeat: 3, request: 'R' . $i);
             $this->flushAfterQuiet();
 
             $indexes[] = TelegramClientCheck::query()->latest('id')->value('phrase_index');

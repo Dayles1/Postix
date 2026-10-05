@@ -18,8 +18,9 @@ use Throwable;
  * Delivers penalties in two steps.
  *
  * 1. forward() - the bot's message, as is, the moment it arrives.
- * 2. flush()   - once a person's batch has gone quiet, one comment for the
- *                whole batch, to the peer the last forward reached.
+ * 2. flush()   - one comment per request, once the bot has stopped
+ *                re-sending it for a moment, to the peer the last forward
+ *                reached.
  *
  * flush() also retries what Telegram refused, while it is still fresh.
  */
@@ -183,12 +184,23 @@ final class ClientCheckSender
 
         $quietFrom = now()->subSeconds($this->escalation->quietSeconds());
 
-        foreach ($pending->groupBy('operation_user_id') as $batch) {
+        /*
+         * Only the same request is ever stacked: the bot's repeat number
+         * already says how many times it was sent, so two different
+         * requests are two comments, never one.
+         */
+        $batches = $pending->groupBy(
+            static fn (TelegramClientCheck $check): string => $check->operation_user_id
+                . '|'
+                . ($check->request_number ?? '#' . $check->id),
+        );
+
+        foreach ($batches as $batch) {
             /** @var TelegramClientCheck $last */
             $last = $batch->last();
 
             /*
-             * The bot may still be sending this person's burst.
+             * The bot may still be re-sending this request.
              */
             if ($last->created_at > $quietFrom) {
                 continue;
@@ -232,6 +244,21 @@ final class ClientCheckSender
 
         try {
             $comment = $this->escalation->comment($batch, $person);
+
+            /*
+             * No comment at this level for this role: the forward was the
+             * whole message. Done, and said so on the row.
+             */
+            if ($comment === null && ! $this->escalation->commentAllowed($batch, $person)) {
+                TelegramClientCheck::query()->whereIn('id', $ids)->update([
+                    'status' => TelegramClientCheckStatus::Sent,
+                    'reason' => TelegramClientCheck::REASON_FORWARD_ONLY,
+                    'error' => null,
+                    'sent_at' => now(),
+                ]);
+
+                return;
+            }
 
             if ($comment !== null) {
                 $telegram->messages->sendMessage([

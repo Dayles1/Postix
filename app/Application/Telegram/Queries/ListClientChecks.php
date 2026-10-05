@@ -85,11 +85,23 @@ final class ListClientChecks
             'failed' => $status(TelegramClientCheckStatus::Failed),
             'skipped' => $status(TelegramClientCheckStatus::Skipped),
             /*
-             * The top level as configured right now - levels are edited
-             * in the panel, so "critical" is not a fixed number.
+             * The top level of each role's ladder as configured right now -
+             * levels are edited in the panel, and operators and sales have
+             * ladders of their own, so "critical" is not one fixed number.
              */
             'critical' => (clone $base)
-                ->where('level', '>=', max(1, $this->rules->current()->topLevel()))
+                ->where(function (Builder $q): void {
+                    $rules = $this->rules->current();
+
+                    $q->where(fn (Builder $sales) => $sales
+                        ->where('responsible_role', OperationUser::ROLE_SALES)
+                        ->where('level', '>=', max(1, $rules->topLevel(OperationUser::ROLE_SALES))))
+                        ->orWhere(fn (Builder $operation) => $operation
+                            ->where(fn (Builder $role) => $role
+                                ->whereNull('responsible_role')
+                                ->orWhere('responsible_role', '!=', OperationUser::ROLE_SALES))
+                            ->where('level', '>=', max(1, $rules->topLevel(OperationUser::ROLE_OPERATION))));
+                })
                 ->count(),
             'people' => (clone $base)->whereNotNull('operation_user_id')
                 ->distinct()

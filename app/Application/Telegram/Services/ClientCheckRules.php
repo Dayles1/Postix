@@ -4,58 +4,77 @@ declare(strict_types=1);
 
 namespace App\Application\Telegram\Services;
 
+use App\Models\Telegram\OperationUser;
+
 /**
- * How the penalty flow leans on people: the levels, what lifts someone to
- * each one, the phrases each one says, and the timings around them.
+ * What a person is told about a penalty, by how many times the bot has
+ * sent it - kept apart for operators and for sales managers.
  *
- * Written in the panel (stored by ClientCheckRulesStore); config/client_checks.php
- * is only the starting point until somebody saves them there.
+ * The count is the bot's own: "⚠️ Штраф по запросу #…" is the first time,
+ * "🆘 Повторное отправление штрафа №N по запросу #…" the N-th. Each role has
+ * its own ladder of levels. A level starts at a repeat number (`from`),
+ * says what goes out at it (`mode`: the forward and a comment, the forward
+ * only, or nothing) and holds four sets of phrases - Uzbek and Russian,
+ * each plain and respectful (for people older than the one writing). The
+ * person's role picks the ladder; their language and respect setting pick
+ * the set.
  *
- * Level 0 is where everyone starts and has no conditions. Every higher level
- * is reached when ANY of its conditions holds, checked from the top down:
- *  - repeat_from:   the bot's repeat number ("штрафа №N") is at least this;
- *  - hour / today / week: that many penalties in the last 60 minutes, since
- *                   midnight, or within history_days;
- *  - repeat_within: the previous batch was at most this many minutes ago.
- * An empty condition is simply not checked.
+ * Written in the panel (stored by ClientCheckRulesStore);
+ * config/client_checks.php is only the starting point.
  */
 final readonly class ClientCheckRules
 {
     public const MAX_LEVELS = 10;
 
-    public const CONDITIONS = ['repeat_from', 'hour', 'today', 'week', 'repeat_within'];
+    public const TONE_PLAIN = 'plain';
+
+    public const TONE_RESPECTFUL = 'respectful';
+
+    public const TONES = [self::TONE_PLAIN, self::TONE_RESPECTFUL];
 
     /**
-     * What a phrase may contain; filled in by ClientCheckEscalation.
+     * The bot's message forwarded, then the comment.
+     */
+    public const MODE_ALL = 'all';
+
+    /**
+     * The bot's message forwarded, no comment after it.
+     */
+    public const MODE_FORWARD = 'forward';
+
+    /**
+     * Nothing goes out at this level - for this role.
+     */
+    public const MODE_OFF = 'off';
+
+    public const MODES = [self::MODE_ALL, self::MODE_FORWARD, self::MODE_OFF];
+
+    /**
+     * What a phrase may contain; filled in by ClientCheckEscalation. The
+     * durations come out in the phrase's language ("2 ч" / "2 soat").
      */
     public const PLACEHOLDERS = [
         'name',
         'request',
         'repeat_number',
-        'batch_count',
-        'hour_count',
-        'today_count',
-        'week_count',
+        'status_limit',
+        'time_in_status',
+        'crm_status',
     ];
 
     /**
-     * @param list<array{
+     * @param array<string, list<array{
      *     name: string|null,
-     *     repeat_from: int|null,
-     *     hour: int|null,
-     *     today: int|null,
-     *     week: int|null,
-     *     repeat_within: int|null,
-     *     phrases: list<string>,
-     * }> $levels
+     *     from: int,
+     *     mode: string,
+     *     phrases: array<string, array<string, list<string>>>,
+     * }>> $ladders  per role, each ordered by `from`, the first one from 1
      */
     public function __construct(
-        public array $levels,
+        public array $ladders,
         public int $batchQuietSeconds,
-        public int $historyDays,
         public int $maxAttempts,
         public int $retryMinutes,
-        public string $batchLine,
     ) {
     }
 
@@ -64,102 +83,40 @@ final readonly class ClientCheckRules
      * malformed falls back to a safe value rather than failing the
      * listener.
      *
+     * Two older shapes are read too: one `levels` list shared by both roles
+     * (before the roles were split - both get a copy), and inside it one
+     * flat list of Russian phrases per level with `repeat_from` (before
+     * languages existed).
+     *
      * @param array<string, mixed> $data
      */
     public static function fromArray(array $data): self
     {
-        $levels = [];
+        $shared = $data['levels'] ?? null;
 
-        foreach (array_values((array) ($data['levels'] ?? [])) as $index => $level) {
-            if ($index >= self::MAX_LEVELS) {
-                break;
-            }
+        $ladders = [];
 
-            $level = (array) $level;
+        foreach (OperationUser::ROLES as $role) {
+            $levels = $data['roles'][$role]['levels'] ?? $shared ?? [];
 
-            $entry = [
-                'name' => self::text($level['name'] ?? null),
-            ];
-
-            foreach (self::CONDITIONS as $condition) {
-                /* Level 0 is the floor: it has nothing to reach. */
-                $entry[$condition] = $index === 0
-                    ? null
-                    : self::positive($level[$condition] ?? null);
-            }
-
-            $entry['phrases'] = self::phraseList($level['phrases'] ?? []);
-
-            $levels[] = $entry;
-        }
-
-        if ($levels === []) {
-            $levels[] = [
-                'name' => null,
-                'repeat_from' => null,
-                'hour' => null,
-                'today' => null,
-                'week' => null,
-                'repeat_within' => null,
-                'phrases' => [],
-            ];
+            $ladders[$role] = self::ladder((array) $levels);
         }
 
         return new self(
-            levels: $levels,
-            batchQuietSeconds: self::clamp($data['batch_quiet_seconds'] ?? 20, 1, 3600),
-            historyDays: self::clamp($data['history_days'] ?? 7, 1, 365),
+            ladders: $ladders,
+            /* Same default as config/client_checks.php: 5 seconds. */
+            batchQuietSeconds: self::clamp($data['batch_quiet_seconds'] ?? 5, 1, 3600),
             maxAttempts: self::clamp($data['max_attempts'] ?? 3, 1, 20),
             retryMinutes: self::clamp($data['retry_minutes'] ?? 30, 1, 1440),
-            batchLine: trim((string) ($data['batch_line'] ?? '')),
         );
     }
 
     /**
-     * From the original config/client_checks.php layout, where the
-     * conditions, the repeat thresholds and the phrases were three
-     * separate maps keyed by level.
-     *
      * @param array<string, mixed> $config
      */
     public static function fromConfig(array $config): self
     {
-        $repeat = (array) ($config['repeat_levels'] ?? []);
-        $history = (array) ($config['levels'] ?? []);
-        $phrases = (array) ($config['phrases'] ?? []);
-
-        $keys = array_map('intval', [
-            ...array_keys($repeat),
-            ...array_keys($history),
-            ...array_keys($phrases),
-        ]);
-
-        $top = $keys === [] ? 0 : max(0, max($keys));
-
-        $levels = [];
-
-        for ($level = 0; $level <= min($top, self::MAX_LEVELS - 1); $level++) {
-            $rules = (array) ($history[$level] ?? []);
-
-            $levels[] = [
-                'name' => null,
-                'repeat_from' => $repeat[$level] ?? null,
-                'hour' => $rules['hour'] ?? null,
-                'today' => $rules['today'] ?? null,
-                'week' => $rules['week'] ?? null,
-                'repeat_within' => $rules['repeat_within'] ?? null,
-                'phrases' => (array) ($phrases[$level] ?? []),
-            ];
-        }
-
-        return self::fromArray([
-            'levels' => $levels,
-            'batch_quiet_seconds' => $config['batch_quiet_seconds'] ?? 20,
-            'history_days' => $config['history_days'] ?? 7,
-            'max_attempts' => $config['max_attempts'] ?? 3,
-            'retry_minutes' => $config['retry_minutes'] ?? 30,
-            'batch_line' => $config['batch_line'] ?? '',
-        ]);
+        return self::fromArray($config);
     }
 
     /**
@@ -167,30 +124,42 @@ final readonly class ClientCheckRules
      */
     public function toArray(): array
     {
+        $roles = [];
+
+        foreach ($this->ladders as $role => $levels) {
+            $roles[$role] = ['levels' => $levels];
+        }
+
         return [
-            'levels' => $this->levels,
+            'roles' => $roles,
             'batch_quiet_seconds' => $this->batchQuietSeconds,
-            'history_days' => $this->historyDays,
             'max_attempts' => $this->maxAttempts,
             'retry_minutes' => $this->retryMinutes,
-            'batch_line' => $this->batchLine,
         ];
     }
 
-    public function topLevel(): int
+    /**
+     * @return list<array{name: string|null, from: int, mode: string, phrases: array<string, array<string, list<string>>>}>
+     */
+    public function levels(string $role): array
     {
-        return count($this->levels) - 1;
+        return $this->ladders[self::role($role)];
+    }
+
+    public function topLevel(string $role): int
+    {
+        return count($this->levels($role)) - 1;
     }
 
     /**
-     * The highest level the bot's own repeat number reaches.
+     * The level the bot's repeat number lands on, on this role's ladder.
      */
-    public function repeatLevel(int $repeat): int
+    public function levelFor(string $role, int $repeat): int
     {
-        for ($level = $this->topLevel(); $level >= 1; $level--) {
-            $from = $this->levels[$level]['repeat_from'];
+        $levels = $this->levels($role);
 
-            if ($from !== null && $repeat >= $from) {
+        for ($level = count($levels) - 1; $level >= 1; $level--) {
+            if ($repeat >= $levels[$level]['from']) {
                 return $level;
             }
         }
@@ -199,47 +168,131 @@ final readonly class ClientCheckRules
     }
 
     /**
-     * The highest level the person's recent history reaches.
-     *
-     * @param array{hour_count: int, today_count: int, week_count: int, minutes_since_last: int|null} $metrics
+     * What goes out at a level for this role (MODE_*).
      */
-    public function historyLevel(array $metrics): int
+    public function mode(string $role, int $level): string
     {
-        for ($level = $this->topLevel(); $level >= 1; $level--) {
-            $rules = $this->levels[$level];
+        $levels = $this->levels($role);
 
-            $met = ($rules['hour'] !== null && $metrics['hour_count'] >= $rules['hour'])
-                || ($rules['today'] !== null && $metrics['today_count'] >= $rules['today'])
-                || ($rules['week'] !== null && $metrics['week_count'] >= $rules['week'])
-                || (
-                    $rules['repeat_within'] !== null
-                    && $metrics['minutes_since_last'] !== null
-                    && $metrics['minutes_since_last'] <= $rules['repeat_within']
-                );
-
-            if ($met) {
-                return $level;
-            }
-        }
-
-        return 0;
+        return $levels[max(0, min($level, count($levels) - 1))]['mode'];
     }
 
     /**
-     * The phrases of a level; one without any borrows the nearest lower
-     * level's.
+     * The phrases for a role, a level, a language and a tone, and which set
+     * they actually came from.
      *
-     * @return list<string>
+     * A missing set is filled in from the nearest one that says the same
+     * thing: the other tone of the same language, then the levels below in
+     * that language, and only when the language has nothing at all, the
+     * other language - a plain phrase in the right language beats a
+     * polite one nobody can read. Always within the role's own ladder.
+     *
+     * @return array{phrases: list<string>, language: string, tone: string, level: int}
      */
-    public function phrases(int $level): array
+    public function variant(string $role, int $level, string $language, string $tone): array
     {
-        for ($l = min($level, $this->topLevel()); $l >= 0; $l--) {
-            if ($this->levels[$l]['phrases'] !== []) {
-                return $this->levels[$l]['phrases'];
+        $levels = $this->levels($role);
+
+        $level = max(0, min($level, count($levels) - 1));
+
+        $languages = [
+            $language,
+            ...array_values(array_diff(OperationUser::LANGUAGES, [$language])),
+        ];
+
+        $tones = [
+            $tone,
+            ...array_values(array_diff(self::TONES, [$tone])),
+        ];
+
+        foreach ($languages as $lang) {
+            for ($l = $level; $l >= 0; $l--) {
+                foreach ($tones as $t) {
+                    $phrases = $levels[$l]['phrases'][$lang][$t] ?? [];
+
+                    if ($phrases !== []) {
+                        return ['phrases' => $phrases, 'language' => $lang, 'tone' => $t, 'level' => $l];
+                    }
+                }
             }
         }
 
-        return [];
+        return ['phrases' => [], 'language' => $language, 'tone' => $tone, 'level' => $level];
+    }
+
+    /**
+     * Anything that is not sales reads as an operator, the same as
+     * OperationUser::roleOrDefault().
+     */
+    public static function role(?string $role): string
+    {
+        return OperationUser::isRole($role) ? $role : OperationUser::ROLE_OPERATION;
+    }
+
+    /**
+     * @param array<int, mixed> $levels
+     * @return list<array{name: string|null, from: int, mode: string, phrases: array<string, array<string, list<string>>>}>
+     */
+    private static function ladder(array $levels): array
+    {
+        $ladder = [];
+        $previous = 0;
+
+        foreach (array_values($levels) as $index => $level) {
+            if ($index >= self::MAX_LEVELS) {
+                break;
+            }
+
+            $level = (array) $level;
+
+            /*
+             * The first level is the first penalty; every next one starts
+             * after the one before it.
+             */
+            $from = $index === 0
+                ? 1
+                : max($previous + 1, self::positive($level['from'] ?? $level['repeat_from'] ?? null) ?? $previous + 1);
+
+            $ladder[] = [
+                'name' => self::text($level['name'] ?? null),
+                'from' => $from,
+                'mode' => in_array($level['mode'] ?? null, self::MODES, true) ? $level['mode'] : self::MODE_ALL,
+                'phrases' => self::phraseSets($level['phrases'] ?? []),
+            ];
+
+            $previous = $from;
+        }
+
+        if ($ladder === []) {
+            $ladder[] = ['name' => null, 'from' => 1, 'mode' => self::MODE_ALL, 'phrases' => self::phraseSets([])];
+        }
+
+        return $ladder;
+    }
+
+    /**
+     * @return array<string, array<string, list<string>>>
+     */
+    private static function phraseSets(mixed $phrases): array
+    {
+        $phrases = (array) $phrases;
+
+        /*
+         * The old shape: one list, written in Russian.
+         */
+        if (array_is_list($phrases)) {
+            $phrases = [OperationUser::LANGUAGE_RU => [self::TONE_PLAIN => $phrases]];
+        }
+
+        $sets = [];
+
+        foreach (OperationUser::LANGUAGES as $language) {
+            foreach (self::TONES as $tone) {
+                $sets[$language][$tone] = self::phraseList($phrases[$language][$tone] ?? []);
+            }
+        }
+
+        return $sets;
     }
 
     private static function positive(mixed $value): ?int

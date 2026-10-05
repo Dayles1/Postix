@@ -51,6 +51,21 @@ class TelegramClientCheck extends Model
      */
     public const REASON_COMMENT_DISABLED = 'comment_disabled';
 
+    /**
+     * Penalties are switched off for the person's role (operators / sales).
+     */
+    public const REASON_ROLE_DISABLED = 'role_disabled';
+
+    /**
+     * The person's role sends nothing at this penalty's level.
+     */
+    public const REASON_LEVEL_OFF = 'level_off';
+
+    /**
+     * Forwarded; the level says "no comment" for the person's role.
+     */
+    public const REASON_FORWARD_ONLY = 'forward_only';
+
     protected $fillable = [
         'telegram_chat_id',
         'telegram_message_id',

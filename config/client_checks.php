@@ -2,56 +2,40 @@
 
 /*
 |--------------------------------------------------------------------------
-| Client checks (CRM penalties)
+| Client checks (CRM penalties) - the defaults
 |--------------------------------------------------------------------------
 |
 | A bot posts a penalty when a request sits in its status too long. The
-| listener forwards it to the person responsible and, once the batch is
-| over, sends that person one comment from the account it runs on.
+| listener forwards it to the person responsible and sends that person one
+| comment, from the account it runs on.
 |
-| The level is the higher of two:
-|  - by the bot's own repeat number ("Повторное отправление штрафа №N");
-|  - by the person's history: penalties in the last hour, today, this week,
-|    and how soon after the previous batch this one came.
+| These are only the starting values: the panel ("Настройки штрафов")
+| saves its own copy to the database (ClientCheckRulesStore), and from then
+| on that copy is what is used. "Restore defaults" comes back here.
+|
+| What is said depends on how many times the bot has sent the penalty -
+| "⚠️ Штраф по запросу #…" is the first time, "🆘 Повторное отправление
+| штрафа №N по запросу #…" the N-th - and on the person: their language
+| (Russian for sales, Uzbek for operators, unless changed on their card)
+| and whether they are written to with respect (people older than the one
+| writing).
 |
 */
 
 return [
 
     /*
-     * The bot posts penalties in bursts. A person's batch is considered over
-     * when no new penalty for them has arrived for this many seconds; only
-     * then is the comment sent, once for the whole batch.
+     * The bot may post the same request twice in a burst. Penalties for the
+     * same person AND the same request within this many seconds get one
+     * comment, at the highest repeat number. Different requests never
+     * share a comment.
+     *
+     * 5, not 20: the comment is meant to follow the forward within seconds
+     * (2026-10-07). Together with the listener's 2-second tick
+     * (TelegramDriverCheckHandler::CLIENT_CHECK_PERIOD) it arrives about
+     * 5-7 seconds after the forward.
      */
-    'batch_quiet_seconds' => 20,
-
-    /*
-     * Lowest repeat number for each level ("№1" is the first penalty).
-     */
-    'repeat_levels' => [
-        3 => 7,
-        2 => 4,
-        1 => 2,
-    ],
-
-    /*
-     * How far back the history is read, days ("week" below).
-     */
-    'history_days' => 7,
-
-    /*
-     * History conditions per level, any one is enough. Checked from the
-     * highest level down; no match is level 0.
-     *  - hour:          penalties in the last 60 minutes
-     *  - today:         penalties since midnight (app timezone)
-     *  - week:          penalties within history_days
-     *  - repeat_within: minutes since the previous batch, at most
-     */
-    'levels' => [
-        3 => ['today' => 8, 'hour' => 5],
-        2 => ['today' => 5, 'repeat_within' => 30],
-        1 => ['today' => 3, 'week' => 8],
-    ],
+    'batch_quiet_seconds' => 5,
 
     /*
      * Failed steps are retried this many times in total, and only while the
@@ -62,19 +46,70 @@ return [
     'retry_minutes' => 30,
 
     /*
-     * Added under the phrase when the batch holds more than one penalty.
-     */
-    'batch_line' => 'Штрафов сейчас: <b>{batch_count}</b>',
-
-    /*
-     * One phrase per batch, never the one this person got last time on the
-     * same level. Telegram HTML is allowed.
+     * One level per repeat count, from the first penalty up. `from` is the
+     * repeat number the level starts at; the last level covers everything
+     * after it ("4+").
      *
-     * Placeholders: {name}, {request}, {repeat_number}, {batch_count},
-     * {hour_count}, {today_count}, {week_count}.
+     * Placeholders: {name}, {request}, {repeat_number}, {status_limit},
+     * {time_in_status}, {crm_status}. Telegram HTML is allowed.
      */
-    'phrases' => [
-        
+    'levels' => [
+        [
+            'name' => 'Первый раз',
+            'from' => 1,
+            'phrases' => [
+                'uz' => [
+                    'plain' => ['Narx berib yubor, {status_limit} vaqt o\'tdi'],
+                    'respectful' => ['Narx berib yuboring, iltimos, {status_limit} vaqt o\'tdi'],
+                ],
+                'ru' => [
+                    'plain' => ['Дай цену, уже {status_limit} прошло'],
+                    'respectful' => ['Дайте, пожалуйста, цену, уже {status_limit} прошло'],
+                ],
+            ],
+        ],
+        [
+            'name' => 'Второй раз',
+            'from' => 2,
+            'phrases' => [
+                'uz' => [
+                    'plain' => ['Narx berasanmi?'],
+                    'respectful' => ['Moshina chiqmadimi?'],
+                ],
+                'ru' => [
+                    'plain' => ['Цену дашь?'],
+                    'respectful' => ['Машина не нашлась?'],
+                ],
+            ],
+        ],
+        [
+            'name' => 'Третий раз',
+            'from' => 3,
+            'phrases' => [
+                'uz' => [
+                    'plain' => ['Baraka topkur, qancha kutish mumkin?'],
+                    'respectful' => ['Baraka toping, yana qancha kutaylik?'],
+                ],
+                'ru' => [
+                    'plain' => ['Ну сколько можно ждать?'],
+                    'respectful' => ['Подскажите, пожалуйста, сколько ещё ждать?'],
+                ],
+            ],
+        ],
+        [
+            'name' => '4 и больше',
+            'from' => 4,
+            'phrases' => [
+                'uz' => [
+                    'plain' => ['Nima qilay, boshqaga olaymi?'],
+                    'respectful' => ['Nima qilasiz, yopa olasizmi yoki boshqaga beramizmi?'],
+                ],
+                'ru' => [
+                    'plain' => ['Что делать, отдать другому?'],
+                    'respectful' => ['Как поступим, передать запрос другому?'],
+                ],
+            ],
+        ],
     ],
 
 ];

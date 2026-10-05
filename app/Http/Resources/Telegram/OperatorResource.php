@@ -21,6 +21,15 @@ final class OperatorResource extends JsonResource
 
             'role' => $this->roleOrDefault(),
 
+            /*
+             * null = the role's default; message_language is what is used.
+             */
+            'language' => $this->language,
+
+            'message_language' => $this->messageLanguage(),
+
+            'respectful' => (bool) $this->respectful,
+
             'telegram_username' => $this->telegramUsername(),
 
             'telegram_id' => $this->telegram_id,

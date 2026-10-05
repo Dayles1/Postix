@@ -51,9 +51,13 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
 
     /**
      * How often client check comments and retries are looked at, seconds.
-     * Short, because a comment waits for its batch to go quiet first.
+     *
+     * 2, not 10 (2026-10-07): the comment waits 5 seconds for a re-send of
+     * the same request (batch_quiet_seconds), and a 10-second tick on top
+     * of that made it arrive 5-15 seconds after the forward. With 2 it is
+     * 5-7. A tick is a few small queries, cheap at this rate.
      */
-    private const CLIENT_CHECK_PERIOD = 10.0;
+    private const CLIENT_CHECK_PERIOD = 2.0;
 
     /**
      * Chats to watch, or null when onStart() could not run at all.
