@@ -122,6 +122,9 @@ function toForm(rules) {
         batch_quiet_seconds: rules.batch_quiet_seconds ?? 5,
         max_attempts: rules.max_attempts ?? 3,
         retry_minutes: rules.retry_minutes ?? 30,
+        /* '' and '' = no limit; rules saved before hours existed come back with the default. */
+        work_from: rules.working_hours ? (rules.working_hours.from ?? '') : '09:00',
+        work_to: rules.working_hours ? (rules.working_hours.to ?? '') : '18:00',
     };
 }
 
@@ -134,6 +137,10 @@ function toPayload(form) {
         batch_quiet_seconds: toNumber(form.batch_quiet_seconds),
         max_attempts: toNumber(form.max_attempts),
         retry_minutes: toNumber(form.retry_minutes),
+        working_hours: {
+            from: form.work_from || null,
+            to: form.work_to || null,
+        },
     };
 }
 
@@ -377,6 +384,16 @@ export function penaltySettingsPage(config) {
             } finally {
                 this.settingsBusy = null;
             }
+        },
+
+        /** Hours off: every hour counts. */
+        clearHours() {
+            this.form.work_from = '';
+            this.form.work_to = '';
+        },
+
+        hoursSet() {
+            return !!(this.form.work_from && this.form.work_to);
         },
 
         notify(message, success = true) {

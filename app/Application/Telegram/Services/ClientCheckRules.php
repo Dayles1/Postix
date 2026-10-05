@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Application\Telegram\Services;
 
 use App\Models\Telegram\OperationUser;
+use DateTimeInterface;
+use Illuminate\Support\Carbon;
 
 /**
  * What a person is told about a penalty, by how many times the bot has
@@ -50,6 +52,14 @@ final readonly class ClientCheckRules
     public const MODES = [self::MODE_ALL, self::MODE_FORWARD, self::MODE_OFF];
 
     /**
+     * Penalties are only handled inside these hours (app timezone); what
+     * the bot posts outside them is recorded and ignored.
+     */
+    public const DEFAULT_WORK_FROM = '09:00';
+
+    public const DEFAULT_WORK_TO = '18:00';
+
+    /**
      * What a phrase may contain; filled in by ClientCheckEscalation. The
      * durations come out in the phrase's language ("2 ч" / "2 soat").
      */
@@ -75,6 +85,11 @@ final readonly class ClientCheckRules
         public int $batchQuietSeconds,
         public int $maxAttempts,
         public int $retryMinutes,
+        /*
+         * "HH:MM", app timezone. Both null: no limit, every hour counts.
+         */
+        public ?string $workFrom = self::DEFAULT_WORK_FROM,
+        public ?string $workTo = self::DEFAULT_WORK_TO,
     ) {
     }
 
@@ -102,12 +117,26 @@ final readonly class ClientCheckRules
             $ladders[$role] = self::ladder((array) $levels);
         }
 
+        /*
+         * Rules saved before working hours existed get the default hours;
+         * hours saved empty mean "no limit".
+         */
+        $hours = array_key_exists('working_hours', $data)
+            ? (array) $data['working_hours']
+            : ['from' => self::DEFAULT_WORK_FROM, 'to' => self::DEFAULT_WORK_TO];
+
+        $from = self::clock($hours['from'] ?? null);
+        $to = self::clock($hours['to'] ?? null);
+
         return new self(
             ladders: $ladders,
             /* Same default as config/client_checks.php: 5 seconds. */
             batchQuietSeconds: self::clamp($data['batch_quiet_seconds'] ?? 5, 1, 3600),
             maxAttempts: self::clamp($data['max_attempts'] ?? 3, 1, 20),
             retryMinutes: self::clamp($data['retry_minutes'] ?? 30, 1, 1440),
+            /* One end alone is no window: both or none. */
+            workFrom: $from !== null && $to !== null ? $from : null,
+            workTo: $from !== null && $to !== null ? $to : null,
         );
     }
 
@@ -135,7 +164,31 @@ final readonly class ClientCheckRules
             'batch_quiet_seconds' => $this->batchQuietSeconds,
             'max_attempts' => $this->maxAttempts,
             'retry_minutes' => $this->retryMinutes,
+            'working_hours' => [
+                'from' => $this->workFrom,
+                'to' => $this->workTo,
+            ],
         ];
+    }
+
+    /**
+     * Inside the working hours, in the app timezone (Asia/Tashkent): from
+     * included, to excluded - 09:00-18:00 takes 09:00 and ignores 18:00.
+     * A window that runs past midnight (22:00-06:00) works too.
+     */
+    public function withinWorkingHours(?DateTimeInterface $at = null): bool
+    {
+        if ($this->workFrom === null || $this->workTo === null || $this->workFrom === $this->workTo) {
+            return true;
+        }
+
+        $time = Carbon::instance($at ?? now())
+            ->setTimezone(config('app.timezone'))
+            ->format('H:i');
+
+        return $this->workFrom < $this->workTo
+            ? $time >= $this->workFrom && $time < $this->workTo
+            : $time >= $this->workFrom || $time < $this->workTo;
     }
 
     /**
@@ -293,6 +346,18 @@ final readonly class ClientCheckRules
         }
 
         return $sets;
+    }
+
+    /**
+     * "9:00" / "09:00" -> "09:00"; anything else -> null.
+     */
+    private static function clock(mixed $value): ?string
+    {
+        if (! is_string($value) || preg_match('/^([01]?\d|2[0-3]):([0-5]\d)$/', trim($value), $m) !== 1) {
+            return null;
+        }
+
+        return sprintf('%02d:%s', (int) $m[1], $m[2]);
     }
 
     private static function positive(mixed $value): ?int

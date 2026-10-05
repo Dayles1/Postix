@@ -327,6 +327,7 @@ return [
             'skipped' => 'Skipped',
         ],
         'reasons' => [
+            'outside_hours' => 'Came in outside working hours - not sent',
             'responsible_missing' => 'The penalty names nobody responsible',
             'responsible_unreachable' => 'The person has no Telegram contact or private messages are off',
             'forward_failed' => 'Telegram refused the forward',
@@ -393,6 +394,7 @@ return [
         'description' => 'What to tell a person on the 1st, 2nd, 3rd and later penalty for one request. The number is the bot\'s own. Texts in two languages, plain and respectful - for people who are older.',
         'back' => 'Back to penalties',
         'sections' => [
+            'hours' => 'Working hours',
             'delivery' => 'Delivery',
             'levels' => 'Texts by penalty number',
             'levels_hint' => '"⚠️ Штраф по запросу" is the first time, "🆘 Повторное отправление штрафа №N" the N-th. The last level also covers everything after it.',
@@ -402,6 +404,13 @@ return [
             'language' => 'Text language',
             'how' => 'How the text is chosen',
             'how_text' => 'Language and tone come from the person\'s card: Russian for sales and Uzbek for operators by default; "Respectful" is switched on there too. An empty set is filled from the nearest one: the other tone, a lower level, and only as a last resort the other language.',
+        ],
+        'hours' => [
+            'hint' => 'Penalties outside these hours are recorded but sent to nobody. Tashkent time.',
+            'from' => 'From',
+            'to' => 'To',
+            'always' => 'Around the clock',
+            'clear' => 'No limit',
         ],
         'languages' => [
             'uz' => 'O\'zbekcha',

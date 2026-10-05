@@ -152,6 +152,12 @@ class ClientCheckTest extends TestCase
          * fallbacks: no respectful text from the 2nd on, no Russian on
          * the 3rd and 4th.
          */
+        /*
+         * The config's own per-role ladders would win over this shared
+         * list; the tests read theirs from the list below.
+         */
+        config()->set('client_checks.roles', null);
+
         config()->set('client_checks.levels', [
             ['from' => 1, 'phrases' => [
                 'uz' => ['plain' => ['U1 {name} #{request} {status_limit}'], 'respectful' => ['U1R {name}']],
@@ -814,6 +820,91 @@ class ClientCheckTest extends TestCase
         $this->assertSame(TelegramClientCheckStatus::Skipped, $third->refresh()->status);
         $this->assertSame(TelegramClientCheck::REASON_LEVEL_OFF, $third->reason);
         $this->assertSame(2, $third->level);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Working hours
+    |--------------------------------------------------------------------------
+    */
+
+    public function test_penalties_outside_working_hours_are_ignored(): void
+    {
+        $this->person();
+
+        foreach (['08:59:59' => 'outside', '09:00:00' => 'in', '17:59:59' => 'in', '18:00:00' => 'outside', '23:30:00' => 'outside'] as $time => $expected) {
+            Carbon::setTestNow('2026-10-02 ' . $time);
+
+            $check = $this->penalty(request: 'H' . str_replace(':', '', $time));
+
+            if ($expected === 'outside') {
+                $this->assertSame(TelegramClientCheckStatus::Skipped, $check->refresh()->status, $time);
+                $this->assertSame(TelegramClientCheck::REASON_OUTSIDE_HOURS, $check->reason, $time);
+            } else {
+                $this->assertSame(TelegramClientCheckStatus::Forwarded, $check->refresh()->status, $time);
+            }
+        }
+
+        /* Two of five went out. */
+        $this->assertSame(2, count(array_filter($this->messages->kinds(), fn ($k) => $k === 'forward')));
+    }
+
+    public function test_a_failed_forward_is_not_retried_after_hours(): void
+    {
+        $this->person();
+
+        Carbon::setTestNow('2026-10-02 17:59:00');
+        $this->messages->forwardFailsFor = ['@afzal', 555];
+        $check = $this->penalty();
+
+        Carbon::setTestNow('2026-10-02 18:01:00');
+        $this->messages->forwardFailsFor = [];
+        app(ClientCheckSender::class)->flush($this->telegram);
+
+        $this->assertSame([], $this->messages->calls);
+        $this->assertSame(TelegramClientCheckStatus::Failed, $check->refresh()->status);
+    }
+
+    public function test_working_hours_read_as_saved(): void
+    {
+        $at = static fn (string $t) => Carbon::parse('2026-10-02 ' . $t, 'Asia/Tashkent');
+
+        /* Saved before hours existed: the default 09:00-18:00. */
+        $old = ClientCheckRules::fromArray(['levels' => []]);
+        $this->assertSame(['09:00', '18:00'], [$old->workFrom, $old->workTo]);
+        $this->assertFalse($old->withinWorkingHours($at('18:00')));
+
+        /* Saved empty: every hour counts. */
+        $always = ClientCheckRules::fromArray(['working_hours' => ['from' => null, 'to' => null]]);
+        $this->assertTrue($always->withinWorkingHours($at('03:00')));
+
+        /* A night window. */
+        $night = ClientCheckRules::fromArray(['working_hours' => ['from' => '22:00', 'to' => '6:00']]);
+        $this->assertSame('06:00', $night->workTo);
+        $this->assertTrue($night->withinWorkingHours($at('23:15')));
+        $this->assertTrue($night->withinWorkingHours($at('05:59')));
+        $this->assertFalse($night->withinWorkingHours($at('12:00')));
+    }
+
+    /**
+     * The shipped defaults: sales get one respectful text on every penalty.
+     */
+    public function test_sales_get_their_own_respectful_text_by_default(): void
+    {
+        config()->set('client_checks', require config_path('client_checks.php'));
+
+        $this->anna();
+
+        $this->penalty(text: self::SALES);
+        $this->flushAfterQuiet();
+
+        $this->assertSame('Обновите, пожалуйста, статус', $this->messages->sent()[0]['message']);
+
+        $rules = app(ClientCheckRulesStore::class)->current();
+        $this->assertSame(
+            $rules->levels('sales')[0]['phrases']['ru']['respectful'],
+            $rules->levels('sales')[0]['phrases']['ru']['plain'],
+        );
     }
 
     public function test_failed_forwards_stop_after_the_limit(): void

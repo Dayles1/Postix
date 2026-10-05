@@ -104,6 +104,20 @@ final class ProcessClientCheckMessage
         }
 
         /*
+         * Outside the working hours the bot's penalties are ignored:
+         * nobody is written to after 18:00. Kept, so the journal still
+         * shows what came in.
+         */
+        if (! $this->escalation->rules()->withinWorkingHours($check->created_at ?? now())) {
+            $check->update([
+                'status' => TelegramClientCheckStatus::Skipped,
+                'reason' => TelegramClientCheck::REASON_OUTSIDE_HOURS,
+            ]);
+
+            return $check;
+        }
+
+        /*
          * The same, for this person's role only: operators and sales
          * managers are switched on and off apart.
          */

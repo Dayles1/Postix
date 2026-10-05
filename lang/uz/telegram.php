@@ -315,6 +315,7 @@ return [
             'skipped' => 'O\'tkazib yuborildi',
         ],
         'reasons' => [
+            'outside_hours' => 'Ish vaqtidan tashqari keldi - yuborilmadi',
             'responsible_missing' => 'Jarimada mas\'ul ko\'rsatilmagan',
             'responsible_unreachable' => 'Mas\'ulning Telegrami yo\'q yoki lichkaga yuborish o\'chirilgan',
             'forward_failed' => 'Telegram forwardni qabul qilmadi',
@@ -381,6 +382,7 @@ return [
         'description' => 'Bitta so\'rov bo\'yicha 1-, 2-, 3- va keyingi jarimalarda odamga nima yozish. Raqam bot xabaridan olinadi. Matnlar ikki tilda, oddiy va hurmatli - yoshi kattalar uchun.',
         'back' => 'Jarimalarga qaytish',
         'sections' => [
+            'hours' => 'Ish vaqti',
             'delivery' => 'Yuborish',
             'levels' => 'Jarima raqami bo\'yicha matnlar',
             'levels_hint' => '«⚠️ Штраф по запросу» - birinchi marta, «🆘 Повторное отправление штрафа №N» - N-marta. Oxirgi daraja undan keyingilar uchun ham ishlaydi.',
@@ -390,6 +392,13 @@ return [
             'language' => 'Matnlar tili',
             'how' => 'Matn qanday tanlanadi',
             'how_text' => 'Til va ohang odamning kartasidan olinadi: sales uchun standart rus tili, operatorlar uchun o\'zbek tili. «Hurmat bilan» ham o\'sha yerda yoqiladi. Bo\'sh variant eng yaqini bilan almashtiriladi: boshqa ohang, pastki daraja, oxirgi chora sifatida boshqa til.',
+        ],
+        'hours' => [
+            'hint' => 'Bu vaqtdan tashqari kelgan jarimalar yoziladi, lekin hech kimga yuborilmaydi. Toshkent vaqti.',
+            'from' => 'Dan',
+            'to' => 'Gacha',
+            'always' => 'Kun bo\'yi',
+            'clear' => 'Cheklovsiz',
         ],
         'languages' => [
             'uz' => 'O\'zbekcha',

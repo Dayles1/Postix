@@ -29,6 +29,13 @@ final class ClientCheckRulesRequest extends FormRequest
             'batch_quiet_seconds' => ['required', 'integer', 'min:5', 'max:600'],
             'max_attempts' => ['required', 'integer', 'min:1', 'max:10'],
             'retry_minutes' => ['required', 'integer', 'min:5', 'max:1440'],
+
+            /*
+             * Both empty: every hour counts.
+             */
+            'working_hours' => ['nullable', 'array'],
+            'working_hours.from' => ['nullable', 'date_format:H:i', 'required_with:working_hours.to'],
+            'working_hours.to' => ['nullable', 'date_format:H:i', 'required_with:working_hours.from'],
         ];
 
         foreach (OperationUser::ROLES as $role) {

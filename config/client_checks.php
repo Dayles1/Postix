@@ -46,70 +46,117 @@ return [
     'retry_minutes' => 30,
 
     /*
-     * One level per repeat count, from the first penalty up. `from` is the
-     * repeat number the level starts at; the last level covers everything
-     * after it ("4+").
+     * Penalties are only handled inside these hours (app timezone,
+     * Asia/Tashkent): what the bot posts before 09:00 or from 18:00 on is
+     * recorded and ignored - nothing is forwarded, no comment follows.
+     * Both null: every hour counts.
+     */
+    'working_hours' => [
+        'from' => '09:00',
+        'to' => '18:00',
+    ],
+
+    /*
+     * A ladder per role: operators and sales managers are told different
+     * things. Each level starts at a repeat number (`from`) and says what
+     * goes out at it (`mode`: 'all' - the forward and a comment,
+     * 'forward' - the forward only, 'off' - nothing). The last level covers
+     * everything after it ("4+").
      *
      * Placeholders: {name}, {request}, {repeat_number}, {status_limit},
      * {time_in_status}, {crm_status}. Telegram HTML is allowed.
+     *
+     * Respectful and plain are written apart: respectful is not a politer
+     * copy of plain, it may say something else.
      */
-    'levels' => [
-        [
-            'name' => 'Первый раз',
-            'from' => 1,
-            'phrases' => [
-                'uz' => [
-                    'plain' => ['Narx berib yubor, {status_limit} vaqt o\'tdi'],
-                    'respectful' => ['Narx berib yuboring, iltimos, {status_limit} vaqt o\'tdi'],
+    'roles' => [
+
+        'operation' => [
+            'levels' => [
+                [
+                    'name' => 'Первый раз',
+                    'from' => 1,
+                    'phrases' => [
+                        'uz' => [
+                            'plain' => ['Narx berib yubor, {status_limit} vaqt o\'tdi'],
+                            'respectful' => ['Narx berib yuboring, iltimos, {status_limit} vaqt o\'tdi'],
+                        ],
+                        'ru' => [
+                            'plain' => ['Дай цену, уже {status_limit} прошло'],
+                            'respectful' => ['Дайте, пожалуйста, цену, уже {status_limit} прошло'],
+                        ],
+                    ],
                 ],
-                'ru' => [
-                    'plain' => ['Дай цену, уже {status_limit} прошло'],
-                    'respectful' => ['Дайте, пожалуйста, цену, уже {status_limit} прошло'],
+                [
+                    'name' => 'Второй раз',
+                    'from' => 2,
+                    'phrases' => [
+                        'uz' => [
+                            'plain' => ['Narx berasanmi?'],
+                            'respectful' => ['Moshina chiqmadimi?'],
+                        ],
+                        'ru' => [
+                            'plain' => ['Цену дашь?'],
+                            'respectful' => ['Машина не нашлась?'],
+                        ],
+                    ],
+                ],
+                [
+                    'name' => 'Третий раз',
+                    'from' => 3,
+                    'phrases' => [
+                        'uz' => [
+                            'plain' => ['Baraka topkur, qancha kutish mumkin?'],
+                            'respectful' => ['Baraka toping, yana qancha kutaylik?'],
+                        ],
+                        'ru' => [
+                            'plain' => ['Ну сколько можно ждать?'],
+                            'respectful' => ['Подскажите, пожалуйста, сколько ещё ждать?'],
+                        ],
+                    ],
+                ],
+                [
+                    'name' => '4 и больше',
+                    'from' => 4,
+                    'phrases' => [
+                        'uz' => [
+                            'plain' => ['Nima qilay, boshqaga olaymi?'],
+                            'respectful' => ['Nima qilasiz, yopa olasizmi yoki boshqaga beramizmi?'],
+                        ],
+                        'ru' => [
+                            'plain' => ['Что делать, отдать другому?'],
+                            'respectful' => ['Как поступим, передать запрос другому?'],
+                        ],
+                    ],
                 ],
             ],
         ],
-        [
-            'name' => 'Второй раз',
-            'from' => 2,
-            'phrases' => [
-                'uz' => [
-                    'plain' => ['Narx berasanmi?'],
-                    'respectful' => ['Moshina chiqmadimi?'],
-                ],
-                'ru' => [
-                    'plain' => ['Цену дашь?'],
-                    'respectful' => ['Машина не нашлась?'],
-                ],
-            ],
-        ],
-        [
-            'name' => 'Третий раз',
-            'from' => 3,
-            'phrases' => [
-                'uz' => [
-                    'plain' => ['Baraka topkur, qancha kutish mumkin?'],
-                    'respectful' => ['Baraka toping, yana qancha kutaylik?'],
-                ],
-                'ru' => [
-                    'plain' => ['Ну сколько можно ждать?'],
-                    'respectful' => ['Подскажите, пожалуйста, сколько ещё ждать?'],
+
+        /*
+         * Sales: one text for every penalty, and respectful to everyone -
+         * the plain set says the same, so the respect switch on a sales
+         * card changes nothing.
+         */
+        'sales' => [
+            'levels' => [
+                [
+                    'name' => 'Sales',
+                    'from' => 1,
+                    'mode' => 'all',
+                    'phrases' => [
+                        'uz' => [
+                            'plain' => ['Statusni yangilang, iltimos'],
+                            'respectful' => ['Statusni yangilang, iltimos'],
+                        ],
+                        'ru' => [
+                            'plain' => ['Обновите, пожалуйста, статус'],
+                            'respectful' => ['Обновите, пожалуйста, статус'],
+                        ],
+                    ],
                 ],
             ],
         ],
-        [
-            'name' => '4 и больше',
-            'from' => 4,
-            'phrases' => [
-                'uz' => [
-                    'plain' => ['Nima qilay, boshqaga olaymi?'],
-                    'respectful' => ['Nima qilasiz, yopa olasizmi yoki boshqaga beramizmi?'],
-                ],
-                'ru' => [
-                    'plain' => ['Что делать, отдать другому?'],
-                    'respectful' => ['Как поступим, передать запрос другому?'],
-                ],
-            ],
-        ],
+
     ],
 
 ];

@@ -462,6 +462,64 @@
                     @endforeach
                 </x-driver-check.surface>
 
+                {{-- Working hours: penalties outside them are ignored --}}
+                <x-driver-check.surface class="p-4">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                                {{ __('telegram.penalty_settings.sections.hours') }}
+                            </h3>
+                            <p class="mt-1 text-[12px] leading-snug text-gray-500 dark:text-gray-400">
+                                {{ __('telegram.penalty_settings.hours.hint') }}
+                            </p>
+                        </div>
+
+                        <span
+                            class="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums"
+                            :class="hoursSet()
+                                ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300'
+                                : 'bg-gray-100 text-gray-500 dark:bg-white/[0.06] dark:text-gray-400'"
+                            x-text="hoursSet() ? form.work_from + '–' + form.work_to : translations.hours.always"
+                        ></span>
+                    </div>
+
+                    <div class="mt-3 grid grid-cols-2 gap-3">
+                        @foreach (['work_from' => 'from', 'work_to' => 'to'] as $field => $end)
+                            <label class="min-w-0">
+                                <span class="mb-1 block text-[11px] font-medium text-gray-500 dark:text-gray-400">
+                                    {{ __("telegram.penalty_settings.hours.{$end}") }}
+                                </span>
+                                <input
+                                    type="time"
+                                    step="60"
+                                    x-model="form.{{ $field }}"
+                                    class="h-10 w-full rounded-xl border bg-white px-3 text-sm tabular-nums text-gray-900 outline-none
+                                           transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10
+                                           dark:bg-gray-900 dark:text-white"
+                                    :class="fieldError('working_hours.{{ $end }}')
+                                        ? 'border-error-400 dark:border-error-500/60'
+                                        : 'border-gray-300 dark:border-gray-700'"
+                                >
+                                <span
+                                    x-show="fieldError('working_hours.{{ $end }}')"
+                                    x-cloak
+                                    class="mt-1 block text-[11px] text-error-600 dark:text-error-400"
+                                    x-text="fieldError('working_hours.{{ $end }}')"
+                                ></span>
+                            </label>
+                        @endforeach
+                    </div>
+
+                    <button
+                        type="button"
+                        x-show="hoursSet()"
+                        x-cloak
+                        x-on:click="clearHours()"
+                        class="mt-2 text-[12px] font-medium text-gray-500 underline-offset-2 hover:text-gray-900 hover:underline
+                               dark:text-gray-400 dark:hover:text-white"
+                    >{{ __('telegram.penalty_settings.hours.clear') }}</button>
+                </x-driver-check.surface>
+
                 {{-- How a text is chosen --}}
                 <x-driver-check.surface class="p-4">
                     <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">

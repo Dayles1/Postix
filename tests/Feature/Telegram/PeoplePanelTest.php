@@ -233,12 +233,14 @@ class PeoplePanelTest extends TestCase
             'batch_quiet_seconds' => 25,
             'max_attempts' => 2,
             'retry_minutes' => 40,
+            'working_hours' => ['from' => '08:30', 'to' => '19:00'],
             ...$override,
         ];
     }
 
     public function test_rules_start_from_the_config_and_are_saved_and_reset(): void
     {
+        config()->set('client_checks.roles', null);
         config()->set('client_checks.levels', [
             ['from' => 1, 'phrases' => ['uz' => ['plain' => ['cfg']]]],
         ]);
@@ -265,7 +267,22 @@ class PeoplePanelTest extends TestCase
             ->assertJsonCount(1, 'data.roles.sales.levels')
             ->assertJsonPath('data.roles.sales.levels.0.phrases.ru.plain', ['Только sales'])
             ->assertJsonPath('data.batch_quiet_seconds', 25)
+            ->assertJsonPath('data.working_hours', ['from' => '08:30', 'to' => '19:00'])
             ->assertJsonPath('defaults.roles.operation.levels.0.phrases.uz.plain.0', 'cfg');
+
+        /* Both ends empty: no limit. */
+        $this->putJson('/api/telegram/client-checks/rules', $this->validRules(['working_hours' => ['from' => null, 'to' => null]]))
+            ->assertOk()
+            ->assertJsonPath('data.working_hours', ['from' => null, 'to' => null]);
+
+        /* One end alone, or a bad time, is refused. */
+        $this->putJson('/api/telegram/client-checks/rules', $this->validRules(['working_hours' => ['from' => '09:00', 'to' => null]]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('working_hours.to');
+
+        $this->putJson('/api/telegram/client-checks/rules', $this->validRules(['working_hours' => ['from' => '25:00', 'to' => '18:00']]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('working_hours.from');
 
         $this->deleteJson('/api/telegram/client-checks/rules')
             ->assertOk()

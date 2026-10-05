@@ -132,7 +132,14 @@ final class ClientCheckSender
             return;
         }
 
-        $this->retryForwards($telegram);
+        /*
+         * A failed forward is not retried after hours: that would be a
+         * penalty sent at 18:05. A comment still follows a forward that
+         * went out in time, so a pair is never cut in half.
+         */
+        if ($this->escalation->rules()->withinWorkingHours()) {
+            $this->retryForwards($telegram);
+        }
 
         $this->expireStale();
 
