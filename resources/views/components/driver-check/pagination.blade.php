@@ -1,17 +1,19 @@
 {{--
     Paging.
 
-    A phone gets three big targets (back / position / forward); a desktop
-    gets the numbered pages and the "showing x-y of z" line.
+    "Showing x-y of z" whenever there are rows. The page controls only when
+    there is more than one page: a phone gets three big targets (back /
+    position / forward), a desktop the numbered pages.
 --}}
 
 <div
-    x-show="pagination.last_page > 1"
+    x-show="pagination.total > 0"
     x-cloak
-    class="flex flex-col gap-3 border-t border-gray-200 px-3.5 py-3 sm:flex-row sm:items-center
-           sm:justify-between sm:px-4 dark:border-gray-800"
+    class="flex flex-col gap-3 border-t border-gray-200 bg-gray-50/50 px-3.5 py-3 sm:flex-row sm:items-center
+           sm:justify-between sm:px-4 dark:border-gray-800 dark:bg-white/[0.01]"
 >
-    <p class="hidden text-xs text-gray-500 sm:block dark:text-gray-400">
+    {{-- Always there: the toolbar no longer carries a count, this line does --}}
+    <p class="text-center text-xs text-gray-500 sm:text-left dark:text-gray-400">
         {{ __('telegram.ui.showing') }}
         <span class="font-semibold tabular-nums text-gray-700 dark:text-gray-200" x-text="number(pagination.from)">0</span>
         &ndash;
@@ -20,7 +22,7 @@
         <span class="font-semibold tabular-nums text-gray-700 dark:text-gray-200" x-text="number(pagination.total)">0</span>
     </p>
 
-    <div class="flex items-center justify-between gap-2 sm:justify-end">
+    <div x-show="pagination.last_page > 1" class="flex items-center justify-between gap-2 sm:justify-end">
         <button
             type="button"
             x-on:click="goToPage(pagination.current_page - 1)"

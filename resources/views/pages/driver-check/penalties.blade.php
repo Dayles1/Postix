@@ -8,15 +8,27 @@
     $rules = app(\App\Application\Telegram\Services\ClientCheckRulesStore::class)->current();
 
     /*
-     * Level names as the settings page has them; a level without a name
-     * is "Level N" (or the stock name of the first four).
+     * Level names as the settings page has them, per role - operators and
+     * sales have ladders of their own. A level without a name is "Level N".
      */
-    $levelNames = collect($rules->levels)
-        ->map(fn (array $level, int $n) => $level['name']
-            ?? (\Illuminate\Support\Facades\Lang::has("telegram.penalties.levels.{$n}")
-                ? __("telegram.penalties.levels.{$n}")
-                : __('telegram.penalties.level_n', ['n' => $n])))
-        ->values()
+    $levelNames = collect(\App\Models\Telegram\OperationUser::ROLES)
+        ->mapWithKeys(fn (string $role) => [
+            $role => collect($rules->levels($role))
+                ->map(fn (array $level, int $n) => $level['name']
+                    ?? __('telegram.penalties.level_n', ['n' => $n + 1]))
+                ->values()
+                ->all(),
+        ])
+        ->all();
+
+    /*
+     * The level filter lists the longer ladder; a level both have is named
+     * after the operators' one.
+     */
+    $levelOptions = collect(range(0, max(
+        count($levelNames['operation']), count($levelNames['sales'])
+    ) - 1))
+        ->mapWithKeys(fn (int $n) => [$n => $levelNames['operation'][$n] ?? $levelNames['sales'][$n]])
         ->all();
 @endphp
 
@@ -29,6 +41,8 @@
         },
         levelNames: @js($levelNames),
         translations: @js(__('telegram.penalties')),
+        languages: @js(__('telegram.penalty_settings.languages')),
+        tones: @js(__('telegram.penalty_settings.tones')),
         ui: @js(__('telegram.ui')),
     })"
 >
@@ -40,7 +54,7 @@
         <x-driver-check.page-header
             icon="alert"
             tone="brand"
-            eyebrow="CRM"
+            :eyebrow="__('telegram.menu.groups.check')"
             :title="__('telegram.penalties.title')"
             :description="__('telegram.penalties.description')"
         >
@@ -142,119 +156,118 @@
             </x-driver-check.stat-card>
         </section>
 
-        {{-- ============================================================
-             Filters
-        ============================================================= --}}
-        <x-driver-check.filters :search-placeholder="__('telegram.penalties.search_placeholder')">
-            <x-slot:leading>
-                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    {{-- All | Operation | Sales --}}
-                    <nav
-                        class="inline-flex w-full gap-1 rounded-xl bg-gray-100 p-1 sm:w-auto dark:bg-white/[0.04]"
-                        aria-label="{{ __('telegram.penalties.filters.role') }}"
-                    >
-                        <template x-for="tab in roleTabs()" :key="'tab-' + tab.value">
-                            <button
-                                type="button"
-                                x-on:click="setRole(tab.value)"
-                                :aria-pressed="filters.role === tab.value"
-                                :class="filters.role === tab.value
-                                    ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
-                                    : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'"
-                                class="dc-tap inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-lg px-3.5 text-[13px]
-                                       font-medium transition sm:flex-none"
-                            >
-                                <span x-text="tab.label"></span>
-                                <span
-                                    class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-gray-100 px-1.5
-                                           text-[11px] font-semibold tabular-nums text-gray-600 dark:bg-white/[0.08] dark:text-gray-300"
-                                    x-text="number(tab.count)"
-                                ></span>
-                            </button>
-                        </template>
-                    </nav>
-
-                    {{-- Narrowed to one person (from the operators / sales pages) --}}
-                    <span
-                        x-show="filters.operation_user_id"
-                        x-cloak
-                        class="inline-flex h-9 max-w-full items-center gap-2 self-start rounded-full bg-brand-50 pl-3 pr-1.5 text-[13px]
-                               text-brand-700 sm:self-auto dark:bg-brand-500/10 dark:text-brand-300"
-                    >
-                        <x-driver-check.icon name="user" class="h-3.5 w-3.5 shrink-0" />
-                        <span class="truncate font-medium" x-text="personFilterName()"></span>
-                        <button
-                            type="button"
-                            x-on:click="clearPerson()"
-                            class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full hover:bg-brand-100
-                                   dark:hover:bg-brand-500/20"
-                            :title="translations.filters.person_clear"
-                            :aria-label="translations.filters.person_clear"
-                        >
-                            <x-driver-check.icon name="close" class="h-3.5 w-3.5" />
-                        </button>
-                    </span>
-                </div>
-            </x-slot:leading>
-
-            <x-driver-check.field
-                :label="__('telegram.penalties.filters.period')"
-                class="sm:col-span-2 xl:col-span-4"
-            >
-                <div class="flex flex-col gap-2.5">
-                    <x-driver-check.chips />
-
-                    <div x-show="periodPreset === 'custom'" x-cloak class="grid grid-cols-2 gap-2 sm:max-w-md">
-                        <x-driver-check.input
-                            type="date"
-                            x-model="filters.period_from"
-                            x-on:change="applyCustomPeriod()"
-                            :aria-label="__('telegram.penalties.filters.period_from')"
-                        />
-                        <x-driver-check.input
-                            type="date"
-                            x-model="filters.period_to"
-                            x-on:change="applyCustomPeriod()"
-                            :aria-label="__('telegram.penalties.filters.period_to')"
-                        />
-                    </div>
-                </div>
-            </x-driver-check.field>
-
-            <x-driver-check.field :label="__('telegram.penalties.filters.status')">
-                <x-driver-check.select x-model="filters.status" x-on:change="applyFilters()">
-                    <option value="">{{ __('telegram.penalties.filters.status_all') }}</option>
-                    @foreach (\App\Enums\Telegram\TelegramClientCheckStatus::cases() as $status)
-                        <option value="{{ $status->value }}">{{ __("telegram.penalties.statuses.{$status->value}") }}</option>
-                    @endforeach
-                </x-driver-check.select>
-            </x-driver-check.field>
-
-            <x-driver-check.field :label="__('telegram.penalties.filters.level')">
-                <x-driver-check.select x-model="filters.level" x-on:change="applyFilters()">
-                    <option value="">{{ __('telegram.penalties.filters.level_all') }}</option>
-                    @foreach ($levelNames as $level => $name)
-                        <option value="{{ $level }}">{{ $level }} · {{ $name }}</option>
-                    @endforeach
-                </x-driver-check.select>
-            </x-driver-check.field>
-        </x-driver-check.filters>
-
         <x-driver-check.error-alert :title="__('telegram.penalties.errors.title')" />
 
         {{-- ============================================================
              Rows: a table from lg up, cards below it
         ============================================================= --}}
         <x-driver-check.surface class="overflow-hidden" x-ref="listTop">
-            <x-driver-check.list-toolbar
-                :title="__('telegram.penalties.title')"
+            <x-driver-check.filters
+                embedded
+                :search-placeholder="__('telegram.penalties.search_placeholder')"
                 :sort-options="[
-                    'created_at' => __('telegram.penalties.table.created'),
-                    'level' => __('telegram.penalties.table.level'),
-                    'repeat_number' => __('telegram.penalties.table.repeat'),
-                    'request_number' => __('telegram.penalties.table.request'),
-                ]"
-            />
+                        'created_at' => __('telegram.penalties.table.created'),
+                        'level' => __('telegram.penalties.table.level'),
+                        'repeat_number' => __('telegram.penalties.table.repeat'),
+                        'request_number' => __('telegram.penalties.table.request'),
+                    ]"
+            >
+                <x-slot:leading>
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        {{-- All | Operation | Sales --}}
+                        <nav
+                            class="inline-flex w-full gap-1 rounded-xl bg-gray-100 p-1 sm:w-auto dark:bg-white/[0.04]"
+                            aria-label="{{ __('telegram.penalties.filters.role') }}"
+                        >
+                            <template x-for="tab in roleTabs()" :key="'tab-' + tab.value">
+                                <button
+                                    type="button"
+                                    x-on:click="setRole(tab.value)"
+                                    :aria-pressed="filters.role === tab.value"
+                                    :class="filters.role === tab.value
+                                        ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
+                                        : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'"
+                                    class="dc-tap inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-lg px-3.5 text-[13px]
+                                           font-medium transition sm:flex-none"
+                                >
+                                    <span x-text="tab.label"></span>
+                                    <span
+                                        :class="filters.role === tab.value
+                                            ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300'
+                                            : 'bg-gray-200/70 text-gray-600 dark:bg-white/[0.08] dark:text-gray-300'"
+                                        class="inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5
+                                               text-[11px] font-semibold tabular-nums"
+                                        x-text="number(tab.count)"
+                                    ></span>
+                                </button>
+                            </template>
+                        </nav>
+
+                        {{-- Narrowed to one person (from the operators / sales pages) --}}
+                        <span
+                            x-show="filters.operation_user_id"
+                            x-cloak
+                            class="inline-flex h-9 max-w-full items-center gap-2 self-start rounded-full bg-brand-50 pl-3 pr-1.5 text-[13px]
+                                   text-brand-700 sm:self-auto dark:bg-brand-500/10 dark:text-brand-300"
+                        >
+                            <x-driver-check.icon name="user" class="h-3.5 w-3.5 shrink-0" />
+                            <span class="truncate font-medium" x-text="personFilterName()"></span>
+                            <button
+                                type="button"
+                                x-on:click="clearPerson()"
+                                class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full hover:bg-brand-100
+                                       dark:hover:bg-brand-500/20"
+                                :title="translations.filters.person_clear"
+                                :aria-label="translations.filters.person_clear"
+                            >
+                                <x-driver-check.icon name="close" class="h-3.5 w-3.5" />
+                            </button>
+                        </span>
+                    </div>
+                </x-slot:leading>
+
+                <x-driver-check.field
+                    :label="__('telegram.penalties.filters.period')"
+                    class="sm:col-span-2 xl:col-span-4"
+                >
+                    <div class="flex flex-col gap-2.5">
+                        <x-driver-check.chips />
+
+                        <div x-show="periodPreset === 'custom'" x-cloak class="grid grid-cols-2 gap-2 sm:max-w-md">
+                            <x-driver-check.input
+                                type="date"
+                                x-model="filters.period_from"
+                                x-on:change="applyCustomPeriod()"
+                                :aria-label="__('telegram.penalties.filters.period_from')"
+                            />
+                            <x-driver-check.input
+                                type="date"
+                                x-model="filters.period_to"
+                                x-on:change="applyCustomPeriod()"
+                                :aria-label="__('telegram.penalties.filters.period_to')"
+                            />
+                        </div>
+                    </div>
+                </x-driver-check.field>
+
+                <x-driver-check.field :label="__('telegram.penalties.filters.status')">
+                    <x-driver-check.select x-model="filters.status" x-on:change="applyFilters()">
+                        <option value="">{{ __('telegram.penalties.filters.status_all') }}</option>
+                        @foreach (\App\Enums\Telegram\TelegramClientCheckStatus::cases() as $status)
+                            <option value="{{ $status->value }}">{{ __("telegram.penalties.statuses.{$status->value}") }}</option>
+                        @endforeach
+                    </x-driver-check.select>
+                </x-driver-check.field>
+
+                <x-driver-check.field :label="__('telegram.penalties.filters.level')">
+                    <x-driver-check.select x-model="filters.level" x-on:change="applyFilters()">
+                        <option value="">{{ __('telegram.penalties.filters.level_all') }}</option>
+                        @foreach ($levelOptions as $level => $name)
+                            <option value="{{ $level }}">{{ $level + 1 }} · {{ $name }}</option>
+                        @endforeach
+                    </x-driver-check.select>
+                </x-driver-check.field>
+            </x-driver-check.filters>
 
             {{-- Table (lg and up) --}}
             <div class="hidden lg:block">
@@ -270,8 +283,8 @@
                             <col class="w-[9%]">
                         </colgroup>
 
-                        <thead class="border-b border-gray-200 bg-gray-50/70 dark:border-gray-800 dark:bg-white/[0.02]">
-                            <tr class="text-[10px] uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">
+                        <thead class="dc-thead border-b border-gray-200 bg-gray-50/70 dark:border-gray-800 dark:bg-white/[0.02]">
+                            <tr class="text-[10px] uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
                                 <th scope="col" class="px-4 py-2.5 font-semibold">{{ __('telegram.penalties.table.request') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.penalties.table.responsible') }}</th>
                                 <th scope="col" class="px-3 py-2.5 text-right font-semibold">{{ __('telegram.penalties.table.repeat') }}</th>
@@ -336,8 +349,8 @@
                                     <td class="px-3 py-3">
                                         <span
                                             class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium"
-                                            :class="levelClass(row.level)"
-                                            x-text="row.level + ' · ' + levelText(row.level)"
+                                            :class="levelClass(row.level, responsibleRole(row))"
+                                            x-text="levelLabel(row)"
                                         ></span>
                                     </td>
 
@@ -367,9 +380,7 @@
                                     </td>
 
                                     <td class="px-4 py-3 text-right">
-                                        <x-driver-check.button size="sm" x-on:click="openDetail(row)">
-                                            {{ __('telegram.penalties.table.details') }}
-                                        </x-driver-check.button>
+                                        <x-driver-check.row-action icon="eye" :label="__('telegram.penalties.table.details')" x-on:click="openDetail(row)" />
                                     </td>
                                 </tr>
                             </template>
@@ -415,8 +426,8 @@
                             <x-driver-check.kv :label="__('telegram.penalties.table.level')">
                                 <span
                                     class="rounded-full px-2 py-0.5 text-[11px] font-medium"
-                                    :class="levelClass(row.level)"
-                                    x-text="row.level + ' · ' + levelText(row.level)"
+                                    :class="levelClass(row.level, responsibleRole(row))"
+                                    x-text="levelLabel(row)"
                                 ></span>
                             </x-driver-check.kv>
 
@@ -471,8 +482,8 @@
 
                     <span
                         class="rounded-full px-2 py-0.5 text-[11px] font-medium"
-                        :class="levelClass(detail.level)"
-                        x-text="detail.level + ' · ' + levelText(detail.level)"
+                        :class="levelClass(detail.level, responsibleRole(detail))"
+                        x-text="levelLabel(detail)"
                     ></span>
 
                     <span
@@ -550,26 +561,12 @@
                     <x-driver-check.kv :label="__('telegram.penalties.detail.sent_at')">
                         <span x-text="detail.sent_at ? date(detail.sent_at) : dash"></span>
                     </x-driver-check.kv>
+
+                    {{-- Which of the four texts the comment came from --}}
+                    <x-driver-check.kv :label="__('telegram.penalties.detail.variant')" class="col-span-2">
+                        <span x-text="variantText(detail)"></span>
+                    </x-driver-check.kv>
                 </dl>
-
-                {{-- The person's history the level was worked out from --}}
-                <section x-show="detail.metrics">
-                    <h3 class="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                        {{ __('telegram.penalties.detail.metrics') }}
-                    </h3>
-
-                    <dl class="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                        @foreach (['hour_count', 'today_count', 'week_count', 'minutes_since_last'] as $metric)
-                            <div class="rounded-xl border border-gray-200 px-3 py-2 dark:border-gray-800">
-                                <dt class="text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                                    {{ __("telegram.penalties.detail.{$metric}") }}
-                                </dt>
-                                <dd class="mt-0.5 text-sm font-semibold tabular-nums text-gray-900 dark:text-white"
-                                    x-text="metric(detail, @js($metric))"></dd>
-                            </div>
-                        @endforeach
-                    </dl>
-                </section>
 
                 {{-- The comment: one per batch, stored on its last penalty --}}
                 <section>

@@ -3,23 +3,32 @@
 | Penalty settings
 |--------------------------------------------------------------------------
 |
-| One form over the whole rule set (ClientCheckRules): the levels, what
-| reaches each one, their phrases and the timings. Edited locally, saved in
-| one go from the bar at the bottom; the two delivery switches beside it
-| save on their own, at once, because they are the "stop now" buttons.
+| One form over the whole rule set (ClientCheckRules): a level per penalty
+| number (the bot's own "№N"), each with four phrase sets - Uzbek and
+| Russian, plain and respectful. One language is edited at a time, plain
+| and respectful side by side. Edited locally, saved in one go from the
+| bar at the bottom; the two delivery switches save on their own, at once,
+| because they are the "stop now" buttons.
 |
 */
 
 import { escapeHtml, telegramHtml } from './telegram-html';
 import { formatNumber } from './format';
 
-const CONDITIONS = ['repeat_from', 'hour', 'today', 'week', 'repeat_within'];
+const LANGUAGES = ['uz', 'ru'];
+
+const TONES = ['plain', 'respectful'];
+
+const ROLES = ['operation', 'sales'];
+
+/** What a level sends: the forward and a comment, the forward only, nothing. */
+const MODES = ['all', 'forward', 'off'];
 
 /*
  * Written out in full: Tailwind only sees literals. Calm to harsh, spread
  * over however many levels there are.
  */
-const TONES = [
+const LEVEL_TONES = [
     {
         badge: 'bg-gray-100 text-gray-700 dark:bg-white/[0.08] dark:text-gray-200',
         rail: 'bg-gray-300 dark:bg-gray-600',
@@ -37,6 +46,12 @@ const TONES = [
         rail: 'bg-error-500',
     },
 ];
+
+/** What a preview fills the placeholders with, in each language. */
+const SAMPLE = {
+    uz: { status_limit: '2 soat', time_in_status: '3 soat 8 daqiqa' },
+    ru: { status_limit: '2 ч', time_in_status: '3 ч 8 мин' },
+};
 
 let keySeed = 0;
 
@@ -56,40 +71,73 @@ const toNumber = (value) => {
     return Number.isFinite(number) && number > 0 ? Math.round(number) : null;
 };
 
-/** Server shape -> form shape: phrases get stable keys for x-for. */
+const emptySets = () => Object.fromEntries(
+    LANGUAGES.map((lang) => [lang, Object.fromEntries(TONES.map((tone) => [tone, []]))]),
+);
+
+/** One level, server shape -> form shape: phrases get stable keys for x-for. */
+function levelToForm(level, index) {
+    const sets = emptySets();
+
+    LANGUAGES.forEach((lang) => TONES.forEach((tone) => {
+        sets[lang][tone] = (level.phrases?.[lang]?.[tone] || []).map((text) => ({ key: nextKey(), text }));
+    }));
+
+    return {
+        key: nextKey(),
+        /* Folded by default: the ladder reads at a glance, one level opens to edit. */
+        open: false,
+        name: level.name ?? '',
+        from: index === 0 ? 1 : (level.from ?? ''),
+        mode: MODES.includes(level.mode) ? level.mode : 'all',
+        phrases: sets,
+    };
+}
+
+/** One level, form shape -> what the API takes. */
+function levelToPayload(level, index) {
+    return {
+        name: String(level.name || '').trim() || null,
+        from: index === 0 ? 1 : toNumber(level.from),
+        mode: MODES.includes(level.mode) ? level.mode : 'all',
+        phrases: Object.fromEntries(LANGUAGES.map((lang) => [
+            lang,
+            Object.fromEntries(TONES.map((tone) => [
+                tone,
+                level.phrases[lang][tone].map((p) => String(p.text || '').trim()).filter((p) => p !== ''),
+            ])),
+        ])),
+    };
+}
+
+/**
+ * Server shape -> form shape. A ladder per role; rules saved before the
+ * roles were split (one `levels` list) give both roles a copy.
+ */
 function toForm(rules) {
     return {
-        levels: (rules.levels || []).map((level) => ({
-            key: nextKey(),
-            /* Folded by default: the ladder reads at a glance, one level opens to edit. */
-            open: false,
-            name: level.name ?? '',
-            ...Object.fromEntries(CONDITIONS.map((c) => [c, level[c] ?? ''])),
-            phrases: (level.phrases || []).map((text) => ({ key: nextKey(), text })),
-        })),
-        batch_quiet_seconds: rules.batch_quiet_seconds ?? 20,
-        history_days: rules.history_days ?? 7,
+        roles: Object.fromEntries(ROLES.map((role) => [role, {
+            levels: (rules.roles?.[role]?.levels ?? rules.levels ?? []).map(levelToForm),
+        }])),
+        batch_quiet_seconds: rules.batch_quiet_seconds ?? 5,
         max_attempts: rules.max_attempts ?? 3,
         retry_minutes: rules.retry_minutes ?? 30,
-        batch_line: rules.batch_line ?? '',
     };
 }
 
 /** Form shape -> what the API takes. */
 function toPayload(form) {
     return {
-        levels: form.levels.map((level, index) => ({
-            name: String(level.name || '').trim() || null,
-            ...Object.fromEntries(CONDITIONS.map((c) => [c, index === 0 ? null : toNumber(level[c])])),
-            phrases: level.phrases.map((p) => String(p.text || '').trim()).filter((p) => p !== ''),
-        })),
+        roles: Object.fromEntries(ROLES.map((role) => [role, {
+            levels: form.roles[role].levels.map(levelToPayload),
+        }])),
         batch_quiet_seconds: toNumber(form.batch_quiet_seconds),
-        history_days: toNumber(form.history_days),
         max_attempts: toNumber(form.max_attempts),
         retry_minutes: toNumber(form.retry_minutes),
-        batch_line: String(form.batch_line || '').trim(),
     };
 }
+
+const filled = (list) => list.filter((p) => String(p.text || '').trim() !== '');
 
 export function penaltySettingsPage(config) {
     const t = config.translations;
@@ -106,7 +154,22 @@ export function penaltySettingsPage(config) {
 
         placeholders: config.placeholders,
 
-        conditions: CONDITIONS,
+        languages: LANGUAGES,
+
+        tones: TONES,
+
+        /** The language being edited; plain and respectful sit side by side. */
+        language: 'uz',
+
+        /** Whose ladder is being edited: operators and sales have their own. */
+        role: 'operation',
+
+        roles: ROLES,
+
+        modes: MODES,
+
+        /** "Copy from the other role" takes two clicks: the first one only asks. */
+        copyArmed: false,
 
         csrf: document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
 
@@ -114,7 +177,7 @@ export function penaltySettingsPage(config) {
 
         loadError: null,
 
-        form: toForm({ levels: [] }),
+        form: toForm({}),
 
         /** What the server holds, to tell a change from a no-op. */
         snapshot: '',
@@ -129,8 +192,8 @@ export function penaltySettingsPage(config) {
 
         formError: null,
 
-        /** Where a placeholder chip inserts: the field edited last. */
-        target: { level: 0, phrase: 0 },
+        /** Where a placeholder chip inserts: the phrase edited last. */
+        target: null,
 
         settings: { ...config.settings },
 
@@ -194,6 +257,7 @@ export function penaltySettingsPage(config) {
             this.errors = {};
             this.formError = null;
             this.resetArmed = false;
+            this.target = null;
         },
 
         async load() {
@@ -232,14 +296,25 @@ export function penaltySettingsPage(config) {
                     this.errors = error.errors;
                     this.formError = t.validation.fix;
 
-                    /* Unfold whatever the server pointed at. */
-                    Object.keys(this.errors).forEach((key) => {
-                        const match = key.match(/^levels\.(\d+)\./);
+                    /*
+                     * Unfold whatever the server pointed at, and show the
+                     * role it is in.
+                     */
+                    let first = null;
 
-                        if (match && this.form.levels[Number(match[1])]) {
-                            this.form.levels[Number(match[1])].open = true;
+                    Object.keys(this.errors).forEach((key) => {
+                        const match = key.match(/^roles\.(\w+)\.levels\.(\d+)\./);
+                        const level = match && this.form.roles[match[1]]?.levels[Number(match[2])];
+
+                        if (level) {
+                            level.open = true;
+                            first ??= match[1];
                         }
                     });
+
+                    if (first && !Object.keys(this.errors).some((key) => key.startsWith(`roles.${this.role}.`))) {
+                        this.role = first;
+                    }
                 } else {
                     this.formError = error?.message || t.messages.failed;
                 }
@@ -249,9 +324,10 @@ export function penaltySettingsPage(config) {
         },
 
         discard() {
-            this.form = toForm(JSON.parse(this.snapshot || '{"levels":[]}'));
+            this.form = toForm(JSON.parse(this.snapshot || '{}'));
             this.errors = {};
             this.formError = null;
+            this.target = null;
         },
 
         async reset() {
@@ -289,10 +365,10 @@ export function penaltySettingsPage(config) {
             try {
                 const json = await this.send(this.endpoints.settings, 'PUT', { [key]: !previous });
 
-                this.settings = {
-                    enabled: !!json.data?.enabled,
-                    comments_enabled: !!json.data?.comments_enabled,
-                };
+                /* Every switch the server knows, the role ones included. */
+                this.settings = Object.fromEntries(
+                    Object.entries({ ...this.settings, ...(json.data || {}) }).map(([k, v]) => [k, !!v]),
+                );
 
                 this.notify(json.message || config.settingsSaved);
             } catch (error) {
@@ -313,29 +389,80 @@ export function penaltySettingsPage(config) {
         |----------------------------------------------------------------
         */
 
-        addLevel() {
-            if (this.form.levels.length >= this.maxLevels) {
+        /** The ladder of the role being edited. */
+        ladder() {
+            return this.form.roles[this.role].levels;
+        },
+
+        setRole(role) {
+            this.role = role;
+            this.target = null;
+            this.copyArmed = false;
+        },
+
+        otherRole() {
+            return this.role === 'sales' ? 'operation' : 'sales';
+        },
+
+        /** A dot on a role tab that holds a validation error. */
+        roleHasErrors(role) {
+            return Object.keys(this.errors).some((key) => key.startsWith(`roles.${role}.`));
+        },
+
+        /**
+         * The other role's levels, copied over this one's (two clicks).
+         * Saved only with the rest, from the bar at the bottom.
+         */
+        copyFromOther() {
+            if (!this.copyArmed) {
+                this.copyArmed = true;
+
                 return;
             }
 
-            const previous = this.form.levels[this.form.levels.length - 1];
+            const from = this.otherRole();
 
-            /*
-             * A step up from the level below, so a new level is reachable
-             * from the first save.
-             */
-            const step = (value, by) => (toNumber(value) ? toNumber(value) + by : '');
+            this.form.roles[this.role].levels = toPayload(this.form).roles[from].levels.map(levelToForm);
+            this.copyArmed = false;
+            this.target = null;
 
-            this.form.levels.push({
+            this.notify(t.copied.replace(':role', t.roles[from]));
+        },
+
+        setMode(index, mode) {
+            this.ladder()[index].mode = mode;
+        },
+
+        modeClass(mode) {
+            return {
+                all: 'bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400',
+                forward: 'bg-blue-light-50 text-blue-light-700 dark:bg-blue-light-500/10 dark:text-blue-light-400',
+                off: 'bg-gray-100 text-gray-500 dark:bg-white/[0.06] dark:text-gray-400',
+            }[mode] ?? '';
+        },
+
+        toggleLevel(index) {
+            this.ladder()[index].open = !this.ladder()[index].open;
+        },
+
+        addLevel() {
+            if (this.ladder().length >= this.maxLevels) {
+                return;
+            }
+
+            const last = this.ladder()[this.ladder().length - 1];
+            const sets = emptySets();
+
+            sets[this.language].plain.push({ key: nextKey(), text: '' });
+
+            this.ladder().push({
                 key: nextKey(),
                 open: true,
                 name: '',
-                repeat_from: step(previous?.repeat_from, 2) || (this.form.levels.length + 1),
-                hour: '',
-                today: step(previous?.today, 2),
-                week: '',
-                repeat_within: '',
-                phrases: [{ key: nextKey(), text: '' }],
+                mode: 'all',
+                /* One past the level before, so the new one is reachable at once. */
+                from: (toNumber(last?.from) ?? this.ladder().length) + 1,
+                phrases: sets,
             });
 
             this.$nextTick(() => {
@@ -343,87 +470,67 @@ export function penaltySettingsPage(config) {
             });
         },
 
-        toggleLevel(index) {
-            const level = this.form.levels[index];
-
-            level.open = !level.open;
-        },
-
-        /** For a folded card: how many phrases, and the first one. */
-        phraseCount(index) {
-            return this.form.levels[index].phrases.filter((p) => String(p.text || '').trim() !== '').length;
-        },
-
-        firstPhrase(index) {
-            const first = this.form.levels[index].phrases.find((p) => String(p.text || '').trim() !== '');
-
-            return first ? this.preview(first.text, index) : '';
-        },
-
         removeLevel(index) {
             if (index === 0) {
                 return;
             }
 
-            this.form.levels.splice(index, 1);
-            this.target = { level: 0, phrase: 0 };
+            this.ladder().splice(index, 1);
+            this.target = null;
         },
 
-        addPhrase(index) {
-            const level = this.form.levels[index];
-
-            level.phrases.push({ key: nextKey(), text: '' });
-            this.target = { level: index, phrase: level.phrases.length - 1 };
-
-            this.$nextTick(() => {
-                document.getElementById(`phrase-${index}-${level.phrases.length - 1}`)?.focus();
-            });
+        phrases(index, tone) {
+            return this.ladder()[index].phrases[this.language][tone];
         },
 
-        removePhrase(index, phrase) {
-            this.form.levels[index].phrases.splice(phrase, 1);
-            this.target = { level: index, phrase: Math.max(0, phrase - 1) };
+        phraseId(index, tone, p) {
+            return `phrase-${this.role}-${index}-${this.language}-${tone}-${p}`;
         },
 
-        focusPhrase(index, phrase) {
-            this.target = { level: index, phrase };
+        addPhrase(index, tone) {
+            const list = this.phrases(index, tone);
+
+            list.push({ key: nextKey(), text: '' });
+
+            const p = list.length - 1;
+
+            this.target = { role: this.role, level: index, language: this.language, tone, phrase: p };
+
+            this.$nextTick(() => document.getElementById(this.phraseId(index, tone, p))?.focus());
         },
 
-        focusBatchLine() {
-            this.target = { level: null, phrase: 'batch_line' };
+        removePhrase(index, tone, p) {
+            this.phrases(index, tone).splice(p, 1);
+            this.target = null;
+        },
+
+        focusPhrase(index, tone, p) {
+            this.target = { role: this.role, level: index, language: this.language, tone, phrase: p };
         },
 
         /**
-         * Puts {name} where the cursor is in the field edited last.
+         * Puts {name} where the cursor is in the phrase edited last.
          */
         insertPlaceholder(name) {
+            const target = this.target;
+
+            if (!target || target.language !== this.language || target.role !== this.role) {
+                return;
+            }
+
+            const item = this.ladder()[target.level]?.phrases[target.language][target.tone][target.phrase];
+
+            if (!item) {
+                return;
+            }
+
             const token = `{${name}}`;
-
-            const isBatchLine = this.target.phrase === 'batch_line';
-
-            const id = isBatchLine
-                ? 'batch-line'
-                : `phrase-${this.target.level}-${this.target.phrase}`;
-
-            const field = document.getElementById(id);
-
-            const read = () => (isBatchLine
-                ? this.form.batch_line
-                : this.form.levels[this.target.level]?.phrases[this.target.phrase]?.text);
-
-            const write = (value) => {
-                if (isBatchLine) {
-                    this.form.batch_line = value;
-                } else if (this.form.levels[this.target.level]?.phrases[this.target.phrase]) {
-                    this.form.levels[this.target.level].phrases[this.target.phrase].text = value;
-                }
-            };
-
-            const text = String(read() ?? '');
+            const field = document.getElementById(this.phraseId(target.level, target.tone, target.phrase));
+            const text = String(item.text ?? '');
             const start = field ? field.selectionStart : text.length;
             const end = field ? field.selectionEnd : text.length;
 
-            write(text.slice(0, start) + token + text.slice(end));
+            item.text = text.slice(0, start) + token + text.slice(end);
 
             this.$nextTick(() => {
                 if (field) {
@@ -442,66 +549,70 @@ export function penaltySettingsPage(config) {
         number: formatNumber,
 
         tone(index) {
-            const top = this.form.levels.length - 1;
+            const top = this.ladder().length - 1;
 
-            const step = top <= 0 ? 0 : Math.round((index / top) * (TONES.length - 1));
+            const step = top <= 0 ? 0 : Math.round((index / top) * (LEVEL_TONES.length - 1));
 
-            return TONES[Math.max(0, Math.min(TONES.length - 1, step))];
+            return LEVEL_TONES[Math.max(0, Math.min(LEVEL_TONES.length - 1, step))];
         },
 
         levelTitle(index) {
-            return t.level.title.replace(':n', index);
+            return t.level.title.replace(':n', index + 1);
         },
 
-        levelName(index) {
-            const name = String(this.form.levels[index]?.name || '').trim();
-
-            if (name !== '') {
-                return name;
-            }
-
-            return config.defaultNames[index] ?? (index === 0 ? t.level.base : '');
-        },
-
-        /** "повтор №4+ или 5+ сегодня" - the conditions in one line. */
+        /** "Штраф №2", or "Штраф №4 и дальше" for the last level. */
         summary(index) {
-            if (index === 0) {
-                return t.level.always;
+            const from = index === 0 ? 1 : (toNumber(this.ladder()[index].from) ?? '?');
+
+            if (index === 0 && this.ladder().length > 1) {
+                return t.level.first;
             }
 
-            const level = this.form.levels[index];
-
-            const parts = CONDITIONS
-                .filter((c) => toNumber(level[c]) !== null)
-                .map((c) => t.conditions[`summary_${c}`].replace(':value', toNumber(level[c])));
-
-            return parts.length > 0 ? parts.join(` ${t.conditions.or} `) : t.level.never;
+            return (index === this.ladder().length - 1 ? t.level.from_summary_last : t.level.from_summary)
+                .replace(':n', from);
         },
 
-        reachable(index) {
-            return index === 0 || CONDITIONS.some((c) => toNumber(this.form.levels[index][c]) !== null);
+        /** How many phrases a level has in each language - "UZ 2 · RU 1". */
+        counts(index) {
+            const level = this.ladder()[index];
+
+            return LANGUAGES
+                .map((lang) => `${lang.toUpperCase()} ${TONES.reduce((n, tone) => n + filled(level.phrases[lang][tone]).length, 0)}`)
+                .join(' · ');
         },
 
-        /** A phrase as a person at this level would get it. */
+        /** For a folded card: the first phrase of a tone in the language being edited. */
+        firstPhrase(index, tone) {
+            const first = filled(this.phrases(index, tone))[0];
+
+            return first ? this.preview(first.text, index) : '';
+        },
+
+        /** What an empty set falls back to, in words. */
+        emptyText(index, tone) {
+            const fallback = tone === 'respectful' ? t.level.fallback_tone : t.level.fallback_lower;
+
+            return t.level.empty.replace(':fallback', fallback);
+        },
+
+        /** A phrase as the person would get it at this level. */
         preview(text, index) {
-            const level = this.form.levels[index] || {};
+            const level = this.ladder()[index] || {};
 
             const sample = {
-                name: 'PULATOV AFZAL',
-                request: 'TLS04834',
-                repeat_number: toNumber(level.repeat_from) ?? 1,
-                batch_count: 3,
-                hour_count: toNumber(level.hour) ?? 1,
-                today_count: toNumber(level.today) ?? 2,
-                week_count: toNumber(level.week) ?? 4,
+                name: 'ABDUKARIM TOSHMUQUMOV',
+                request: 'TLS04851',
+                repeat_number: index === 0 ? 1 : (toNumber(level.from) ?? 1),
+                crm_status: 'В поиске перевозчика',
+                ...SAMPLE[this.language],
             };
 
-            const filled = String(text || '').replace(
+            const html = String(text || '').replace(
                 /\{([a-z_]+)\}/g,
                 (match, key) => (key in sample ? escapeHtml(sample[key]) : match),
             );
 
-            return telegramHtml(filled);
+            return telegramHtml(html);
         },
 
         fieldError(path) {
@@ -511,8 +622,10 @@ export function penaltySettingsPage(config) {
         },
 
         levelErrors(index) {
+            const prefix = `roles.${this.role}.levels.${index}.`;
+
             return Object.keys(this.errors)
-                .filter((key) => key === `levels.${index}.conditions` || key === `levels.${index}.phrases`)
+                .filter((key) => key === `${prefix}from` || key === `${prefix}phrases`)
                 .map((key) => this.errors[key][0]);
         },
     };

@@ -73,6 +73,8 @@ class PeoplePanelTest extends TestCase
             $table->string('name');
             $table->string('name_normalized')->unique();
             $table->string('role', 16)->default('operation');
+            $table->string('language', 5)->nullable();
+            $table->boolean('respectful')->default(false);
             $table->string('telegram_username')->nullable()->unique();
             $table->unsignedBigInteger('telegram_id')->nullable()->unique();
             $table->boolean('is_active')->default(true);
@@ -205,68 +207,155 @@ class PeoplePanelTest extends TestCase
     |--------------------------------------------------------------------------
     */
 
+    private function ladder(): array
+    {
+        return [
+            ['name' => 'First', 'mode' => 'all', 'phrases' => [
+                'uz' => ['plain' => ['Narx {status_limit}'], 'respectful' => ['Narx bering']],
+                'ru' => ['plain' => ['Цену'], 'respectful' => []],
+            ]],
+            ['name' => null, 'from' => 2, 'mode' => 'forward', 'phrases' => [
+                'uz' => ['plain' => ['Ikkinchi', '  '], 'respectful' => []],
+                'ru' => ['plain' => [], 'respectful' => []],
+            ]],
+        ];
+    }
+
     private function validRules(array $override = []): array
     {
         return [
-            'levels' => [
-                ['name' => 'Calm', 'phrases' => ['{name}, #{request}']],
-                ['name' => null, 'repeat_from' => 3, 'today' => '', 'phrases' => ['{name}!!', '']],
+            'roles' => [
+                'operation' => ['levels' => $this->ladder()],
+                'sales' => ['levels' => [
+                    ['mode' => 'all', 'phrases' => ['ru' => ['plain' => ['Только sales']]]],
+                ]],
             ],
             'batch_quiet_seconds' => 25,
-            'history_days' => 5,
             'max_attempts' => 2,
             'retry_minutes' => 40,
-            'batch_line' => 'x{batch_count}',
             ...$override,
         ];
     }
 
     public function test_rules_start_from_the_config_and_are_saved_and_reset(): void
     {
-        config()->set('client_checks.phrases', [0 => ['cfg']]);
+        config()->set('client_checks.levels', [
+            ['from' => 1, 'phrases' => ['uz' => ['plain' => ['cfg']]]],
+        ]);
 
         $this->getJson('/api/telegram/client-checks/rules')
             ->assertOk()
             ->assertJsonPath('customised', false)
-            ->assertJsonPath('data.levels.0.phrases.0', 'cfg');
+            /* one list in the config: both roles start from it */
+            ->assertJsonPath('data.roles.operation.levels.0.phrases.uz.plain.0', 'cfg')
+            ->assertJsonPath('data.roles.sales.levels.0.phrases.uz.plain.0', 'cfg')
+            /* every set is there, even an empty one */
+            ->assertJsonPath('data.roles.operation.levels.0.phrases.ru.respectful', []);
 
         $this->putJson('/api/telegram/client-checks/rules', $this->validRules())
             ->assertOk()
             ->assertJsonPath('customised', true)
-            ->assertJsonPath('data.levels.1.repeat_from', 3)
+            ->assertJsonPath('data.roles.operation.levels.0.from', 1)
+            ->assertJsonPath('data.roles.operation.levels.1.from', 2)
+            ->assertJsonPath('data.roles.operation.levels.1.mode', 'forward')
             /* blanks are dropped, not stored */
-            ->assertJsonPath('data.levels.1.today', null)
-            ->assertJsonPath('data.levels.1.phrases', ['{name}!!'])
+            ->assertJsonPath('data.roles.operation.levels.1.phrases.uz.plain', ['Ikkinchi'])
+            ->assertJsonPath('data.roles.operation.levels.0.phrases.uz.respectful', ['Narx bering'])
+            /* the roles are kept apart */
+            ->assertJsonCount(1, 'data.roles.sales.levels')
+            ->assertJsonPath('data.roles.sales.levels.0.phrases.ru.plain', ['Только sales'])
             ->assertJsonPath('data.batch_quiet_seconds', 25)
-            ->assertJsonPath('defaults.levels.0.phrases.0', 'cfg');
+            ->assertJsonPath('defaults.roles.operation.levels.0.phrases.uz.plain.0', 'cfg');
 
         $this->deleteJson('/api/telegram/client-checks/rules')
             ->assertOk()
             ->assertJsonPath('customised', false)
-            ->assertJsonPath('data.levels.0.phrases.0', 'cfg');
+            ->assertJsonPath('data.roles.sales.levels.0.phrases.uz.plain.0', 'cfg');
     }
 
     public function test_rules_that_could_never_work_are_refused(): void
     {
         $this->putJson('/api/telegram/client-checks/rules', $this->validRules([
-            'levels' => [
-                ['phrases' => ['  ']],
-                ['repeat_from' => null, 'phrases' => ['x']],
+            'roles' => [
+                'operation' => ['levels' => $this->ladder()],
+                'sales' => ['levels' => [
+                    ['mode' => 'all', 'phrases' => ['uz' => ['plain' => ['  ']]]],
+                    ['from' => 3, 'mode' => 'all', 'phrases' => []],
+                    /* not after the level before it */
+                    ['from' => 3, 'mode' => 'banana', 'phrases' => []],
+                ]],
             ],
             'max_attempts' => 0,
         ]))
             ->assertUnprocessable()
             ->assertJsonValidationErrors([
-                'levels.0.phrases',
-                'levels.1.conditions',
+                'roles.sales.levels.0.phrases',
+                'roles.sales.levels.2.from',
+                'roles.sales.levels.2.mode',
                 'max_attempts',
-            ]);
+            ])
+            ->assertJsonMissingValidationErrors(['roles.sales.levels.1.from', 'roles.operation.levels.0.phrases']);
+
+        /* A first level that sends no comment needs no phrase. */
+        $this->putJson('/api/telegram/client-checks/rules', $this->validRules([
+            'roles' => [
+                'operation' => ['levels' => $this->ladder()],
+                'sales' => ['levels' => [['mode' => 'forward', 'phrases' => []]]],
+            ],
+        ]))->assertOk();
 
         $this->putJson('/api/telegram/client-checks/rules', $this->validRules([
-            'levels' => array_fill(0, 11, ['repeat_from' => 1, 'phrases' => ['x']]),
+            'roles' => [
+                'operation' => ['levels' => array_fill(0, 11, ['from' => 1, 'mode' => 'all', 'phrases' => ['uz' => ['plain' => ['x']]]])],
+                'sales' => ['levels' => $this->ladder()],
+            ],
         ]))
             ->assertUnprocessable()
-            ->assertJsonValidationErrors('levels');
+            ->assertJsonValidationErrors('roles.operation.levels');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | How a person is written to
+    |--------------------------------------------------------------------------
+    */
+
+    public function test_the_language_follows_the_role_until_one_is_picked(): void
+    {
+        $operator = $this->person('ALPHA OPERATOR');
+        $sales = $this->person('BELYAKOVA ANNA', OperationUser::ROLE_SALES);
+
+        $this->getJson('/api/telegram/operators')
+            ->assertJsonPath('data.0.language', null)
+            ->assertJsonPath('data.0.message_language', 'uz')
+            ->assertJsonPath('data.0.respectful', false);
+
+        $this->getJson('/api/telegram/operators?role=sales')
+            ->assertJsonPath('data.0.message_language', 'ru');
+
+        $this->putJson("/api/telegram/operators/{$sales->id}", [
+            'name' => 'BELYAKOVA ANNA',
+            'language' => 'uz',
+            'respectful' => true,
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.language', 'uz')
+            ->assertJsonPath('data.message_language', 'uz')
+            ->assertJsonPath('data.respectful', true);
+
+        /* Left out of an edit, both stay as they are. */
+        $this->putJson("/api/telegram/operators/{$sales->id}", ['name' => 'BELYAKOVA ANNA'])
+            ->assertJsonPath('data.language', 'uz')
+            ->assertJsonPath('data.respectful', true);
+
+        /* Back to "by role". */
+        $this->putJson("/api/telegram/operators/{$sales->id}", ['name' => 'BELYAKOVA ANNA', 'language' => null])
+            ->assertJsonPath('data.language', null)
+            ->assertJsonPath('data.message_language', 'ru');
+
+        $this->putJson("/api/telegram/operators/{$operator->id}", ['name' => 'ALPHA OPERATOR', 'language' => 'en'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('language');
     }
 
     /*
@@ -461,7 +550,18 @@ class PeoplePanelTest extends TestCase
     {
         $this->getJson('/api/telegram/client-checks/settings')
             ->assertOk()
-            ->assertExactJson(['data' => ['enabled' => true, 'comments_enabled' => true]]);
+            ->assertExactJson(['data' => [
+                'enabled' => true,
+                'comments_enabled' => true,
+                'operation_enabled' => true,
+                'sales_enabled' => true,
+            ]]);
+
+        /* A role alone. */
+        $this->putJson('/api/telegram/client-checks/settings', ['sales_enabled' => false])
+            ->assertOk()
+            ->assertJsonPath('data.sales_enabled', false)
+            ->assertJsonPath('data.operation_enabled', true);
 
         /* Either switch alone. */
         $this->putJson('/api/telegram/client-checks/settings', ['comments_enabled' => false])

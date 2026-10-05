@@ -1001,6 +1001,37 @@ input.dc-date[type='date']:focus::-webkit-calendar-picker-indicator {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Table heads: one line each, cut with an ellipsis rather than run into
+   the next column. */
+.dc-thead th {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* A list refetching: a short bar sweeping the bottom edge of its toolbar. */
+.dc-progress > span {
+  animation: dc-progress 1.1s ease-in-out infinite;
+}
+
+@keyframes dc-progress {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(300%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dc-progress > span {
+    animation: none;
+    width: 100%;
+    opacity: 0.6;
+  }
+}
+
 /* Long Telegram handles and normalised names must never widen a card. */
 .dc-break {
   overflow-wrap: anywhere;

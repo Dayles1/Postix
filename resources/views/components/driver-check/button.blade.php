@@ -8,7 +8,7 @@
 ])
 
 @php
-    $base = 'dc-tap inline-flex items-center justify-center gap-2 rounded-xl font-medium
+    $base = 'dc-tap inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl font-medium
              transition select-none outline-none focus-visible:ring-4
              disabled:cursor-not-allowed disabled:opacity-55 aria-disabled:opacity-55';
 

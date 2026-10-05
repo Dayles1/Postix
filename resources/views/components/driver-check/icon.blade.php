@@ -79,6 +79,14 @@
 
         'trending' => '<path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5 9 10l4 4 8-8m0 0h-5m5 0v5"/>',
 
+        'pencil' => '<path stroke-linecap="round" stroke-linejoin="round" d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4Z"/><path stroke-linecap="round" d="m13.5 6.5 4 4"/>',
+
+        'eye' => '<path stroke-linecap="round" stroke-linejoin="round" d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.8"/>',
+
+        'play' => '<path stroke-linejoin="round" d="M7 5.5v13l11-6.5L7 5.5Z"/>',
+
+        'stop' => '<rect x="6" y="6" width="12" height="12" rx="2.5"/>',
+
         'spark' => '<path stroke-linecap="round" stroke-linejoin="round" d="M12 3.5 13.8 9l5.7 1.8-5.7 1.8L12 18.2l-1.8-5.6L4.5 10.8 10.2 9 12 3.5Z"/>',
     ];
 @endphp

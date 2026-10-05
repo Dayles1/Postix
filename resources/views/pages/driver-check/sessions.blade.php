@@ -24,7 +24,7 @@
         <x-driver-check.page-header
             icon="telegram"
             tone="blue"
-            eyebrow="MadelineProto"
+            :eyebrow="__('telegram.menu.groups.settings')"
             :title="__('telegram.sessions.title')"
             :description="__('telegram.sessions.description')"
         >
@@ -81,36 +81,32 @@
             @endforeach
         </section>
 
-        {{-- ============================================================
-             Filters
-        ============================================================= --}}
-        <x-driver-check.filters :search-placeholder="__('telegram.sessions.search_placeholder')">
-            <x-driver-check.field :label="__('telegram.sessions.filters.state')">
-                <x-driver-check.select x-model="filters.state" x-on:change="applyFilters()">
-                    <option value="">{{ __('telegram.sessions.filters.state_all') }}</option>
-                    <option value="authorized">{{ __('telegram.sessions.stats.authorized') }}</option>
-                    <option value="pending">{{ __('telegram.sessions.stats.pending') }}</option>
-                    <option value="problem">{{ __('telegram.sessions.stats.problem') }}</option>
-                    <option value="logged_out">{{ __('telegram.sessions.stats.logged_out') }}</option>
-                </x-driver-check.select>
-            </x-driver-check.field>
-        </x-driver-check.filters>
-
         <x-driver-check.error-alert :title="__('telegram.sessions.errors.title')" />
 
         {{-- ============================================================
              Rows
         ============================================================= --}}
         <x-driver-check.surface class="overflow-hidden" x-ref="listTop">
-            <x-driver-check.list-toolbar
-                :title="__('telegram.sessions.title')"
+            <x-driver-check.filters
+                embedded
+                :search-placeholder="__('telegram.sessions.search_placeholder')"
                 :sort-options="[
-                    'created_at' => __('telegram.ui.created'),
-                    'phone' => __('telegram.sessions.table.phone'),
-                    'authorized_at' => __('telegram.sessions.table.authorized_at'),
-                    'last_checked_at' => __('telegram.sessions.table.last_checked'),
-                ]"
-            />
+                        'created_at' => __('telegram.ui.created'),
+                        'phone' => __('telegram.sessions.table.phone'),
+                        'authorized_at' => __('telegram.sessions.table.authorized_at'),
+                        'last_checked_at' => __('telegram.sessions.table.last_checked'),
+                    ]"
+            >
+                <x-driver-check.field :label="__('telegram.sessions.filters.state')">
+                    <x-driver-check.select x-model="filters.state" x-on:change="applyFilters()">
+                        <option value="">{{ __('telegram.sessions.filters.state_all') }}</option>
+                        <option value="authorized">{{ __('telegram.sessions.stats.authorized') }}</option>
+                        <option value="pending">{{ __('telegram.sessions.stats.pending') }}</option>
+                        <option value="problem">{{ __('telegram.sessions.stats.problem') }}</option>
+                        <option value="logged_out">{{ __('telegram.sessions.stats.logged_out') }}</option>
+                    </x-driver-check.select>
+                </x-driver-check.field>
+            </x-driver-check.filters>
 
             {{-- Table (lg and up) --}}
             <div class="hidden lg:block">
@@ -124,8 +120,8 @@
                             <col class="w-[14%]">
                         </colgroup>
 
-                        <thead class="border-b border-gray-200 bg-gray-50/70 dark:border-gray-800 dark:bg-white/[0.02]">
-                            <tr class="text-[10px] uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">
+                        <thead class="dc-thead border-b border-gray-200 bg-gray-50/70 dark:border-gray-800 dark:bg-white/[0.02]">
+                            <tr class="text-[10px] uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
                                 <th scope="col" class="px-4 py-2.5 font-semibold">{{ __('telegram.sessions.table.account') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.sessions.table.status') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.sessions.table.processes') }}</th>
@@ -235,9 +231,7 @@
                                                 </x-driver-check.button>
                                             </template>
 
-                                            <x-driver-check.button size="sm" x-on:click="openDetail(row)">
-                                                {{ __('telegram.ui.details') }}
-                                            </x-driver-check.button>
+                                            <x-driver-check.row-action icon="eye" :label="__('telegram.ui.details')" x-on:click="openDetail(row)" />
                                         </div>
                                     </td>
                                 </tr>

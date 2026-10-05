@@ -38,6 +38,9 @@ function operatorsPage(config) {
         telegram_id: '',
         dm_enabled: true,
         role,
+        /* '' = as the role says (Russian for sales, Uzbek for operators). */
+        language: '',
+        respectful: false,
         deletable: false,
     });
 
@@ -102,6 +105,20 @@ function operatorsPage(config) {
             this.filters.role = role;
 
             this.load();
+        },
+
+        /**
+         * "По роли: Узбекский" - the option that leaves the language to the
+         * role, naming what that is for the role in the form right now.
+         */
+        languageAutoLabel() {
+            const lang = this.form.role === 'sales' ? 'ru' : 'uz';
+
+            return t.form.language_auto.replace(':language', config.languages[lang] ?? lang);
+        },
+
+        languageOf(row) {
+            return (row.message_language || '').toUpperCase();
         },
 
         /**
@@ -190,6 +207,8 @@ function operatorsPage(config) {
                 telegram_id: row.telegram_id ?? '',
                 dm_enabled: !!row.dm_enabled,
                 role: row.role || role,
+                language: row.language || '',
+                respectful: !!row.respectful,
                 deletable: !!row.deletable,
             };
 
@@ -272,6 +291,8 @@ function operatorsPage(config) {
                             : Number(this.form.telegram_id),
                         dm_enabled: this.form.dm_enabled,
                         role: this.form.role,
+                        language: this.form.language || null,
+                        respectful: !!this.form.respectful,
                     }),
                 });
 

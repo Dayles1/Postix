@@ -23,7 +23,7 @@
         <x-driver-check.page-header
             icon="telegram"
             tone="blue"
-            eyebrow="Telegram"
+            :eyebrow="__('telegram.menu.groups.check')"
             :title="__('telegram.resolved_phones.title')"
             :description="__('telegram.resolved_phones.description')"
         >
@@ -39,90 +39,86 @@
             </x-slot:actions>
         </x-driver-check.page-header>
 
-        {{-- ============================================================
-             Filters
-        ============================================================= --}}
-        <x-driver-check.filters :search-placeholder="__('telegram.resolved_phones.filters.search_placeholder')">
-            <x-driver-check.field
-                :label="__('telegram.resolved_phones.filters.period')"
-                class="sm:col-span-2 xl:col-span-4"
-            >
-                <div class="flex flex-col gap-2.5">
-                    <x-driver-check.chips />
-
-                    <div x-show="periodPreset === 'custom'" x-cloak class="grid grid-cols-2 gap-2 sm:max-w-md">
-                        <x-driver-check.input
-                            type="date"
-                            x-model="filters.period_from"
-                            x-on:change="applyCustomPeriod()"
-                            :aria-label="__('telegram.resolved_phones.filters.period_from')"
-                        />
-                        <x-driver-check.input
-                            type="date"
-                            x-model="filters.period_to"
-                            x-on:change="applyCustomPeriod()"
-                            :aria-label="__('telegram.resolved_phones.filters.period_to')"
-                        />
-                    </div>
-                </div>
-            </x-driver-check.field>
-
-            <x-driver-check.field :label="__('telegram.resolved_phones.filters.has_username')">
-                <x-driver-check.select x-model="filters.has_username" x-on:change="applyFilters()">
-                    <option value="">{{ __('telegram.resolved_phones.filters.any') }}</option>
-                    <option value="1">{{ __('telegram.resolved_phones.filters.yes') }}</option>
-                    <option value="0">{{ __('telegram.resolved_phones.filters.no') }}</option>
-                </x-driver-check.select>
-            </x-driver-check.field>
-
-            <x-driver-check.field :label="__('telegram.resolved_phones.filters.has_driver')">
-                <x-driver-check.select x-model="filters.has_driver" x-on:change="applyFilters()">
-                    <option value="">{{ __('telegram.resolved_phones.filters.any') }}</option>
-                    <option value="1">{{ __('telegram.resolved_phones.filters.yes') }}</option>
-                    <option value="0">{{ __('telegram.resolved_phones.filters.no') }}</option>
-                </x-driver-check.select>
-            </x-driver-check.field>
-
-            <x-driver-check.field class="sm:col-span-2 sm:self-end">
-                <label
-                    class="dc-tap flex h-11 cursor-pointer items-center gap-2.5 rounded-xl border px-3.5
-                           transition sm:h-10"
-                    :class="filters.stale
-                        ? 'border-warning-500 bg-warning-25 dark:border-warning-500/50 dark:bg-warning-500/[0.07]'
-                        : 'border-gray-300 bg-white hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-white/[0.05]'"
-                >
-                    <input
-                        type="checkbox"
-                        x-model="filters.stale"
-                        x-on:change="applyFilters()"
-                        class="h-[18px] w-[18px] rounded border-gray-300 text-warning-500
-                               focus:ring-warning-500/30 dark:border-gray-600 dark:bg-gray-900"
-                    >
-
-                    <span class="text-sm text-gray-700 dark:text-gray-200">
-                        {{ __('telegram.resolved_phones.filters.stale') }}
-                    </span>
-                </label>
-            </x-driver-check.field>
-        </x-driver-check.filters>
-
         <x-driver-check.error-alert :title="__('telegram.resolved_phones.errors.load_failed')" />
 
         {{-- ============================================================
              Rows
         ============================================================= --}}
         <x-driver-check.surface class="overflow-hidden" x-ref="listTop">
-            <x-driver-check.list-toolbar
-                :title="__('telegram.resolved_phones.title')"
+            <x-driver-check.filters
+                embedded
+                :search-placeholder="__('telegram.resolved_phones.filters.search_placeholder')"
                 :sort-options="[
-                    'resolved_at' => __('telegram.resolved_phones.filters.resolved'),
-                    'created_at' => __('telegram.resolved_phones.filters.created'),
-                    'phone_normalized' => __('telegram.resolved_phones.filters.phone'),
-                    'checks' => __('telegram.resolved_phones.filters.checks'),
-                    'confirmed' => __('telegram.resolved_phones.filters.confirmed'),
-                    'not_confirmed' => __('telegram.resolved_phones.filters.not_confirmed'),
-                ]"
-            />
+                        'resolved_at' => __('telegram.resolved_phones.filters.resolved'),
+                        'created_at' => __('telegram.resolved_phones.filters.created'),
+                        'phone_normalized' => __('telegram.resolved_phones.filters.phone'),
+                        'checks' => __('telegram.resolved_phones.filters.checks'),
+                        'confirmed' => __('telegram.resolved_phones.filters.confirmed'),
+                        'not_confirmed' => __('telegram.resolved_phones.filters.not_confirmed'),
+                    ]"
+            >
+                <x-driver-check.field
+                    :label="__('telegram.resolved_phones.filters.period')"
+                    class="sm:col-span-2 xl:col-span-4"
+                >
+                    <div class="flex flex-col gap-2.5">
+                        <x-driver-check.chips />
+
+                        <div x-show="periodPreset === 'custom'" x-cloak class="grid grid-cols-2 gap-2 sm:max-w-md">
+                            <x-driver-check.input
+                                type="date"
+                                x-model="filters.period_from"
+                                x-on:change="applyCustomPeriod()"
+                                :aria-label="__('telegram.resolved_phones.filters.period_from')"
+                            />
+                            <x-driver-check.input
+                                type="date"
+                                x-model="filters.period_to"
+                                x-on:change="applyCustomPeriod()"
+                                :aria-label="__('telegram.resolved_phones.filters.period_to')"
+                            />
+                        </div>
+                    </div>
+                </x-driver-check.field>
+
+                <x-driver-check.field :label="__('telegram.resolved_phones.filters.has_username')">
+                    <x-driver-check.select x-model="filters.has_username" x-on:change="applyFilters()">
+                        <option value="">{{ __('telegram.resolved_phones.filters.any') }}</option>
+                        <option value="1">{{ __('telegram.resolved_phones.filters.yes') }}</option>
+                        <option value="0">{{ __('telegram.resolved_phones.filters.no') }}</option>
+                    </x-driver-check.select>
+                </x-driver-check.field>
+
+                <x-driver-check.field :label="__('telegram.resolved_phones.filters.has_driver')">
+                    <x-driver-check.select x-model="filters.has_driver" x-on:change="applyFilters()">
+                        <option value="">{{ __('telegram.resolved_phones.filters.any') }}</option>
+                        <option value="1">{{ __('telegram.resolved_phones.filters.yes') }}</option>
+                        <option value="0">{{ __('telegram.resolved_phones.filters.no') }}</option>
+                    </x-driver-check.select>
+                </x-driver-check.field>
+
+                <x-driver-check.field class="sm:col-span-2 sm:self-end">
+                    <label
+                        class="dc-tap flex h-11 cursor-pointer items-center gap-2.5 rounded-xl border px-3.5
+                               transition sm:h-10"
+                        :class="filters.stale
+                            ? 'border-warning-500 bg-warning-25 dark:border-warning-500/50 dark:bg-warning-500/[0.07]'
+                            : 'border-gray-300 bg-white hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-white/[0.05]'"
+                    >
+                        <input
+                            type="checkbox"
+                            x-model="filters.stale"
+                            x-on:change="applyFilters()"
+                            class="h-[18px] w-[18px] rounded border-gray-300 text-warning-500
+                                   focus:ring-warning-500/30 dark:border-gray-600 dark:bg-gray-900"
+                        >
+
+                        <span class="text-sm text-gray-700 dark:text-gray-200">
+                            {{ __('telegram.resolved_phones.filters.stale') }}
+                        </span>
+                    </label>
+                </x-driver-check.field>
+            </x-driver-check.filters>
 
             {{-- Table (lg and up) --}}
             <div class="hidden lg:block">
@@ -137,8 +133,8 @@
                             <col class="w-[12%]">
                         </colgroup>
 
-                        <thead class="border-b border-gray-200 bg-gray-50/70 dark:border-gray-800 dark:bg-white/[0.02]">
-                            <tr class="text-[10px] uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">
+                        <thead class="dc-thead border-b border-gray-200 bg-gray-50/70 dark:border-gray-800 dark:bg-white/[0.02]">
+                            <tr class="text-[10px] uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
                                 <th scope="col" class="px-4 py-2.5 font-semibold">{{ __('telegram.resolved_phones.table.phone') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.resolved_phones.table.telegram') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.resolved_phones.table.driver') }}</th>

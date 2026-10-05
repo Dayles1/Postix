@@ -57,7 +57,10 @@ const POLL_MS = 15000;
 export function penaltiesPage(config) {
     const t = config.translations;
     const ui = config.ui;
-    const levelNames = Array.isArray(config.levelNames) ? config.levelNames : [];
+    /* Per role: operators and sales have ladders of their own. */
+    const levelNames = config.levelNames && typeof config.levelNames === 'object' ? config.levelNames : {};
+
+    const namesFor = (role) => levelNames[role === 'sales' ? 'sales' : 'operation'] ?? [];
 
     const emptyStats = {
         total: 0,
@@ -223,13 +226,18 @@ export function penaltiesPage(config) {
         },
 
         /** Named as on the settings page; a level since removed is just "Level N". */
-        levelText(level) {
-            return levelNames[Number(level)] ?? t.level_n.replace(':n', level);
+        levelText(level, role = 'operation') {
+            return namesFor(role)[Number(level)] ?? t.level_n.replace(':n', Number(level) + 1);
         },
 
-        /** Calm to harsh, spread over however many levels are configured. */
-        levelClass(level) {
-            const top = Math.max(1, levelNames.length - 1);
+        /** "2 · Второй раз" - counted from 1, as the settings page counts. */
+        levelLabel(row) {
+            return `${Number(row?.level ?? 0) + 1} · ${this.levelText(row?.level, this.responsibleRole(row))}`;
+        },
+
+        /** Calm to harsh, spread over however many levels the role has. */
+        levelClass(level, role = 'operation') {
+            const top = Math.max(1, namesFor(role).length - 1);
             const step = Math.round((Math.min(Number(level) || 0, top) / top) * (LEVEL_TONES.length - 1));
 
             return LEVEL_TONES[step];
@@ -290,10 +298,22 @@ export function penaltiesPage(config) {
             }
         },
 
-        metric(row, key) {
-            const value = row?.metrics?.[key];
+        /**
+         * "O'zbekcha, Уважительно" - the set the comment was taken from, or,
+         * before one went out, the set the person would get.
+         */
+        variantText(row) {
+            const language = row?.metrics?.language ?? row?.person?.message_language;
 
-            return value === null || value === undefined ? this.dash : this.number(value);
+            const tone = row?.metrics?.tone ?? (row?.person ? (row.person.respectful ? 'respectful' : 'plain') : null);
+
+            if (!language || !tone) {
+                return this.dash;
+            }
+
+            return t.detail.variant_value
+                .replace(':language', config.languages?.[language] ?? language)
+                .replace(':tone', config.tones?.[tone] ?? tone);
         },
     };
 }

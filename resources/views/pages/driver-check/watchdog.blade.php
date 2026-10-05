@@ -26,30 +26,64 @@
         <x-driver-check.page-header
             icon="shield"
             tone="brand"
-            eyebrow="telegram:watchdog"
+            :eyebrow="__('telegram.menu.groups.monitoring')"
             :title="__('telegram.watchdog.title')"
             :description="__('telegram.watchdog.description')"
         >
             <x-slot:actions>
-                <x-driver-check.button x-on:click="load()" ::disabled="loading">
+                {{-- Control: one joined group, the colour only on the icons --}}
+                <div
+                    class="col-span-2 inline-flex overflow-hidden rounded-xl border border-gray-300 bg-white shadow-xs
+                           divide-x divide-gray-200 dark:divide-gray-700 dark:border-gray-700 dark:bg-white/[0.03]"
+                    role="group"
+                >
+                    <button
+                        type="button"
+                        x-on:click="start()"
+                        :disabled="!!busy"
+                        class="dc-tap inline-flex h-11 flex-1 items-center justify-center gap-2 px-3.5 text-sm font-medium text-gray-700
+                               transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 sm:h-10
+                               dark:text-gray-200 dark:hover:bg-white/[0.06]"
+                    >
+                        <x-driver-check.icon name="refresh" class="h-4 w-4 animate-spin text-success-600" x-show="busy === 'start'" x-cloak />
+                        <x-driver-check.icon name="play" class="h-4 w-4 text-success-600 dark:text-success-400" x-show="busy !== 'start'" />
+                        <span class="whitespace-nowrap">{{ __('telegram.watchdog.actions.start') }}</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        x-on:click="askConfirm('restart')"
+                        :disabled="!!busy || !canRestart()"
+                        class="dc-tap inline-flex h-11 flex-1 items-center justify-center gap-2 px-3.5 text-sm font-medium text-gray-700
+                               transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 sm:h-10
+                               dark:text-gray-200 dark:hover:bg-white/[0.06]"
+                    >
+                        <x-driver-check.icon name="refresh" class="h-4 w-4 text-brand-500 dark:text-brand-400" />
+                        <span class="hidden whitespace-nowrap sm:inline" title="{{ __('telegram.watchdog.actions.restart') }}">{{ __('telegram.watchdog.actions.restart_short') }}</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        x-on:click="askConfirm('stop')"
+                        :disabled="!!busy || !canStop()"
+                        class="dc-tap inline-flex h-11 flex-1 items-center justify-center gap-2 px-3.5 text-sm font-medium text-gray-700
+                               transition hover:bg-error-50 disabled:cursor-not-allowed disabled:opacity-50 sm:h-10
+                               dark:text-gray-200 dark:hover:bg-error-500/10"
+                    >
+                        <x-driver-check.icon name="stop" class="h-4 w-4 text-error-500" />
+                        <span class="whitespace-nowrap">{{ __('telegram.watchdog.actions.stop') }}</span>
+                    </button>
+                </div>
+
+                <x-driver-check.button
+                    size="icon"
+                    class="hidden sm:inline-flex"
+                    x-on:click="load()"
+                    ::disabled="loading"
+                    :title="__('telegram.ui.refresh')"
+                    :aria-label="__('telegram.ui.refresh')"
+                >
                     <x-driver-check.icon name="refresh" class="h-4 w-4" ::class="loading && 'animate-spin'" />
-                    <span x-text="ui.refresh"></span>
-                </x-driver-check.button>
-
-                <x-driver-check.button variant="primary" x-on:click="start()" ::disabled="!!busy">
-                    <x-driver-check.icon name="refresh" class="h-4 w-4 animate-spin" x-show="busy === 'start'" x-cloak />
-                    <x-driver-check.icon name="send" class="h-4 w-4" x-show="busy !== 'start'" />
-                    {{ __('telegram.watchdog.actions.start') }}
-                </x-driver-check.button>
-
-                <x-driver-check.button x-on:click="askConfirm('restart')" ::disabled="!!busy || !canRestart()">
-                    <x-driver-check.icon name="refresh" class="h-4 w-4" />
-                    {{ __('telegram.watchdog.actions.restart') }}
-                </x-driver-check.button>
-
-                <x-driver-check.button variant="danger" x-on:click="askConfirm('stop')" ::disabled="!!busy || !canStop()">
-                    <x-driver-check.icon name="x-circle" class="h-4 w-4" />
-                    {{ __('telegram.watchdog.actions.stop') }}
                 </x-driver-check.button>
             </x-slot:actions>
         </x-driver-check.page-header>

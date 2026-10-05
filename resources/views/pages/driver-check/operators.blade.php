@@ -24,6 +24,7 @@
             penalties: @js(route('driver-check.penalties')),
         },
         translations: @js(__('telegram.operators')),
+        languages: @js(__('telegram.penalty_settings.languages')),
         ui: @js(__('telegram.ui')),
     })"
 >
@@ -35,7 +36,7 @@
         <x-driver-check.page-header
             icon="operator"
             tone="brand"
-            eyebrow="Telegram"
+            :eyebrow="__('telegram.menu.groups.settings')"
             :title="$page['title']"
             :description="$page['description']"
         >
@@ -59,27 +60,26 @@
              Operation | Sales
         ============================================================= --}}
         <nav
-            class="inline-flex w-full gap-1 rounded-2xl border border-gray-200 bg-white p-1 sm:w-auto
-                   dark:border-gray-800 dark:bg-white/[0.03]"
+            class="inline-flex w-full gap-1 self-start rounded-xl bg-gray-100 p-1 sm:w-auto dark:bg-white/[0.04]"
             aria-label="{{ __('telegram.operators.form.role') }}"
         >
             @foreach (\App\Models\Telegram\OperationUser::ROLES as $tab)
                 <a
                     href="{{ $tab === \App\Models\Telegram\OperationUser::ROLE_SALES ? route('driver-check.sales') : route('driver-check.operators') }}"
                     @if ($tab === $role) aria-current="page" @endif
-                    class="dc-tap inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl px-4 text-sm font-medium
+                    class="dc-tap inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-lg px-4 text-[13px] font-medium
                            transition sm:flex-none
                            {{ $tab === $role
-                               ? 'bg-brand-500 text-white shadow-sm shadow-brand-500/25'
-                               : 'text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-white/[0.06]' }}"
+                               ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
+                               : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white' }}"
                 >
                     {{ __("telegram.operators.tabs.{$tab}") }}
 
                     <span
                         class="inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold tabular-nums
                                {{ $tab === $role
-                                   ? 'bg-white/20 text-white'
-                                   : 'bg-gray-100 text-gray-600 dark:bg-white/[0.08] dark:text-gray-300' }}"
+                                   ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300'
+                                   : 'bg-gray-200/70 text-gray-600 dark:bg-white/[0.08] dark:text-gray-300' }}"
                         x-text="number(stats.roles[@js($tab)])"
                     >0</span>
                 </a>
@@ -128,27 +128,6 @@
             </x-driver-check.stat-card>
         </section>
 
-        {{-- ============================================================
-             Filters
-        ============================================================= --}}
-        <x-driver-check.filters :search-placeholder="__('telegram.operators.search_placeholder')">
-            <x-driver-check.field :label="__('telegram.operators.filters.dm')">
-                <x-driver-check.select x-model="filters.dm_enabled" x-on:change="applyFilters()">
-                    <option value="">{{ __('telegram.operators.filters.dm_all') }}</option>
-                    <option value="1">{{ __('telegram.operators.filters.dm_on') }}</option>
-                    <option value="0">{{ __('telegram.operators.filters.dm_off') }}</option>
-                </x-driver-check.select>
-            </x-driver-check.field>
-
-            <x-driver-check.field :label="__('telegram.operators.filters.linked')">
-                <x-driver-check.select x-model="filters.linked" x-on:change="applyFilters()">
-                    <option value="">{{ __('telegram.operators.filters.linked_all') }}</option>
-                    <option value="1">{{ __('telegram.operators.filters.linked_yes') }}</option>
-                    <option value="0">{{ __('telegram.operators.filters.linked_no') }}</option>
-                </x-driver-check.select>
-            </x-driver-check.field>
-        </x-driver-check.filters>
-
         <x-driver-check.error-alert :title="__('telegram.operators.errors.title')" />
 
         {{-- ============================================================
@@ -158,25 +137,42 @@
              into both widths is what made the columns collide on a phone.
         ============================================================= --}}
         <x-driver-check.surface class="overflow-hidden" x-ref="listTop">
-            <x-driver-check.list-toolbar
-                :title="$page['title']"
+            <x-driver-check.filters
+                embedded
+                :search-placeholder="__('telegram.operators.search_placeholder')"
                 :sort-options="$isSales
-                    ? [
-                        'name' => __('telegram.operators.table.operator'),
-                        'penalties' => __('telegram.operators.table.penalties'),
-                        'last_penalty_at' => __('telegram.operators.table.last_penalty'),
-                        'dm_last_sent_at' => __('telegram.operators.table.last_sent'),
-                        'created_at' => __('telegram.ui.created'),
-                    ]
-                    : [
-                        'name' => __('telegram.operators.table.operator'),
-                        'drivers' => __('telegram.operators.table.drivers'),
-                        'checks' => __('telegram.operators.table.checks'),
-                        'penalties' => __('telegram.operators.table.penalties'),
-                        'dm_last_sent_at' => __('telegram.operators.table.last_sent'),
-                        'created_at' => __('telegram.ui.created'),
-                    ]"
-            />
+                        ? [
+                            'name' => __('telegram.operators.table.operator'),
+                            'penalties' => __('telegram.operators.table.penalties'),
+                            'last_penalty_at' => __('telegram.operators.table.last_penalty'),
+                            'dm_last_sent_at' => __('telegram.operators.table.last_sent'),
+                            'created_at' => __('telegram.ui.created'),
+                        ]
+                        : [
+                            'name' => __('telegram.operators.table.operator'),
+                            'drivers' => __('telegram.operators.table.drivers'),
+                            'checks' => __('telegram.operators.table.checks'),
+                            'penalties' => __('telegram.operators.table.penalties'),
+                            'dm_last_sent_at' => __('telegram.operators.table.last_sent'),
+                            'created_at' => __('telegram.ui.created'),
+                        ]"
+            >
+                <x-driver-check.field :label="__('telegram.operators.filters.dm')">
+                    <x-driver-check.select x-model="filters.dm_enabled" x-on:change="applyFilters()">
+                        <option value="">{{ __('telegram.operators.filters.dm_all') }}</option>
+                        <option value="1">{{ __('telegram.operators.filters.dm_on') }}</option>
+                        <option value="0">{{ __('telegram.operators.filters.dm_off') }}</option>
+                    </x-driver-check.select>
+                </x-driver-check.field>
+
+                <x-driver-check.field :label="__('telegram.operators.filters.linked')">
+                    <x-driver-check.select x-model="filters.linked" x-on:change="applyFilters()">
+                        <option value="">{{ __('telegram.operators.filters.linked_all') }}</option>
+                        <option value="1">{{ __('telegram.operators.filters.linked_yes') }}</option>
+                        <option value="0">{{ __('telegram.operators.filters.linked_no') }}</option>
+                    </x-driver-check.select>
+                </x-driver-check.field>
+            </x-driver-check.filters>
 
             {{-- Table (lg and up) --}}
             <div class="hidden lg:block">
@@ -203,8 +199,8 @@
                             @endif
                         </colgroup>
 
-                        <thead class="border-b border-gray-200 bg-gray-50/70 dark:border-gray-800 dark:bg-white/[0.02]">
-                            <tr class="text-[10px] uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">
+                        <thead class="dc-thead border-b border-gray-200 bg-gray-50/70 dark:border-gray-800 dark:bg-white/[0.02]">
+                            <tr class="text-[10px] uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
                                 <th scope="col" class="px-4 py-2.5 font-semibold">{{ __('telegram.operators.table.operator') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.operators.table.telegram') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.operators.table.dm') }}</th>
@@ -243,6 +239,7 @@
                                                 ></p>
                                                 <p
                                                     class="truncate text-[11px] text-gray-400 dark:text-gray-500"
+                                                    x-show="row.name_normalized !== String(row.name || '').trim().replace(/\s+/g, ' ').toUpperCase()"
                                                     :title="row.name_normalized"
                                                     x-text="row.name_normalized"
                                                 ></p>
@@ -284,12 +281,27 @@
                                         </div>
                                     </td>
 
-                                    {{-- Delivery --}}
+                                    {{-- Delivery, and how we write: language and respect --}}
                                     <td class="px-3 py-3">
+                                        <div class="flex flex-wrap items-center gap-1">
                                         <x-driver-check.badge ::class="deliveryClass(row)">
                                             <span class="h-1.5 w-1.5 rounded-full" :class="deliveryDot(row)"></span>
                                             <span x-text="deliveryLabel(row)"></span>
                                         </x-driver-check.badge>
+                                            <span
+                                                class="rounded-md bg-gray-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-gray-600
+                                                       dark:bg-white/[0.06] dark:text-gray-300"
+                                                :title="translations.form.language"
+                                                x-text="languageOf(row)"
+                                            ></span>
+                                            <span
+                                                x-show="row.respectful"
+                                                x-cloak
+                                                class="rounded bg-brand-50 px-1.5 py-px text-[10px] font-medium text-brand-700
+                                                       dark:bg-brand-500/10 dark:text-brand-300"
+                                                x-text="translations.table.respectful"
+                                            ></span>
+                                        </div>
                                     </td>
 
                                     @unless ($isSales)
@@ -352,9 +364,7 @@
 
                                     {{-- Actions --}}
                                     <td class="px-4 py-3 text-right">
-                                        <x-driver-check.button size="sm" x-on:click="openEdit(row)">
-                                            {{ __('telegram.operators.table.edit') }}
-                                        </x-driver-check.button>
+                                        <x-driver-check.row-action icon="pencil" :label="__('telegram.operators.table.edit')" x-on:click="openEdit(row)" />
                                     </td>
                                 </tr>
                             </template>
@@ -374,13 +384,34 @@
 
                             <div class="min-w-0 flex-1">
                                 <p class="dc-break text-sm font-semibold text-gray-900 dark:text-white" x-text="row.name"></p>
-                                <p class="dc-break text-[11px] text-gray-400 dark:text-gray-500" x-text="row.name_normalized"></p>
+                                <p
+                                    x-show="row.name_normalized !== String(row.name || '').trim().replace(/\s+/g, ' ').toUpperCase()"
+                                    class="dc-break text-[11px] text-gray-400 dark:text-gray-500"
+                                    x-text="row.name_normalized"
+                                ></p>
                             </div>
 
-                            <x-driver-check.badge ::class="deliveryClass(row)">
-                                <span class="h-1.5 w-1.5 rounded-full" :class="deliveryDot(row)"></span>
-                                <span x-text="deliveryLabel(row)"></span>
-                            </x-driver-check.badge>
+                            <div class="flex shrink-0 flex-col items-end gap-1">
+                                <x-driver-check.badge ::class="deliveryClass(row)">
+                                    <span class="h-1.5 w-1.5 rounded-full" :class="deliveryDot(row)"></span>
+                                    <span x-text="deliveryLabel(row)"></span>
+                                </x-driver-check.badge>
+
+                                <div class="flex items-center gap-1">
+                                    <span
+                                        class="rounded bg-gray-100 px-1.5 py-px font-mono text-[10px] font-semibold text-gray-600
+                                               dark:bg-white/[0.06] dark:text-gray-300"
+                                        x-text="languageOf(row)"
+                                    ></span>
+                                    <span
+                                        x-show="row.respectful"
+                                        x-cloak
+                                        class="rounded bg-brand-50 px-1.5 py-px text-[10px] font-medium text-brand-700
+                                               dark:bg-brand-500/10 dark:text-brand-300"
+                                        x-text="translations.table.respectful"
+                                    ></span>
+                                </div>
+                            </div>
                         </div>
 
                         <dl class="grid grid-cols-2 gap-x-3 gap-y-2.5 rounded-xl bg-gray-50 p-3 dark:bg-white/[0.02]">
@@ -592,6 +623,53 @@
                     ></p>
                 </x-slot:error>
             </x-driver-check.field>
+
+            {{-- How penalty comments are written to this person --}}
+            <div class="grid gap-3 sm:grid-cols-2">
+                <x-driver-check.field
+                    :label="__('telegram.operators.form.language')"
+                    :hint="__('telegram.operators.form.language_hint')"
+                    for="operator-language"
+                >
+                    <x-driver-check.select id="operator-language" x-model="form.language">
+                        <option value="" x-text="languageAutoLabel()"></option>
+                        @foreach (\App\Models\Telegram\OperationUser::LANGUAGES as $language)
+                            <option value="{{ $language }}">{{ __("telegram.penalty_settings.languages.{$language}") }}</option>
+                        @endforeach
+                    </x-driver-check.select>
+
+                    <x-slot:error>
+                        <p
+                            x-show="fieldError('language')"
+                            x-cloak
+                            class="mt-1 text-[11px] font-medium text-error-600 dark:text-error-400"
+                            x-text="fieldError('language')"
+                        ></p>
+                    </x-slot:error>
+                </x-driver-check.field>
+
+                <label
+                    class="dc-tap flex cursor-pointer items-start gap-3 self-start rounded-2xl border p-3 transition sm:mt-5"
+                    :class="form.respectful
+                        ? 'border-brand-500 bg-brand-25 dark:border-brand-500/50 dark:bg-brand-500/[0.07]'
+                        : 'border-gray-200 bg-white hover:bg-gray-50 dark:border-gray-800 dark:bg-transparent dark:hover:bg-white/[0.03]'"
+                >
+                    <input
+                        type="checkbox"
+                        x-model="form.respectful"
+                        class="mt-0.5 h-5 w-5 shrink-0 rounded-md border-gray-300 text-brand-500
+                               focus:ring-brand-500/30 dark:border-gray-600 dark:bg-gray-900"
+                    >
+                    <span class="min-w-0">
+                        <span class="block text-sm font-medium text-gray-900 dark:text-white">
+                            {{ __('telegram.operators.form.respectful') }}
+                        </span>
+                        <span class="mt-0.5 block text-[11px] leading-snug text-gray-500 dark:text-gray-400">
+                            {{ __('telegram.operators.form.respectful_hint') }}
+                        </span>
+                    </span>
+                </label>
+            </div>
 
             {{-- The only switch: copy the report into the operator's private chat --}}
             <label

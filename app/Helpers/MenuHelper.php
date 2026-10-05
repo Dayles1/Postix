@@ -89,71 +89,71 @@ class MenuHelper
     {
         return [
             [
-                'title' => 'Проверка водителей',
+                'title' => __('telegram.menu.groups.check'),
                 'items' => [
                     [
                         'icon' => 'statistics',
-                        'name' => 'Операторы',
+                        'name' => __('telegram.menu.items.operation_users'),
                         'path' => '/driver-check/operation-users',
                     ],
                     [
                         'icon' => 'user-profile',
-                        'name' => 'Водители',
+                        'name' => __('telegram.menu.items.drivers'),
                         'path' => '/driver-check/drivers',
                     ],
                     [
                         'icon' => 'phone',
-                        'name' => 'Telegram номера',
+                        'name' => __('telegram.menu.items.resolved_phones'),
                         'path' => '/driver-check/resolved-phones',
                     ],
                     [
                         'icon' => 'support-ticket',
-                        'name' => 'Штрафы CRM',
+                        'name' => __('telegram.menu.items.penalties'),
                         'path' => '/driver-check/penalties',
                     ],
                 ],
             ],
             [
-                'title' => 'Настройки',
+                'title' => __('telegram.menu.groups.settings'),
                 'items' => [
                     [
                         'icon' => 'operators',
-                        'name' => 'Операторы (Operation)',
+                        'name' => __('telegram.menu.items.operators'),
                         'path' => '/driver-check/operators',
                     ],
                     [
                         'icon' => 'ecommerce',
-                        'name' => 'Sales',
+                        'name' => __('telegram.menu.items.sales'),
                         'path' => '/driver-check/sales',
                     ],
                     [
                         'icon' => 'support-ticket',
-                        'name' => 'Настройки штрафов',
+                        'name' => __('telegram.menu.items.penalty_settings'),
                         'path' => '/driver-check/penalties/settings',
                     ],
                     [
                         'icon' => 'chat',
-                        'name' => 'Чаты',
+                        'name' => __('telegram.menu.items.chats'),
                         'path' => '/driver-check/chats',
                     ],
                     [
                         'icon' => 'authentication',
-                        'name' => 'Сессии Telegram',
+                        'name' => __('telegram.menu.items.sessions'),
                         'path' => '/driver-check/sessions',
                     ],
                 ],
             ],
             [
-                'title' => 'Мониторинг',
+                'title' => __('telegram.menu.groups.monitoring'),
                 'items' => [
                     [
                         'icon' => 'dashboard',
-                        'name' => 'Watchdog',
+                        'name' => __('telegram.menu.items.watchdog'),
                         'path' => '/driver-check/watchdog',
                     ],
                     [
                         'icon' => 'task',
-                        'name' => 'Очередь',
+                        'name' => __('telegram.menu.items.queue'),
                         'path' => '/driver-check/queue',
                     ],
                 ],

@@ -23,7 +23,7 @@
         <x-driver-check.page-header
             icon="truck"
             tone="brand"
-            eyebrow="Telegram"
+            :eyebrow="__('telegram.menu.groups.check')"
             :title="__('telegram.drivers.title')"
             :description="__('telegram.drivers.description')"
         >
@@ -38,7 +38,6 @@
                 </x-driver-check.button>
 
                 <x-driver-check.button
-                    variant="success"
                     icon="download"
                     ::href="exportUrl()"
                     :href="route('driver-check.export.details')"
@@ -49,85 +48,81 @@
             </x-slot:actions>
         </x-driver-check.page-header>
 
-        {{-- ============================================================
-             Filters
-        ============================================================= --}}
-        <x-driver-check.filters :search-placeholder="__('telegram.drivers.filters.search_placeholder')">
-            <x-driver-check.field
-                :label="__('telegram.drivers.filters.period')"
-                class="sm:col-span-2 xl:col-span-4"
-            >
-                <div class="flex flex-col gap-2.5">
-                    <x-driver-check.chips />
-
-                    <div x-show="periodPreset === 'custom'" x-cloak class="grid grid-cols-2 gap-2 sm:max-w-md">
-                        <x-driver-check.input
-                            type="date"
-                            x-model="filters.period_from"
-                            x-on:change="applyCustomPeriod()"
-                            :aria-label="__('telegram.drivers.filters.period_from')"
-                        />
-                        <x-driver-check.input
-                            type="date"
-                            x-model="filters.period_to"
-                            x-on:change="applyCustomPeriod()"
-                            :aria-label="__('telegram.drivers.filters.period_to')"
-                        />
-                    </div>
-                </div>
-            </x-driver-check.field>
-
-            <x-driver-check.field :label="__('telegram.drivers.filters.status')" class="sm:col-span-2">
-                <x-driver-check.select x-model="filters.status" x-on:change="applyFilters()">
-                    <option value="">{{ __('telegram.drivers.filters.status_all') }}</option>
-                    <option value="confirmed">{{ __('telegram.drivers.filters.confirmed_status') }}</option>
-                    <option value="not_confirmed">{{ __('telegram.drivers.filters.not_confirmed_status') }}</option>
-                    <option value="pending">{{ __('telegram.drivers.filters.pending_status') }}</option>
-                </x-driver-check.select>
-            </x-driver-check.field>
-
-            <x-driver-check.field :label="__('telegram.drivers.filters.score_range')" class="sm:col-span-2">
-                <div class="grid grid-cols-2 gap-2">
-                    <x-driver-check.input
-                        type="number"
-                        inputmode="numeric"
-                        min="0"
-                        max="100"
-                        x-model="filters.min_match_score"
-                        x-on:input.debounce.500ms="applyFilters()"
-                        :placeholder="__('telegram.drivers.filters.score_from')"
-                    />
-                    <x-driver-check.input
-                        type="number"
-                        inputmode="numeric"
-                        min="0"
-                        max="100"
-                        x-model="filters.max_match_score"
-                        x-on:input.debounce.500ms="applyFilters()"
-                        :placeholder="__('telegram.drivers.filters.score_to')"
-                    />
-                </div>
-            </x-driver-check.field>
-        </x-driver-check.filters>
-
         <x-driver-check.error-alert :title="__('telegram.drivers.errors.load_failed')" />
 
         {{-- ============================================================
              Rows
         ============================================================= --}}
         <x-driver-check.surface class="overflow-hidden" x-ref="listTop">
-            <x-driver-check.list-toolbar
-                :title="__('telegram.drivers.title')"
+            <x-driver-check.filters
+                embedded
+                :search-placeholder="__('telegram.drivers.filters.search_placeholder')"
                 :sort-options="[
-                    'created_at' => __('telegram.drivers.filters.created'),
-                    'name' => __('telegram.drivers.filters.name'),
-                    'checks' => __('telegram.drivers.filters.checks'),
-                    'confirmed' => __('telegram.drivers.filters.confirmed'),
-                    'not_confirmed' => __('telegram.drivers.filters.not_confirmed'),
-                    'best_match_score' => __('telegram.drivers.filters.best_match_score'),
-                    'last_check_at' => __('telegram.drivers.filters.last_check'),
-                ]"
-            />
+                        'created_at' => __('telegram.drivers.filters.created'),
+                        'name' => __('telegram.drivers.filters.name'),
+                        'checks' => __('telegram.drivers.filters.checks'),
+                        'confirmed' => __('telegram.drivers.filters.confirmed'),
+                        'not_confirmed' => __('telegram.drivers.filters.not_confirmed'),
+                        'best_match_score' => __('telegram.drivers.filters.best_match_score'),
+                        'last_check_at' => __('telegram.drivers.filters.last_check'),
+                    ]"
+            >
+                <x-driver-check.field
+                    :label="__('telegram.drivers.filters.period')"
+                    class="sm:col-span-2 xl:col-span-4"
+                >
+                    <div class="flex flex-col gap-2.5">
+                        <x-driver-check.chips />
+
+                        <div x-show="periodPreset === 'custom'" x-cloak class="grid grid-cols-2 gap-2 sm:max-w-md">
+                            <x-driver-check.input
+                                type="date"
+                                x-model="filters.period_from"
+                                x-on:change="applyCustomPeriod()"
+                                :aria-label="__('telegram.drivers.filters.period_from')"
+                            />
+                            <x-driver-check.input
+                                type="date"
+                                x-model="filters.period_to"
+                                x-on:change="applyCustomPeriod()"
+                                :aria-label="__('telegram.drivers.filters.period_to')"
+                            />
+                        </div>
+                    </div>
+                </x-driver-check.field>
+
+                <x-driver-check.field :label="__('telegram.drivers.filters.status')" class="sm:col-span-2">
+                    <x-driver-check.select x-model="filters.status" x-on:change="applyFilters()">
+                        <option value="">{{ __('telegram.drivers.filters.status_all') }}</option>
+                        <option value="confirmed">{{ __('telegram.drivers.filters.confirmed_status') }}</option>
+                        <option value="not_confirmed">{{ __('telegram.drivers.filters.not_confirmed_status') }}</option>
+                        <option value="pending">{{ __('telegram.drivers.filters.pending_status') }}</option>
+                    </x-driver-check.select>
+                </x-driver-check.field>
+
+                <x-driver-check.field :label="__('telegram.drivers.filters.score_range')" class="sm:col-span-2">
+                    <div class="grid grid-cols-2 gap-2">
+                        <x-driver-check.input
+                            type="number"
+                            inputmode="numeric"
+                            min="0"
+                            max="100"
+                            x-model="filters.min_match_score"
+                            x-on:input.debounce.500ms="applyFilters()"
+                            :placeholder="__('telegram.drivers.filters.score_from')"
+                        />
+                        <x-driver-check.input
+                            type="number"
+                            inputmode="numeric"
+                            min="0"
+                            max="100"
+                            x-model="filters.max_match_score"
+                            x-on:input.debounce.500ms="applyFilters()"
+                            :placeholder="__('telegram.drivers.filters.score_to')"
+                        />
+                    </div>
+                </x-driver-check.field>
+            </x-driver-check.filters>
 
             {{-- Table (lg and up) --}}
             <div class="hidden lg:block">
@@ -137,14 +132,14 @@
                             <col class="w-[24%]">
                             <col class="w-[17%]">
                             <col class="w-[12%]">
-                            <col class="w-[8%]">
-                            <col class="w-[16%]">
+                            <col class="w-[10%]">
+                            <col class="w-[14%]">
                             <col class="w-[9%]">
                             <col class="w-[14%]">
                         </colgroup>
 
-                        <thead class="border-b border-gray-200 bg-gray-50/70 dark:border-gray-800 dark:bg-white/[0.02]">
-                            <tr class="text-[10px] uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">
+                        <thead class="dc-thead border-b border-gray-200 bg-gray-50/70 dark:border-gray-800 dark:bg-white/[0.02]">
+                            <tr class="text-[10px] uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
                                 <th scope="col" class="px-4 py-2.5 font-semibold">{{ __('telegram.drivers.table.driver') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.drivers.table.operator') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.drivers.table.status') }}</th>

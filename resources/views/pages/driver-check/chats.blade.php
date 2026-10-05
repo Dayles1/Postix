@@ -23,7 +23,7 @@
         <x-driver-check.page-header
             icon="telegram"
             tone="brand"
-            eyebrow="Telegram"
+            :eyebrow="__('telegram.menu.groups.settings')"
             :title="__('telegram.chats.title')"
             :description="__('telegram.chats.description')"
         >
@@ -97,27 +97,6 @@
             </x-driver-check.stat-card>
         </section>
 
-        {{-- ============================================================
-             Filters
-        ============================================================= --}}
-        <x-driver-check.filters :search-placeholder="__('telegram.chats.search_placeholder')">
-            <x-driver-check.field :label="__('telegram.chats.filters.status')">
-                <x-driver-check.select x-model="filters.is_active" x-on:change="applyFilters()">
-                    <option value="">{{ __('telegram.chats.filters.status_all') }}</option>
-                    <option value="1">{{ __('telegram.chats.filters.status_active') }}</option>
-                    <option value="0">{{ __('telegram.chats.filters.status_inactive') }}</option>
-                </x-driver-check.select>
-            </x-driver-check.field>
-
-            <x-driver-check.field :label="__('telegram.chats.filters.resolved')">
-                <x-driver-check.select x-model="filters.resolved" x-on:change="applyFilters()">
-                    <option value="">{{ __('telegram.chats.filters.resolved_all') }}</option>
-                    <option value="1">{{ __('telegram.chats.filters.resolved_yes') }}</option>
-                    <option value="0">{{ __('telegram.chats.filters.resolved_no') }}</option>
-                </x-driver-check.select>
-            </x-driver-check.field>
-        </x-driver-check.filters>
-
         <x-driver-check.error-alert :title="__('telegram.chats.errors.title')" />
 
         {{-- ============================================================
@@ -127,15 +106,32 @@
              operators page.
         ============================================================= --}}
         <x-driver-check.surface class="overflow-hidden" x-ref="listTop">
-            <x-driver-check.list-toolbar
-                :title="__('telegram.chats.title')"
+            <x-driver-check.filters
+                embedded
+                :search-placeholder="__('telegram.chats.search_placeholder')"
                 :sort-options="[
-                    'created_at' => __('telegram.ui.created'),
-                    'title' => __('telegram.chats.table.chat'),
-                    'last_message_at' => __('telegram.chats.table.last_message'),
-                    'checks' => __('telegram.chats.table.checks'),
-                ]"
-            />
+                        'created_at' => __('telegram.ui.created'),
+                        'title' => __('telegram.chats.table.chat'),
+                        'last_message_at' => __('telegram.chats.table.last_message'),
+                        'checks' => __('telegram.chats.table.checks'),
+                    ]"
+            >
+                <x-driver-check.field :label="__('telegram.chats.filters.status')">
+                    <x-driver-check.select x-model="filters.is_active" x-on:change="applyFilters()">
+                        <option value="">{{ __('telegram.chats.filters.status_all') }}</option>
+                        <option value="1">{{ __('telegram.chats.filters.status_active') }}</option>
+                        <option value="0">{{ __('telegram.chats.filters.status_inactive') }}</option>
+                    </x-driver-check.select>
+                </x-driver-check.field>
+
+                <x-driver-check.field :label="__('telegram.chats.filters.resolved')">
+                    <x-driver-check.select x-model="filters.resolved" x-on:change="applyFilters()">
+                        <option value="">{{ __('telegram.chats.filters.resolved_all') }}</option>
+                        <option value="1">{{ __('telegram.chats.filters.resolved_yes') }}</option>
+                        <option value="0">{{ __('telegram.chats.filters.resolved_no') }}</option>
+                    </x-driver-check.select>
+                </x-driver-check.field>
+            </x-driver-check.filters>
 
             {{-- Table (lg and up) --}}
             <div class="hidden lg:block">
@@ -143,15 +139,15 @@
                     <table class="w-full min-w-[960px] table-fixed text-left">
                         <colgroup>
                             <col class="w-[28%]">
-                            <col class="w-[18%]">
+                            <col class="w-[16%]">
                             <col class="w-[14%]">
-                            <col class="w-[8%]">
+                            <col class="w-[10%]">
                             <col class="w-[18%]">
                             <col class="w-[14%]">
                         </colgroup>
 
-                        <thead class="border-b border-gray-200 bg-gray-50/70 dark:border-gray-800 dark:bg-white/[0.02]">
-                            <tr class="text-[10px] uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">
+                        <thead class="dc-thead border-b border-gray-200 bg-gray-50/70 dark:border-gray-800 dark:bg-white/[0.02]">
+                            <tr class="text-[10px] uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
                                 <th scope="col" class="px-4 py-2.5 font-semibold">{{ __('telegram.chats.table.chat') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.chats.table.peer') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.chats.table.status') }}</th>
@@ -211,7 +207,7 @@
 
                                                     <template x-if="row.source === 'env'">
                                                         <span
-                                                            class="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px]
+                                                            class="shrink-0 whitespace-nowrap rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px]
                                                                    font-medium text-gray-500 dark:bg-white/[0.06] dark:text-gray-400"
                                                             x-text="translations.table.source_env"
                                                         ></span>
@@ -272,9 +268,7 @@
 
                                     {{-- Actions --}}
                                     <td class="px-4 py-3 text-right">
-                                        <x-driver-check.button size="sm" x-on:click="openEdit(row)">
-                                            {{ __('telegram.chats.table.edit') }}
-                                        </x-driver-check.button>
+                                        <x-driver-check.row-action icon="pencil" :label="__('telegram.chats.table.edit')" x-on:click="openEdit(row)" />
                                     </td>
                                 </tr>
                             </template>
