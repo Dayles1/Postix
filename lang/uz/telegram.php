@@ -348,7 +348,7 @@ return [
             'title' => 'So\'rov bo\'yicha jarima',
             'message' => 'Bot xabari',
             'comment' => 'Izoh',
-            'comment_on_last' => 'Izoh har bir to\'plamga bitta yuboriladi - u to\'plamning oxirgi jarimasida saqlanadi.',
+            'comment_on_last' => 'Izoh har bir to\'plamga bitta yuboriladi - u to\'plamning eng kuchli jarimasida saqlanadi.',
             'batch' => 'To\'plamdagi jarimalar',
             'metrics' => 'Odam tarixi',
             'hour_count' => 'Oxirgi soat',
@@ -431,7 +431,7 @@ return [
         ],
         'timing' => [
             'batch_quiet_seconds' => 'Takrorni kutish, son',
-            'batch_quiet_seconds_hint' => 'Bot shu vaqt ichida o\'sha so\'rovni yana yuborsa, kattaroq raqam bo\'yicha bitta izoh ketadi. Turli so\'rovlar hech qachon birlashtirilmaydi.',
+            'batch_quiet_seconds_hint' => 'Shu vaqt ichida bitta odamga kelgan jarimalarga, turli so\'rovlar bo\'lsa ham, bitta izoh ketadi - eng kuchlisiniki (kattaroq raqam).',
             'max_attempts' => 'Yuborish urinishlari',
             'max_attempts_hint' => 'Telegram rad etsa, necha marta urinish.',
             'retry_minutes' => 'Qayta urinish muddati, daq',

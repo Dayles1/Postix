@@ -360,7 +360,7 @@ return [
             'title' => 'Penalty for request',
             'message' => 'Bot message',
             'comment' => 'Comment',
-            'comment_on_last' => 'One comment goes out per batch - it is stored on the batch\'s last penalty.',
+            'comment_on_last' => 'One comment goes out per batch - it is stored on the batch\'s strongest penalty.',
             'batch' => 'Penalties in the batch',
             'metrics' => 'Person\'s history',
             'hour_count' => 'Last hour',
@@ -443,7 +443,7 @@ return [
         ],
         'timing' => [
             'batch_quiet_seconds' => 'Wait for a repeat, sec',
-            'batch_quiet_seconds_hint' => 'If the bot re-sends the same request within this time, one comment goes out, for the higher number. Different requests are never stacked.',
+            'batch_quiet_seconds_hint' => 'Penalties for one person within this time, different requests too, get one comment - the strongest one\'s (the highest number).',
             'max_attempts' => 'Delivery attempts',
             'max_attempts_hint' => 'How many times to try when Telegram refuses.',
             'retry_minutes' => 'Retry for, min',

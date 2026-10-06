@@ -25,10 +25,10 @@
 return [
 
     /*
-     * The bot may post the same request twice in a burst. Penalties for the
-     * same person AND the same request within this many seconds get one
-     * comment, at the highest repeat number. Different requests never
-     * share a comment.
+     * The bot often posts several penalties in a burst. One person's
+     * penalties within this many seconds of each other get one comment -
+     * different requests too - the strongest one's: the highest repeat
+     * number whose level has a comment, the latest on a tie.
      *
      * 5, not 20: the comment is meant to follow the forward within seconds
      * (2026-10-07). Together with the listener's 2-second tick

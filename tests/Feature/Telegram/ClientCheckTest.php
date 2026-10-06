@@ -422,35 +422,75 @@ class ClientCheckTest extends TestCase
     }
 
     /**
-     * The bot's number already says how many times a request was sent:
-     * only a re-send of the same request is stacked, never two requests.
+     * Several penalties of one person in a burst, different requests too:
+     * every one is forwarded, one comment follows - the strongest one's.
      */
-    public function test_only_the_same_request_is_stacked(): void
+    public function test_a_burst_gets_one_comment_the_strongest(): void
     {
         $this->person();
 
         $first = $this->penalty(repeat: 1, request: 'EGS1');
         Carbon::setTestNow(now()->addSecond());
-        $this->penalty(repeat: 5, request: 'EGS2');
+        $strongest = $this->penalty(repeat: 5, request: 'EGS2');
         Carbon::setTestNow(now()->addSecond());
         $again = $this->penalty(repeat: 2, request: 'EGS1');
 
         $this->flushAfterQuiet();
 
-        $this->assertSame(['forward', 'forward', 'forward', 'send', 'send'], $this->messages->kinds());
+        $this->assertSame(['forward', 'forward', 'forward', 'send'], $this->messages->kinds());
+        $this->assertSame('U4+ №5', $this->messages->sent()[0]['message']);
 
-        $comments = array_column($this->messages->sent(), 'message');
-        sort($comments);
-
-        /* EGS1 once, at its higher number; EGS2 on its own. */
-        $this->assertSame(['U2 №2', 'U4+ №5'], $comments);
-
-        $this->assertSame(2, $again->refresh()->batch_count);
+        $this->assertSame('U4+ №5', $strongest->refresh()->comment);
+        $this->assertSame(3, $strongest->batch_count);
         $this->assertNull($first->refresh()->comment);
+        $this->assertNull($again->refresh()->comment);
         $this->assertSame(
             3,
             TelegramClientCheck::query()->where('status', TelegramClientCheckStatus::Sent)->count(),
         );
+    }
+
+    /**
+     * The case from 2026-10-06: two requests on the top level, the same
+     * text twice in a row. Now one comment, the latest one's.
+     */
+    public function test_on_the_same_level_the_latest_speaks(): void
+    {
+        $this->person();
+
+        $this->penalty(repeat: 4, request: 'EGS19496');
+        Carbon::setTestNow(now()->addSecond());
+        $latest = $this->penalty(repeat: 4, request: 'EGS19709');
+
+        $this->flushAfterQuiet();
+
+        $this->assertSame(['forward', 'forward', 'send'], $this->messages->kinds());
+        $this->assertSame('U4+ №4', $latest->refresh()->comment);
+    }
+
+    /**
+     * A penalty on a "forward only" level does not silence another
+     * request's comment in the same burst.
+     */
+    public function test_a_forward_only_level_does_not_silence_the_burst(): void
+    {
+        $this->person();
+
+        $this->saveRules([], ['roles' => [
+            'operation' => ['levels' => [
+                ['mode' => 'all', 'phrases' => ['uz' => ['plain' => ['ONE #{request}']]]],
+                ['from' => 2, 'mode' => 'forward', 'phrases' => []],
+            ]],
+            'sales' => ['levels' => [['phrases' => ['ru' => ['plain' => ['x']]]]]],
+        ]]);
+
+        $this->penalty(repeat: 1, request: 'R1');
+        $this->penalty(repeat: 7, request: 'R7');
+
+        $this->flushAfterQuiet();
+
+        $this->assertSame(['forward', 'forward', 'send'], $this->messages->kinds());
+        $this->assertSame('ONE #R1', $this->messages->sent()[0]['message']);
     }
 
     /*

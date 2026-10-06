@@ -18,8 +18,8 @@ use Throwable;
  * Delivers penalties in two steps.
  *
  * 1. forward() - the bot's message, as is, the moment it arrives.
- * 2. flush()   - one comment per request, once the bot has stopped
- *                re-sending it for a moment, to the peer the last forward
+ * 2. flush()   - one comment per person, once the bot has stopped posting
+ *                their penalties for a moment, to the peer the last forward
  *                reached.
  *
  * flush() also retries what Telegram refused, while it is still fresh.
@@ -192,22 +192,19 @@ final class ClientCheckSender
         $quietFrom = now()->subSeconds($this->escalation->quietSeconds());
 
         /*
-         * Only the same request is ever stacked: the bot's repeat number
-         * already says how many times it was sent, so two different
-         * requests are two comments, never one.
+         * One comment per person per burst, whatever the requests: the bot
+         * often posts several of one person's penalties at once, and the
+         * same text twice in a row reads as a glitch (2026-10-06). The
+         * strongest penalty speaks for the batch (ClientCheckEscalation).
          */
-        $batches = $pending->groupBy(
-            static fn (TelegramClientCheck $check): string => $check->operation_user_id
-                . '|'
-                . ($check->request_number ?? '#' . $check->id),
-        );
+        $batches = $pending->groupBy('operation_user_id');
 
         foreach ($batches as $batch) {
             /** @var TelegramClientCheck $last */
             $last = $batch->last();
 
             /*
-             * The bot may still be re-sending this request.
+             * The bot may still be posting this person's penalties.
              */
             if ($last->created_at > $quietFrom) {
                 continue;

@@ -57,28 +57,29 @@ final class ClientCheckEscalation
     }
 
     /**
-     * The one comment for a batch - penalties of one person for one
-     * request - chosen and stored on its last penalty.
+     * The one comment for a batch - every penalty of one person in a
+     * burst, whatever the request - chosen and stored on the penalty it
+     * speaks for: the strongest one whose level has a comment, the latest
+     * of them on a tie.
      *
      * @param Collection<int, TelegramClientCheck> $batch oldest first
      */
     public function comment(Collection $batch, OperationUser $person): ?string
     {
-        /** @var TelegramClientCheck $last */
-        $last = $batch->sortBy('repeat_number')->last();
+        $last = $this->strongest($batch, $person);
+
+        if ($last === null) {
+            return null;
+        }
 
         $rules = $this->rules();
         $role = $person->roleOrDefault();
 
         /*
-         * The highest repeat in the batch decides; levels may also have
-         * been removed since the penalty came in.
+         * Read again rather than taken from the row: levels may have been
+         * removed since the penalty came in.
          */
-        $level = $rules->levelFor($role, max(1, (int) $batch->max('repeat_number')));
-
-        if (! $this->commentAllowed($batch, $person)) {
-            return null;
-        }
+        $level = $rules->levelFor($role, max(1, (int) $last->repeat_number));
 
         $variant = $rules->variant(
             $role,
@@ -115,19 +116,29 @@ final class ClientCheckEscalation
     }
 
     /**
-     * Whether a comment follows this batch at all: its level - the highest
-     * repeat in it - may say "forward only" (or nothing) for the role.
+     * Whether a comment follows this batch at all: every level in it may
+     * say "forward only" (or nothing) for the role.
      *
      * @param Collection<int, TelegramClientCheck> $batch
      */
     public function commentAllowed(Collection $batch, OperationUser $person): bool
     {
-        $rules = $this->rules();
-        $role = $person->roleOrDefault();
+        return $this->strongest($batch, $person) !== null;
+    }
 
-        $level = $rules->levelFor($role, max(1, (int) $batch->max('repeat_number')));
-
-        return $rules->mode($role, $level) === ClientCheckRules::MODE_ALL;
+    /**
+     * The penalty the batch's comment speaks for: the highest repeat among
+     * those whose level has a comment - a "forward only" level does not
+     * silence another request's comment - and the latest on a tie.
+     *
+     * @param Collection<int, TelegramClientCheck> $batch oldest first
+     */
+    private function strongest(Collection $batch, OperationUser $person): ?TelegramClientCheck
+    {
+        return $batch
+            ->filter(fn (TelegramClientCheck $check): bool => $this->mode($check, $person) === ClientCheckRules::MODE_ALL)
+            ->sortBy([['repeat_number', 'asc'], ['id', 'asc']])
+            ->last();
     }
 
     public function quietSeconds(): int
