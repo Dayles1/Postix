@@ -11,6 +11,7 @@
 import { createListPage } from './list-page';
 import { sessionsPage } from './sessions';
 import { penaltiesPage } from './penalties';
+import { autoRepliesPage } from './auto-replies';
 import { penaltySettingsPage } from './penalty-settings';
 import { queuePage, watchdogPage } from './monitoring';
 import { statusType } from './status';
@@ -41,6 +42,8 @@ function operatorsPage(config) {
         /* '' = as the role says (Russian for sales, Uzbek for operators). */
         language: '',
         respectful: false,
+        /* How to call them, per language: "Ali aka", "jigar". */
+        address: { uz: '', ru: '' },
         deletable: false,
     });
 
@@ -119,6 +122,13 @@ function operatorsPage(config) {
 
         languageOf(row) {
             return (row.message_language || '').toUpperCase();
+        },
+
+        /** How the person is called in the language they are written to. */
+        addressOf(row) {
+            const address = row.address || {};
+
+            return address[row.message_language] || Object.values(address)[0] || '';
         },
 
         /**
@@ -209,6 +219,7 @@ function operatorsPage(config) {
                 role: row.role || role,
                 language: row.language || '',
                 respectful: !!row.respectful,
+                address: { uz: row.address?.uz || '', ru: row.address?.ru || '' },
                 deletable: !!row.deletable,
             };
 
@@ -293,6 +304,10 @@ function operatorsPage(config) {
                         role: this.form.role,
                         language: this.form.language || null,
                         respectful: !!this.form.respectful,
+                        address: {
+                            uz: this.form.address.uz.trim() || null,
+                            ru: this.form.address.ru.trim() || null,
+                        },
                     }),
                 });
 
@@ -1176,6 +1191,7 @@ export function registerDriverCheck(Alpine) {
     Alpine.data('dcSessions', sessionsPage);
     Alpine.data('dcPenalties', penaltiesPage);
     Alpine.data('dcPenaltySettings', penaltySettingsPage);
+    Alpine.data('dcAutoReplies', autoRepliesPage);
     Alpine.data('dcWatchdog', watchdogPage);
     Alpine.data('dcQueue', queuePage);
 }

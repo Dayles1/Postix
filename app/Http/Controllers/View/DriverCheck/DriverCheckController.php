@@ -62,6 +62,13 @@ final class DriverCheckController extends Controller
         );
     }
 
+    public function autoReplies()
+    {
+        return view(
+            'pages.driver-check.auto-replies'
+        );
+    }
+
     public function chats()
     {
         return view(

@@ -49,8 +49,8 @@ const LEVEL_TONES = [
 
 /** What a preview fills the placeholders with, in each language. */
 const SAMPLE = {
-    uz: { status_limit: '2 soat', time_in_status: '3 soat 8 daqiqa' },
-    ru: { status_limit: '2 ч', time_in_status: '3 ч 8 мин' },
+    uz: { status_limit: '2 soat', time_in_status: '3 soat 8 daqiqa', address: 'Ali aka' },
+    ru: { status_limit: '2 ч', time_in_status: '3 ч 8 мин', address: 'Али ака' },
 };
 
 let keySeed = 0;

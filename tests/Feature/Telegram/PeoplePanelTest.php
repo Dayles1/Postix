@@ -75,6 +75,7 @@ class PeoplePanelTest extends TestCase
             $table->string('role', 16)->default('operation');
             $table->string('language', 5)->nullable();
             $table->boolean('respectful')->default(false);
+            $table->json('address')->nullable();
             $table->string('telegram_username')->nullable()->unique();
             $table->unsignedBigInteger('telegram_id')->nullable()->unique();
             $table->boolean('is_active')->default(true);
@@ -129,6 +130,13 @@ class PeoplePanelTest extends TestCase
             $table->string('peer')->nullable();
             $table->timestamp('forwarded_at')->nullable();
             $table->timestamp('sent_at')->nullable();
+            $table->text('reply_text')->nullable();
+            $table->timestamp('replied_at')->nullable();
+            $table->string('reply_kind', 60)->nullable();
+            $table->text('reply_answer')->nullable();
+            $table->timestamp('reply_answered_at')->nullable();
+            $table->timestamp('nudged_at')->nullable();
+            $table->text('nudge_text')->nullable();
             $table->timestamps();
         });
 
@@ -373,6 +381,148 @@ class PeoplePanelTest extends TestCase
         $this->putJson("/api/telegram/operators/{$operator->id}", ['name' => 'ALPHA OPERATOR', 'language' => 'en'])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('language');
+    }
+
+    public function test_how_to_call_a_person_is_saved_per_language(): void
+    {
+        $person = $this->person('ALPHA OPERATOR');
+
+        $this->getJson('/api/telegram/operators')
+            ->assertJsonPath('data.0.address', []);
+
+        $this->putJson("/api/telegram/operators/{$person->id}", [
+            'name' => 'ALPHA OPERATOR',
+            'address' => ['uz' => '  Ali aka ', 'ru' => ''],
+        ])
+            ->assertOk()
+            /* trimmed, and an empty language left out */
+            ->assertJsonPath('data.address', ['uz' => 'Ali aka']);
+
+        /* Left out of an edit, it stays. */
+        $this->putJson("/api/telegram/operators/{$person->id}", ['name' => 'ALPHA OPERATOR'])
+            ->assertJsonPath('data.address', ['uz' => 'Ali aka']);
+
+        $this->putJson("/api/telegram/operators/{$person->id}", [
+            'name' => 'ALPHA OPERATOR',
+            'address' => ['uz' => null, 'ru' => null],
+        ])
+            ->assertJsonPath('data.address', []);
+
+        $this->assertNull($person->refresh()->address);
+
+        $this->putJson("/api/telegram/operators/{$person->id}", [
+            'name' => 'ALPHA OPERATOR',
+            'address' => ['uz' => str_repeat('a', 61)],
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('address.uz');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Auto replies: one JSON file
+    |--------------------------------------------------------------------------
+    */
+
+    private function autoReplies(array $override = []): array
+    {
+        return [
+            'enabled' => true,
+            'only_after_penalty' => false,
+            'penalty_window_minutes' => 45,
+            'cooldown_minutes' => 0,
+            'max_words' => 4,
+            'replies' => [
+                ['name' => 'Agreed', 'keywords' => ['ok', ' ', '+', 'ok'], 'max_words' => null, 'answers' => [
+                    'uz' => ['plain' => ['Rahmat, {address}', ''], 'respectful' => []],
+                    'ru' => ['plain' => [], 'respectful' => []],
+                ]],
+                ['name' => 'Client', 'keywords' => ['клиент*'], 'max_words' => 12, 'answers' => [
+                    'ru' => ['plain' => ['Понял']],
+                ]],
+            ],
+            'silence' => [
+                'enabled' => true,
+                'after_minutes' => 20,
+                'answers' => ['uz' => ['plain' => ['Iltimos, {address}'], 'respectful' => []]],
+            ],
+            ...$override,
+        ];
+    }
+
+    public function test_auto_replies_are_kept_in_one_file(): void
+    {
+        $path = storage_path('framework/testing/auto-replies-' . bin2hex(random_bytes(4)) . '.json');
+        config()->set('auto_replies.path', $path);
+
+        try {
+            $this->get('/driver-check/auto-replies')
+                ->assertOk()
+                ->assertSee(__('telegram.auto_replies.title'));
+
+            /* No file yet: the defaults. */
+            $this->getJson('/api/telegram/auto-replies')
+                ->assertOk()
+                ->assertJsonPath('customised', false)
+                ->assertJsonPath('file_error', null)
+                ->assertJsonPath('data.replies.0.name', 'Ждём клиента');
+
+            $this->putJson('/api/telegram/auto-replies', $this->autoReplies())
+                ->assertOk()
+                ->assertJsonPath('customised', true)
+                ->assertJsonPath('data.max_words', 4)
+                ->assertJsonPath('data.cooldown_minutes', 0)
+                /* blanks and repeats dropped */
+                ->assertJsonPath('data.replies.0.keywords', ['ok', '+'])
+                ->assertJsonPath('data.replies.0.answers.uz.plain', ['Rahmat, {address}'])
+                ->assertJsonPath('data.replies.0.max_words', null)
+                ->assertJsonPath('data.replies.1.max_words', 12)
+                ->assertJsonPath('data.replies.1.keywords', ['клиент*'])
+                ->assertJsonPath('data.silence.after_minutes', 20)
+                ->assertJsonPath('data.silence.answers.uz.plain', ['Iltimos, {address}']);
+
+            /* Everything is in the file, readable by hand. */
+            $file = json_decode((string) file_get_contents($path), true);
+            $this->assertSame('Agreed', $file['replies'][0]['name']);
+            $this->assertSame(45, $file['penalty_window_minutes']);
+            $this->assertStringContainsString('Rahmat', (string) file_get_contents($path));
+
+            $this->get('/api/telegram/auto-replies/download')
+                ->assertOk()
+                ->assertHeader('Content-Disposition', 'attachment; filename="' . basename($path) . '"');
+
+            /* A half-made kind is refused, and the file is left alone. */
+            $this->putJson('/api/telegram/auto-replies', $this->autoReplies([
+                'replies' => [
+                    ['name' => null, 'keywords' => ['  '], 'answers' => ['uz' => ['plain' => ['x']]]],
+                    ['name' => null, 'keywords' => ['ok'], 'answers' => ['uz' => ['plain' => ['  ']]]],
+                ],
+                'max_words' => 0,
+                'silence' => ['enabled' => true, 'after_minutes' => 15, 'answers' => ['uz' => ['plain' => [' ']]]],
+            ]))
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors(['replies.0.keywords', 'replies.1.answers', 'max_words', 'silence.answers'])
+                ->assertJsonMissingValidationErrors(['replies.0.answers', 'replies.1.keywords']);
+
+            $this->assertSame('Agreed', json_decode((string) file_get_contents($path), true)['replies'][0]['name']);
+
+            /* Broken by hand: said so. */
+            file_put_contents($path, '{');
+            $this->getJson('/api/telegram/auto-replies')
+                ->assertJsonPath('customised', true)
+                ->assertJsonPath('data.enabled', false)
+                ->assertJsonPath('file_error', 'Syntax error');
+
+            /* Reset: the file goes, the defaults are back. */
+            $this->deleteJson('/api/telegram/auto-replies')
+                ->assertOk()
+                ->assertJsonPath('customised', false)
+                ->assertJsonPath('data.replies.0.name', 'Ждём клиента');
+
+            $this->assertFileDoesNotExist($path);
+        } finally {
+            @unlink($path);
+        }
     }
 
     /*

@@ -183,7 +183,11 @@ final class ClientCheckEscalation
         return $choices[array_rand($choices)];
     }
 
-    private function render(
+    /**
+     * A phrase with its placeholders filled in - a penalty comment, or the
+     * answer to the person's reply (ProcessAutoReply).
+     */
+    public function render(
         string $template,
         TelegramClientCheck $last,
         OperationUser $person,
@@ -199,7 +203,23 @@ final class ClientCheckEscalation
 
         $name = trim((string) $person->name);
 
+        $address = $person->addressFor($language);
+
+        /*
+         * Nobody wrote how to call this person: the address goes, with the
+         * comma that led to it or followed it - "Rahmat, {address}!" reads
+         * "Rahmat!", "{address}, narx bering" reads "narx bering".
+         */
+        if ($address === null) {
+            $template = trim((string) preg_replace(
+                ['/^\h*\{address\}\h*,?\h*/um', '/,?\h*\{address\}/u'],
+                '',
+                $template,
+            ));
+        }
+
         return strtr($template, [
+            '{address}' => $e($address),
             '{name}' => $e($name !== '' ? $name : ($language === OperationUser::LANGUAGE_UZ ? 'Hamkasb' : 'Коллега')),
             '{request}' => $e($last->request_number ?? '—'),
             '{repeat_number}' => (string) $last->repeat_number,

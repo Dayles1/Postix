@@ -154,6 +154,27 @@ final class OperatorController extends Controller
              */
             ...(array_key_exists('language', $validated) ? ['language' => $validated['language']] : []),
             ...(array_key_exists('respectful', $validated) ? ['respectful' => (bool) $validated['respectful']] : []),
+            ...(array_key_exists('address', $validated) ? ['address' => $this->address($validated['address'])] : []),
         ];
+    }
+
+    /**
+     * Only the languages that have something; nothing at all is null.
+     *
+     * @return array<string, string>|null
+     */
+    private function address(mixed $address): ?array
+    {
+        $clean = [];
+
+        foreach (OperationUser::LANGUAGES as $language) {
+            $value = trim((string) ($address[$language] ?? ''));
+
+            if ($value !== '') {
+                $clean[$language] = $value;
+            }
+        }
+
+        return $clean !== [] ? $clean : null;
     }
 }

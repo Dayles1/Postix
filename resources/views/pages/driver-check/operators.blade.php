@@ -301,6 +301,14 @@
                                                        dark:bg-brand-500/10 dark:text-brand-300"
                                                 x-text="translations.table.respectful"
                                             ></span>
+                                            <span
+                                                x-show="addressOf(row)"
+                                                x-cloak
+                                                class="max-w-[9rem] truncate rounded bg-gray-100 px-1.5 py-px text-[10px] font-medium text-gray-600
+                                                       dark:bg-white/[0.06] dark:text-gray-300"
+                                                :title="translations.form.address_short"
+                                                x-text="addressOf(row)"
+                                            ></span>
                                         </div>
                                     </td>
 
@@ -409,6 +417,13 @@
                                         class="rounded bg-brand-50 px-1.5 py-px text-[10px] font-medium text-brand-700
                                                dark:bg-brand-500/10 dark:text-brand-300"
                                         x-text="translations.table.respectful"
+                                    ></span>
+                                    <span
+                                        x-show="addressOf(row)"
+                                        x-cloak
+                                        class="max-w-[9rem] truncate rounded bg-gray-100 px-1.5 py-px text-[10px] font-medium text-gray-600
+                                               dark:bg-white/[0.06] dark:text-gray-300"
+                                        x-text="addressOf(row)"
                                     ></span>
                                 </div>
                             </div>
@@ -669,6 +684,40 @@
                         </span>
                     </span>
                 </label>
+            </div>
+
+            {{-- How to call the person: "Ali aka", "jigar" - {address} in the texts --}}
+            <div>
+                <div class="grid gap-3 sm:grid-cols-2">
+                @foreach (\App\Models\Telegram\OperationUser::LANGUAGES as $language)
+                    <x-driver-check.field
+                        :label="__('telegram.operators.form.address', ['language' => __('telegram.penalty_settings.languages.' . $language)])"
+                        for="operator-address-{{ $language }}"
+                    >
+                        <x-driver-check.input
+                            id="operator-address-{{ $language }}"
+                            x-model="form.address.{{ $language }}"
+                            maxlength="60"
+                            autocomplete="off"
+                            placeholder="{{ __('telegram.operators.form.address_placeholder.' . $language) }}"
+                            ::data-invalid="!!fieldError('address.{{ $language }}')"
+                        />
+
+                        <x-slot:error>
+                            <p
+                                x-show="fieldError('address.{{ $language }}')"
+                                x-cloak
+                                class="mt-1 text-[11px] font-medium text-error-600 dark:text-error-400"
+                                x-text="fieldError('address.{{ $language }}')"
+                            ></p>
+                        </x-slot:error>
+                    </x-driver-check.field>
+                @endforeach
+                </div>
+
+                <p class="mt-1 text-[11px] leading-snug text-gray-400 dark:text-gray-500">
+                    {{ __('telegram.operators.form.address_hint') }}
+                </p>
             </div>
 
             {{-- The only switch: copy the report into the operator's private chat --}}

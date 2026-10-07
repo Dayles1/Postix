@@ -132,6 +132,11 @@ class MenuHelper
                         'path' => '/driver-check/penalties/settings',
                     ],
                     [
+                        'icon' => 'ai-assistant',
+                        'name' => __('telegram.menu.items.auto_replies'),
+                        'path' => '/driver-check/auto-replies',
+                    ],
+                    [
                         'icon' => 'chat',
                         'name' => __('telegram.menu.items.chats'),
                         'path' => '/driver-check/chats',

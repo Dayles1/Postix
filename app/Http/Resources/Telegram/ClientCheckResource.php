@@ -49,6 +49,7 @@ final class ClientCheckResource extends JsonResource
                     'dm_enabled' => (bool) $person->dm_enabled,
                     'message_language' => $person->messageLanguage(),
                     'respectful' => (bool) $person->respectful,
+                    'address' => $person->addressFor($person->messageLanguage()),
                 ]
                 : null,
 
@@ -76,6 +77,27 @@ final class ClientCheckResource extends JsonResource
             'peer' => $this->peer,
 
             'message_text' => $this->message_text,
+
+            /*
+             * What the person wrote back, the kind it was read as (null:
+             * none) and our answer to it.
+             */
+            'reply_text' => $this->reply_text,
+
+            'replied_at' => $this->replied_at,
+
+            'reply_kind' => $this->reply_kind,
+
+            'reply_answer' => $this->reply_answer,
+
+            'reply_answered_at' => $this->reply_answered_at,
+
+            /*
+             * Nobody answered: the nudge that followed.
+             */
+            'nudged_at' => $this->nudged_at,
+
+            'nudge_text' => $this->nudge_text,
 
             'forwarded_at' => $this->forwarded_at,
 

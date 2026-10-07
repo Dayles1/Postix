@@ -64,6 +64,7 @@ final readonly class ClientCheckRules
      * durations come out in the phrase's language ("2 ч" / "2 soat").
      */
     public const PLACEHOLDERS = [
+        'address',
         'name',
         'request',
         'repeat_number',

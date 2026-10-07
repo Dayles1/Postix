@@ -30,6 +30,12 @@ final class OperatorResource extends JsonResource
 
             'respectful' => (bool) $this->respectful,
 
+            /*
+             * {"uz": "Ali aka", "ru": "Али ака"}; a language left out has
+             * none.
+             */
+            'address' => (object) ($this->address ?? []),
+
             'telegram_username' => $this->telegramUsername(),
 
             'telegram_id' => $this->telegram_id,

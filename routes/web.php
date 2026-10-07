@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\Telegram\ClientCheckController;
+use App\Http\Controllers\Api\Telegram\AutoReplyController;
 use App\Http\Controllers\Api\Telegram\ClientCheckRulesController;
 use App\Http\Controllers\Api\Telegram\DriverCheckChatController;
 use App\Http\Controllers\Api\Telegram\DriverCheckExportController;
@@ -211,6 +212,15 @@ Route::middleware(['auth', 'role:driverCheck,superadmin'])
         )->name('driver-check.penalties.settings');
 
         /*
+         * Auto replies: what an operator's or a sales manager's private
+         * message is answered with. One JSON file, edited here.
+         */
+        Route::get(
+            '/auto-replies',
+            [DriverCheckController::class, 'autoReplies']
+        )->name('driver-check.auto-replies');
+
+        /*
          * Watched chats
          *
          * The groups the listener follows. Editable here so a new group can
@@ -371,6 +381,29 @@ Route::middleware(['auth', 'role:driverCheck,superadmin'])
             '/client-checks/rules',
             [ClientCheckRulesController::class, 'destroy']
         )->name('api.telegram.client-checks.rules.reset');
+
+        /*
+         * The auto replies file
+         */
+        Route::get(
+            '/auto-replies',
+            [AutoReplyController::class, 'show']
+        )->name('api.telegram.auto-replies');
+
+        Route::put(
+            '/auto-replies',
+            [AutoReplyController::class, 'update']
+        )->name('api.telegram.auto-replies.update');
+
+        Route::delete(
+            '/auto-replies',
+            [AutoReplyController::class, 'destroy']
+        )->name('api.telegram.auto-replies.reset');
+
+        Route::get(
+            '/auto-replies/download',
+            [AutoReplyController::class, 'download']
+        )->name('api.telegram.auto-replies.download');
 
         /*
          * Watched chats (management CRUD)

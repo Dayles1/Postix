@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Telegram;
 
 use App\Application\Telegram\Actions\NotifyTelegramResolverExhaustion;
+use App\Application\Telegram\Actions\NudgeSilentClientChecks;
+use App\Application\Telegram\Actions\ProcessAutoReply;
 use App\Application\Telegram\Actions\ProcessClientCheckMessage;
 use App\Application\Telegram\Actions\ProcessCreatedDriverMessage;
 use App\Application\Telegram\Actions\ProcessTelegramDriverCheckResults;
@@ -124,6 +126,22 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
 
             // Ignore all other chats silently.
             if (! in_array((int) $chatId, $this->targetChatIds, true)) {
+                /*
+                 * Except a private chat: an operator or a sales manager
+                 * writing to us - "+", "ok" after a penalty - is answered
+                 * from the auto replies file. Strangers are not.
+                 */
+                if ((int) $chatId > 0) {
+                    app(
+                        ProcessAutoReply::class,
+                    )->execute(
+                        telegram: $this,
+                        senderId: (int) ($message->senderId ?? 0),
+                        messageId: (int) ($message->id ?? 0),
+                        text: (string) ($message->message ?? ''),
+                    );
+                }
+
                 return;
             }
 
@@ -374,6 +392,24 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
         } catch (Throwable $e) {
             Log::error(
                 'TelegramDriverCheckHandler: client check flush failed',
+                [
+                    'error' => $e->getMessage(),
+                    'exception' => $e::class,
+                ],
+            );
+        }
+
+        /*
+         * After the comments: a penalty nobody answered gets its nudge.
+         * Apart, so a failure here never holds the comments back.
+         */
+        try {
+            app(
+                NudgeSilentClientChecks::class,
+            )->execute($this);
+        } catch (Throwable $e) {
+            Log::error(
+                'TelegramDriverCheckHandler: client check nudge failed',
                 [
                     'error' => $e->getMessage(),
                     'exception' => $e::class,

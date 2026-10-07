@@ -63,8 +63,10 @@ return [
      * 'forward' - the forward only, 'off' - nothing). The last level covers
      * everything after it ("4+").
      *
-     * Placeholders: {name}, {request}, {repeat_number}, {status_limit},
-     * {time_in_status}, {crm_status}. Telegram HTML is allowed.
+     * Placeholders: {address}, {name}, {request}, {repeat_number},
+     * {status_limit}, {time_in_status}, {crm_status}. Telegram HTML is
+     * allowed. {address} is how the person's card says to call them ("Ali
+     * aka", "jigar"); with none written it is left out, with its comma.
      *
      * Respectful and plain are written apart: respectful is not a politer
      * copy of plain, it may say something else.

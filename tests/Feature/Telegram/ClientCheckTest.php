@@ -3,7 +3,12 @@
 namespace Tests\Feature\Telegram;
 
 use App\Application\Telegram\Actions\ProcessClientCheckMessage;
+use App\Application\Telegram\Actions\NudgeSilentClientChecks;
+use App\Application\Telegram\Actions\ProcessAutoReply;
 use App\Application\Telegram\Services\ClientCheckEscalation;
+use App\Application\Telegram\Services\AutoReplyMatcher;
+use App\Application\Telegram\Services\AutoReplyRules;
+use App\Application\Telegram\Services\AutoReplyStore;
 use App\Application\Telegram\Services\ClientCheckRules;
 use App\Application\Telegram\Services\ClientCheckRulesStore;
 use App\Application\Telegram\Services\ClientCheckSender;
@@ -175,12 +180,38 @@ class ClientCheckTest extends TestCase
             ]],
         ]);
 
+        /*
+         * The auto replies file: a fresh one per test, and one kind apart
+         * from the config's own.
+         */
+        config()->set('auto_replies.path', storage_path('framework/testing/auto-replies-' . bin2hex(random_bytes(4)) . '.json'));
+        config()->set('auto_replies.defaults', [
+            'enabled' => true,
+            'only_after_penalty' => false,
+            'penalty_window_minutes' => 60,
+            'cooldown_minutes' => 10,
+            'max_words' => 5,
+            'replies' => [
+                ['name' => 'Agreed', 'keywords' => ['+', 'ok', 'хоп', "bo'ldi", '👍', 'hop aka'], 'answers' => [
+                    'uz' => ['plain' => ['Rahmat, {address}'], 'respectful' => ['Rahmat, {address}!']],
+                    'ru' => ['plain' => ['Спасибо, {address}'], 'respectful' => ['Спасибо большое, {address}!']],
+                ]],
+            ],
+            'silence' => [
+                'enabled' => true,
+                'after_minutes' => 15,
+                'answers' => ['uz' => ['plain' => ['Javob kutyapman, {address}'], 'respectful' => ['Iltimos, {address}']]],
+            ],
+        ]);
+
         Carbon::setTestNow('2026-10-02 10:00:00');
     }
 
     protected function tearDown(): void
     {
         Carbon::setTestNow();
+
+        app(AutoReplyStore::class)->reset();
 
         parent::tearDown();
     }
@@ -205,6 +236,7 @@ class ClientCheckTest extends TestCase
             $table->string('role', 16)->default('operation');
             $table->string('language', 5)->nullable();
             $table->boolean('respectful')->default(false);
+            $table->json('address')->nullable();
             $table->string('telegram_username')->nullable();
             $table->unsignedBigInteger('telegram_id')->nullable();
             $table->boolean('is_active')->default(true);
@@ -241,6 +273,13 @@ class ClientCheckTest extends TestCase
             $table->string('peer')->nullable();
             $table->timestamp('forwarded_at')->nullable();
             $table->timestamp('sent_at')->nullable();
+            $table->text('reply_text')->nullable();
+            $table->timestamp('replied_at')->nullable();
+            $table->string('reply_kind', 60)->nullable();
+            $table->text('reply_answer')->nullable();
+            $table->timestamp('reply_answered_at')->nullable();
+            $table->timestamp('nudged_at')->nullable();
+            $table->text('nudge_text')->nullable();
             $table->timestamps();
             $table->unique(['telegram_chat_id', 'telegram_message_id']);
         });
@@ -1017,5 +1056,401 @@ class ClientCheckTest extends TestCase
         for ($i = 1; $i < count($indexes); $i++) {
             $this->assertNotSame($indexes[$i - 1], $indexes[$i]);
         }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Auto replies: what the person writes in private
+    |--------------------------------------------------------------------------
+    */
+
+    private function reply(string $text, int $from = 555): ?string
+    {
+        return app(ProcessAutoReply::class)->execute(
+            telegram: $this->telegram,
+            senderId: $from,
+            messageId: ++$this->messageId,
+            text: $text,
+        );
+    }
+
+    /** A penalty forwarded and commented, the messages cleared. */
+    private function penaltySent(int $repeat = 1): TelegramClientCheck
+    {
+        $check = $this->penalty(repeat: $repeat);
+        $this->flushAfterQuiet();
+        $this->messages->calls = [];
+
+        return $check;
+    }
+
+    /**
+     * @param array<string, mixed> $override
+     */
+    private function saveAutoReplies(array $override): void
+    {
+        $store = app(AutoReplyStore::class);
+
+        $store->save(AutoReplyRules::fromArray([...$store->defaults()->toArray(), ...$override]));
+    }
+
+    public function test_a_plus_after_a_penalty_is_thanked_by_how_the_person_is_called(): void
+    {
+        $this->person(attributes: ['address' => ['uz' => 'Afzal aka']]);
+        $check = $this->penaltySent();
+
+        $this->assertSame('Rahmat, Afzal aka', $this->reply('+'));
+
+        $this->assertSame(['send'], $this->messages->kinds());
+        $sent = $this->messages->sent()[0];
+        $this->assertSame(555, $sent['peer']);
+        $this->assertSame('Rahmat, Afzal aka', $sent['message']);
+        /* in answer to their message */
+        $this->assertSame($this->messageId, $sent['reply_to']['reply_to_msg_id']);
+
+        /* kept on the penalty for the journal */
+        $check->refresh();
+        $this->assertSame('+', $check->reply_text);
+        $this->assertSame('Agreed', $check->reply_kind);
+        $this->assertSame('Rahmat, Afzal aka', $check->reply_answer);
+        $this->assertNotNull($check->reply_answered_at);
+    }
+
+    public function test_without_an_address_it_is_left_out_with_its_comma(): void
+    {
+        $this->person();
+        $this->penaltySent();
+
+        $this->assertSame('Rahmat', $this->reply('ok'));
+    }
+
+    public function test_the_answer_comes_in_the_person_language_and_tone(): void
+    {
+        $this->anna()->update(['respectful' => true, 'address' => ['ru' => 'Анна Владимировна']]);
+
+        $this->assertSame('Спасибо большое, Анна Владимировна!', $this->reply('Ок👍🏻', from: 777));
+    }
+
+    /**
+     * Not only after a penalty: any private message of an operator or a
+     * sales manager is answered.
+     */
+    public function test_any_message_of_a_known_person_is_answered(): void
+    {
+        $this->person(attributes: ['address' => ['uz' => 'Afzal aka']]);
+
+        $this->assertSame('Rahmat, Afzal aka', $this->reply('hop aka'));
+
+        /* Strangers are not. */
+        $this->assertNull($this->reply('+', from: 999));
+
+        $this->assertSame(['send'], $this->messages->kinds());
+    }
+
+    public function test_the_cooldown_keeps_ok_ok_ok_to_one_thanks(): void
+    {
+        $this->person();
+
+        $this->reply('+');
+        $this->reply('ok');
+        $this->assertSame(['send'], $this->messages->kinds());
+
+        Carbon::setTestNow(now()->addMinutes(11));
+        $this->reply('ok');
+        $this->assertSame(['send', 'send'], $this->messages->kinds());
+    }
+
+    public function test_a_penalty_reply_is_answered_once_even_inside_the_cooldown(): void
+    {
+        $this->person();
+
+        /* A "thanks" just now, then a penalty: its reply is still answered. */
+        $this->reply('+');
+        $check = $this->penaltySent();
+
+        $this->reply('+');
+        $this->assertSame(['send'], $this->messages->kinds());
+        $this->assertNotNull($check->refresh()->reply_answered_at);
+
+        /* Answered: the next "ok" falls under the cooldown. */
+        $this->reply('ok');
+        $this->assertSame(['send'], $this->messages->kinds());
+        $this->assertSame('+', $check->refresh()->reply_text);
+    }
+
+    public function test_only_after_a_penalty_when_the_file_says_so(): void
+    {
+        $this->saveAutoReplies(['only_after_penalty' => true]);
+        $this->person();
+
+        $this->assertNull($this->reply('+'));
+
+        $this->penaltySent();
+        $this->assertSame('Rahmat', $this->reply('+'));
+
+        /* Too late after it. */
+        $this->penaltySent();
+        Carbon::setTestNow(now()->addMinutes(61));
+        $this->assertNull($this->reply('+'));
+    }
+
+    public function test_anything_else_is_kept_on_the_penalty_but_not_answered(): void
+    {
+        $this->person();
+        $check = $this->penaltySent();
+
+        $this->assertNull($this->reply('Mashina hali topilmadi'));
+        $check->refresh();
+        $this->assertSame('Mashina hali topilmadi', $check->reply_text);
+        $this->assertNull($check->reply_kind);
+        $this->assertNull($check->reply_answer);
+
+        /* A long message is a conversation, even with an "ok" in it. */
+        $this->assertNull($this->reply('ok lekin mashina hali ham topilmadi'));
+
+        $this->assertSame('Rahmat', $this->reply('Bo‘ldi'));
+        $this->assertSame('Agreed', $check->refresh()->reply_kind);
+    }
+
+    public function test_switched_off_or_muted_nothing_is_answered(): void
+    {
+        $person = $this->person();
+
+        $this->saveAutoReplies(['enabled' => false]);
+        $this->assertNull($this->reply('+'));
+
+        $this->saveAutoReplies(['enabled' => true]);
+        $person->update(['dm_enabled' => false]);
+        $this->assertNull($this->reply('+'));
+
+        $this->assertSame([], $this->messages->kinds());
+    }
+
+    public function test_a_failed_answer_is_tried_again_on_the_next_message(): void
+    {
+        $this->person();
+
+        $this->messages->commentFails = true;
+        $this->assertNull($this->reply('+'));
+
+        $this->messages->commentFails = false;
+        $this->assertSame('Rahmat', $this->reply('ok'));
+    }
+
+    public function test_the_file_is_what_the_listener_reads(): void
+    {
+        $this->person();
+
+        $this->saveAutoReplies(['replies' => [
+            ['name' => 'Done', 'keywords' => ['qildim'], 'answers' => ['uz' => ['plain' => ['Zo\'r, {request}']]]],
+        ]]);
+
+        $file = json_decode((string) file_get_contents(config('auto_replies.path')), true);
+        $this->assertSame(['qildim'], $file['replies'][0]['keywords']);
+
+        /* "+" is the defaults' keyword, not the file's. */
+        $this->assertNull($this->reply('+'));
+
+        /* Without a penalty, {request} reads "—". */
+        $this->assertSame('Zo\'r, —', $this->reply('Qildim'));
+
+        /* Edited by hand, it applies to the next message. */
+        Carbon::setTestNow(now()->addHour());
+        $file['replies'][0]['answers']['uz']['plain'] = ['Barakalla'];
+        file_put_contents(config('auto_replies.path'), json_encode($file));
+        $this->assertSame('Barakalla', $this->reply('qildim'));
+
+        /* Broken by hand: nothing is answered, rather than the defaults. */
+        Carbon::setTestNow(now()->addHour());
+        file_put_contents(config('auto_replies.path'), '{"replies": [');
+        $this->assertNotNull(app(AutoReplyStore::class)->error());
+        $this->assertNull($this->reply('+'));
+    }
+
+    public function test_replies_are_matched_loosely(): void
+    {
+        $rules = app(AutoReplyStore::class)->current();
+        $matcher = new AutoReplyMatcher();
+
+        foreach (['+', '++', '+1', 'OK', 'okkk', 'Ok👍🏻', '👍', 'Хоп', 'ok!', "bo'ldi", 'bo‘ldi', 'boʻldi', 'Hop aka'] as $text) {
+            $this->assertSame(0, $matcher->match($rules, $text), $text);
+        }
+
+        foreach (['', 'hop', 'okay then', 'nima?', 'kok', 'ok bir ikki uch tort besh'] as $text) {
+            $this->assertNull($matcher->match($rules, $text), $text);
+        }
+
+        $this->assertSame(['ok', '👍'], AutoReplyMatcher::words('Ok👍🏻!'));
+    }
+
+    public function test_the_address_goes_into_penalty_comments_too(): void
+    {
+        $this->saveRules([['phrases' => ['uz' => ['plain' => ['{address}, narx bering']]]]]);
+
+        $this->person(attributes: ['address' => ['uz' => 'Afzal aka']]);
+        $this->penalty();
+        $this->flushAfterQuiet();
+
+        $this->assertSame('Afzal aka, narx bering', $this->messages->sent()[0]['message']);
+    }
+
+    public function test_an_address_in_one_language_serves_the_other(): void
+    {
+        $person = $this->person(attributes: ['address' => ['ru' => 'Афзал']]);
+
+        $this->assertSame('Афзал', $person->addressFor('uz'));
+        $this->assertNull($this->person('SOMEONE ELSE', ['telegram_username' => 'x', 'telegram_id' => 1])->addressFor('uz'));
+    }
+
+    /**
+     * Real answers to "обновите статус" / "Narx berib yubor" (2026-10-06),
+     * against the kinds config/auto_replies.php ships with.
+     */
+    public function test_the_shipped_kinds_read_real_answers(): void
+    {
+        $rules = AutoReplyRules::fromArray((require config_path('auto_replies.php'))['defaults']);
+        $matcher = new AutoReplyMatcher();
+
+        $cases = [
+            'хали клент билан гаплашолмадим телефонни кутармади .' => 'Ждём клиента',
+            'гаплашиб кейин узгартирсам буладими?' => 'Ждём клиента',
+            'Ещё ждем ответ от клиента' => 'Ждём клиента',
+            'обновила' => 'Готово',
+            'Обновила' => 'Готово',
+            'Done ✅' => 'Готово',
+            'Aka narx berdimku' => 'Уже сделано',
+            'Ассалому алайкум Ёпаман акажон узим' => 'Сделаю',
+            "Assalomu aleykum xo'p bo'ladi" => 'Согласие',
+            '+' => 'Согласие',
+            /* For a person to read: no answer. */
+            'буни системада бошка нарх беришди' => null,
+            '66 берганди' => null,
+            '66 млн перечисления хисобини олинг' => null,
+            'Да' => null,
+        ];
+
+        foreach ($cases as $text => $kind) {
+            $index = $matcher->match($rules, $text);
+
+            $this->assertSame($kind, $index !== null ? $rules->name($index) : null, $text);
+        }
+    }
+
+    public function test_a_star_takes_any_ending_and_a_kind_may_allow_longer_messages(): void
+    {
+        $rules = AutoReplyRules::fromArray([
+            'max_words' => 3,
+            'replies' => [
+                ['name' => 'Client', 'max_words' => 8, 'keywords' => ['клиент*'], 'answers' => ['uz' => ['plain' => ['x']]]],
+                ['name' => 'Ok', 'keywords' => ['ok'], 'answers' => ['uz' => ['plain' => ['x']]]],
+            ],
+        ]);
+        $matcher = new AutoReplyMatcher();
+
+        $this->assertSame(0, $matcher->match($rules, 'клиент трубку не берет пока что'));
+        $this->assertSame(0, $matcher->match($rules, 'Ждём клиента'));
+        /* the start of a word, not the middle */
+        $this->assertNull($matcher->match($rules, 'суперклиент'));
+        /* "ok" keeps the file's 3 words */
+        $this->assertSame(1, $matcher->match($rules, 'ok aka'));
+        $this->assertNull($matcher->match($rules, 'ok aka hozir qilaman'));
+        /* ё/е and Uzbek Cyrillic marks do not count */
+        $this->assertSame(['еще', 'кутаман'], AutoReplyMatcher::words('Ещё қутаман'));
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | The nudge when nobody answers
+    |--------------------------------------------------------------------------
+    */
+
+    private function nudge(): void
+    {
+        app(NudgeSilentClientChecks::class)->execute($this->telegram);
+    }
+
+    public function test_a_penalty_nobody_answered_is_nudged_once(): void
+    {
+        $this->person(attributes: ['address' => ['uz' => 'Afzal aka']]);
+        $check = $this->penaltySent();
+
+        /* Not yet. */
+        Carbon::setTestNow(now()->addMinutes(14));
+        $this->nudge();
+        $this->assertSame([], $this->messages->kinds());
+
+        Carbon::setTestNow(now()->addMinutes(2));
+        $this->nudge();
+        $this->nudge();
+
+        $this->assertSame(['send'], $this->messages->kinds());
+        $sent = $this->messages->sent()[0];
+        $this->assertSame('@afzal', $sent['peer']);
+        $this->assertSame('Javob kutyapman, Afzal aka', $sent['message']);
+
+        $check->refresh();
+        $this->assertNotNull($check->nudged_at);
+        $this->assertSame('Javob kutyapman, Afzal aka', $check->nudge_text);
+
+        /* An answer to the nudge is the penalty's reply. */
+        $this->assertSame('Rahmat, Afzal aka', $this->reply('+'));
+    }
+
+    public function test_someone_who_wrote_back_is_not_nudged(): void
+    {
+        $this->person();
+        $this->penaltySent();
+
+        /* Not something we answer - still not silence. */
+        $this->reply('mashina hali topilmadi');
+        $this->messages->calls = [];
+
+        Carbon::setTestNow(now()->addMinutes(16));
+        $this->nudge();
+
+        $this->assertSame([], $this->messages->kinds());
+    }
+
+    public function test_only_the_latest_comment_is_nudged_and_only_while_fresh(): void
+    {
+        $this->person();
+        $first = $this->penaltySent();
+
+        Carbon::setTestNow(now()->addMinutes(5));
+        $second = $this->penaltySent(repeat: 2);
+
+        Carbon::setTestNow(now()->addMinutes(16));
+        $this->nudge();
+
+        $this->assertSame(['send'], $this->messages->kinds());
+        $this->assertNull($first->refresh()->nudged_at);
+        $this->assertNotNull($second->refresh()->nudged_at);
+
+        /* A backlog, say after a restart, is left alone. */
+        $this->messages->calls = [];
+        Carbon::setTestNow(now()->addHours(2));
+        $this->penaltySent(repeat: 3);
+        Carbon::setTestNow(now()->addHours(2));
+        $this->nudge();
+        $this->assertSame([], $this->messages->kinds());
+    }
+
+    public function test_no_nudge_when_switched_off_or_after_hours(): void
+    {
+        $this->person();
+        $this->penaltySent();
+
+        $this->saveAutoReplies(['silence' => ['enabled' => false, 'after_minutes' => 15, 'answers' => []]]);
+        Carbon::setTestNow(now()->addMinutes(16));
+        $this->nudge();
+        $this->assertSame([], $this->messages->kinds());
+
+        /* On again, but past 18:00. */
+        app(AutoReplyStore::class)->reset();
+        $this->at('17:55:00');
+        $this->penaltySent();
+        Carbon::setTestNow(now()->addMinutes(16));
+        $this->nudge();
+        $this->assertSame([], $this->messages->kinds());
     }
 }

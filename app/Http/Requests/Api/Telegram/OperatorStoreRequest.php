@@ -65,6 +65,13 @@ class OperatorStoreRequest extends FormRequest
             ],
 
             'respectful' => ['nullable', 'boolean'],
+
+            /*
+             * How to call the person, per language: "Ali aka", "jigar".
+             */
+            'address' => ['nullable', 'array'],
+            'address.uz' => ['nullable', 'string', 'max:60'],
+            'address.ru' => ['nullable', 'string', 'max:60'],
         ];
     }
 

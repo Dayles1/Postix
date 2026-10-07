@@ -30,6 +30,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null               $reason
  * @property int                       $attempts
  * @property string|null               $peer
+ * @property string|null               $reply_text
+ * @property string|null               $reply_kind
+ * @property string|null               $reply_answer
  */
 class TelegramClientCheck extends Model
 {
@@ -97,6 +100,13 @@ class TelegramClientCheck extends Model
         'peer',
         'forwarded_at',
         'sent_at',
+        'reply_text',
+        'replied_at',
+        'reply_kind',
+        'reply_answer',
+        'reply_answered_at',
+        'nudged_at',
+        'nudge_text',
     ];
 
     protected function casts(): array
@@ -117,6 +127,9 @@ class TelegramClientCheck extends Model
             'attempts' => 'integer',
             'forwarded_at' => 'datetime',
             'sent_at' => 'datetime',
+            'replied_at' => 'datetime',
+            'reply_answered_at' => 'datetime',
+            'nudged_at' => 'datetime',
         ];
     }
 

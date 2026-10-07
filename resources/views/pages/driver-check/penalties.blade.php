@@ -593,6 +593,48 @@
                     >{{ __('telegram.penalties.detail.comment_on_last') }}</p>
                 </section>
 
+                {{-- What the person wrote back, and our answer to it --}}
+                <section x-show="detail.nudge_text && !detail.reply_text" x-cloak>
+                    <h3 class="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                        {{ __('telegram.penalties.detail.nudge') }}
+                    </h3>
+                    <p
+                        class="dc-break whitespace-pre-wrap rounded-xl bg-warning-50 px-3 py-2 text-[13px] leading-relaxed
+                               text-gray-800 dark:bg-warning-500/10 dark:text-gray-200"
+                        x-text="detail.nudge_text"
+                    ></p>
+                </section>
+
+                <section x-show="detail.reply_text" x-cloak>
+                    <h3 class="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                        {{ __('telegram.penalties.detail.reply') }}
+                        <span
+                            class="ml-1 normal-case tracking-normal"
+                            x-text="'· ' + (detail.reply_kind || translations.detail.reply_unread)"
+                        ></span>
+                    </h3>
+
+                    <div class="flex flex-col gap-1.5">
+                        <p
+                            class="dc-break self-start whitespace-pre-wrap rounded-xl bg-gray-100 px-3 py-2 text-[13px] leading-relaxed
+                                   text-gray-800 dark:bg-white/[0.06] dark:text-gray-200"
+                            x-text="detail.reply_text"
+                        ></p>
+
+                        <p
+                            x-show="detail.reply_answer"
+                            class="dc-break self-end whitespace-pre-wrap rounded-xl bg-brand-25 px-3 py-2 text-[13px] leading-relaxed
+                                   text-gray-800 dark:bg-brand-500/[0.07] dark:text-gray-200"
+                            x-text="detail.reply_answer"
+                        ></p>
+
+                        <p
+                            x-show="!detail.reply_answer"
+                            class="text-[11px] text-gray-400 dark:text-gray-500"
+                        >{{ __('telegram.penalties.detail.reply_unanswered') }}</p>
+                    </div>
+                </section>
+
                 <section>
                     <h3 class="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                         {{ __('telegram.penalties.detail.message') }}

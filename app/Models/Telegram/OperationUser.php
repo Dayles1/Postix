@@ -45,6 +45,7 @@ class OperationUser extends Model
         'role',
         'language',
         'respectful',
+        'address',
         'telegram_username',
         'telegram_id',
         'is_active',
@@ -60,6 +61,7 @@ class OperationUser extends Model
             'is_active' => 'boolean',
             'dm_enabled' => 'boolean',
             'respectful' => 'boolean',
+            'address' => 'array',
             'dm_last_sent_at' => 'datetime',
         ];
     }
@@ -111,6 +113,26 @@ class OperationUser extends Model
         return in_array($this->language, self::LANGUAGES, true)
             ? $this->language
             : self::defaultLanguageFor($this->roleOrDefault());
+    }
+
+    /**
+     * How this person is called in $language - "Ali aka", "jigar" - or,
+     * when only the other language has it, that one: a name reads the same
+     * in either. Null when none is written: phrases then leave it out.
+     */
+    public function addressFor(string $language): ?string
+    {
+        $address = (array) ($this->address ?? []);
+
+        foreach ([$language, ...array_diff(self::LANGUAGES, [$language])] as $lang) {
+            $value = trim((string) ($address[$lang] ?? ''));
+
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return null;
     }
 
     public static function defaultLanguageFor(string $role): string
