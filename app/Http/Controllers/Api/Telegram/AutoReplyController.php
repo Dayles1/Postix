@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\Telegram;
 
+use App\Application\Telegram\Services\AutoReplyMedia;
 use App\Application\Telegram\Services\AutoReplyRules;
 use App\Application\Telegram\Services\AutoReplyStore;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\Telegram\AutoReplyRequest;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
  * Behind the auto replies page: the one JSON file the listener answers
@@ -23,6 +26,7 @@ final class AutoReplyController extends Controller
 {
     public function __construct(
         private readonly AutoReplyStore $store,
+        private readonly AutoReplyMedia $media,
     ) {
     }
 
@@ -33,9 +37,11 @@ final class AutoReplyController extends Controller
 
     public function update(AutoReplyRequest $request): JsonResponse
     {
-        $this->store->save(
-            AutoReplyRules::fromArray($request->validated()),
-        );
+        $rules = AutoReplyRules::fromArray($request->validated());
+
+        $this->store->save($rules);
+
+        $this->media->prune($rules->mediaFiles());
 
         return $this->respond(__('telegram.auto_replies.messages.saved'));
     }
@@ -46,6 +52,8 @@ final class AutoReplyController extends Controller
     public function destroy(): JsonResponse
     {
         $this->store->reset();
+
+        $this->media->prune($this->store->current()->mediaFiles());
 
         return $this->respond(__('telegram.auto_replies.messages.reset'));
     }
@@ -63,6 +71,59 @@ final class AutoReplyController extends Controller
         return response($json . "\n", 200, [
             'Content-Type' => 'application/json; charset=UTF-8',
             'Content-Disposition' => 'attachment; filename="' . basename($this->store->path()) . '"',
+        ]);
+    }
+
+    /**
+     * A GIF or a voice message, stored until a save puts it into the
+     * rules (or a day passes without one).
+     */
+    public function upload(Request $request): JsonResponse
+    {
+        $type = $request->input('type') === AutoReplyRules::MEDIA_VOICE
+            ? AutoReplyRules::MEDIA_VOICE
+            : AutoReplyRules::MEDIA_GIF;
+
+        $request->validate([
+            'type' => ['required', 'in:' . AutoReplyRules::MEDIA_GIF . ',' . AutoReplyRules::MEDIA_VOICE],
+            'file' => [
+                'required',
+                'file',
+                'max:' . AutoReplyMedia::MAX_KILOBYTES,
+                /*
+                 * By the extension: browsers disagree on the type of .oga
+                 * and .opus.
+                 */
+                function (string $attribute, mixed $file, \Closure $fail) use ($type): void {
+                    $extension = mb_strtolower($file->getClientOriginalExtension());
+
+                    if (! in_array($extension, AutoReplyMedia::extensions($type), true)) {
+                        $fail(__('telegram.auto_replies.validation.media_' . $type));
+                    }
+                },
+            ],
+        ]);
+
+        return response()->json([
+            'data' => $this->media->store($request->file('file'), $type),
+        ], 201);
+    }
+
+    /**
+     * For the panel's preview.
+     */
+    public function media(string $file): BinaryFileResponse
+    {
+        $path = $this->media->path($file);
+
+        abort_if($path === null, 404);
+
+        return response()->file($path, [
+            'Content-Type' => match (pathinfo($path, PATHINFO_EXTENSION)) {
+                'gif' => 'image/gif',
+                'mp4' => 'video/mp4',
+                default => 'audio/ogg',
+            },
         ]);
     }
 

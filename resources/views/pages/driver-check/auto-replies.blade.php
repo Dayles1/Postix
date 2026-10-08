@@ -14,6 +14,8 @@
     x-data="dcAutoReplies({
         endpoints: {
             rules: @js(route('api.telegram.auto-replies')),
+            upload: @js(route('api.telegram.auto-replies.media.upload')),
+            media: @js(url('/api/telegram/auto-replies/media')),
         },
         maxReplies: @js(\App\Application\Telegram\Services\AutoReplyRules::MAX_REPLIES),
         placeholders: @js($placeholders),
@@ -69,6 +71,64 @@
             <x-driver-check.icon name="alert" class="mt-0.5 h-4 w-4 shrink-0" />
             <span x-text="translations.file.broken.replace(':error', fileError)"></span>
         </div>
+
+        {{-- Try a message, against the form as it is now --}}
+        <x-driver-check.surface class="p-4">
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                {{ __('telegram.auto_replies.sections.test') }}
+            </h3>
+
+            <input
+                type="text"
+                x-model="test.text"
+                :placeholder="translations.test.placeholder"
+                class="mt-3 h-10 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none transition
+                       focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+            >
+
+            <div class="mt-2 flex items-center gap-2 text-[11px] text-gray-500 dark:text-gray-400">
+                <span x-text="translations.test.as"></span>
+                <select
+                    x-model="test.language"
+                    class="h-7 rounded-lg border border-gray-300 bg-white px-2 text-[12px] text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                >
+                    <template x-for="lang in languages" :key="'tl-' + lang">
+                        <option :value="lang" x-text="lang.toUpperCase()"></option>
+                    </template>
+                </select>
+                <select
+                    x-model="test.tone"
+                    class="h-7 rounded-lg border border-gray-300 bg-white px-2 text-[12px] text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                >
+                    <template x-for="t in tones" :key="'tt-' + t">
+                        <option :value="t" x-text="translations.tones[t]"></option>
+                    </template>
+                </select>
+            </div>
+
+            <div x-show="tried().state !== 'empty'" x-cloak class="mt-3 flex flex-col gap-1.5">
+                <p
+                    class="text-[12px] font-medium"
+                    :class="tried().state === 'match' ? 'text-success-700 dark:text-success-400' : 'text-gray-500 dark:text-gray-400'"
+                    x-text="triedText()"
+                ></p>
+
+                {{-- Every possible answer, one is picked at random. Already reduced to Telegram's tags by telegramHtml(). --}}
+                <template x-for="(answer, a) in tried().answers || []" :key="'ta-' + a">
+                    <p
+                        class="dc-break self-start whitespace-pre-wrap rounded-xl bg-brand-25 px-3 py-2 text-[13px] leading-relaxed
+                               text-gray-800 dark:bg-brand-500/[0.07] dark:text-gray-200"
+                        x-html="answer"
+                    ></p>
+                </template>
+
+                <p
+                    x-show="tried().gifs || tried().voices"
+                    class="text-[11px] text-gray-500 dark:text-gray-400"
+                    x-text="translations.test.media.replace(':gifs', tried().gifs || 0).replace(':voices', tried().voices || 0)"
+                ></p>
+            </div>
+        </x-driver-check.surface>
 
         <div class="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
 
@@ -309,6 +369,12 @@
                                 </div>
                             </div>
 
+                            {{-- GIFs and voice messages: picked at random among the texts --}}
+                            <div class="flex flex-col gap-2">
+                                <span class="text-[13px] font-medium text-gray-700 dark:text-gray-300" x-text="translations.media.title"></span>
+                                @include('pages.driver-check.partials.auto-reply-media', ['owner' => 'k'])
+                            </div>
+
                             <template x-for="message in kindErrors(k)" :key="message">
                                 <p class="rounded-lg bg-error-50 px-3 py-2 text-[12px] font-medium text-error-600 dark:bg-error-500/10 dark:text-error-400"
                                    x-text="message"></p>
@@ -387,21 +453,22 @@
                         <div x-show="form.silence.enabled" x-collapse class="flex flex-col gap-4">
                             <label class="flex flex-wrap items-center gap-x-3 gap-y-1">
                                 <span class="text-[13px] font-medium text-gray-700 dark:text-gray-300">
-                                    {{ __('telegram.auto_replies.silence.after_minutes') }}
+                                    {{ __('telegram.auto_replies.silence.after_penalties') }}
                                 </span>
                                 <input
                                     type="number"
                                     min="1"
+                                    max="50"
                                     inputmode="numeric"
-                                    x-model="form.silence.after_minutes"
+                                    x-model="form.silence.after_penalties"
                                     class="h-9 w-20 rounded-lg border bg-white px-2.5 text-sm tabular-nums text-gray-900 outline-none transition
                                            focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 dark:bg-gray-900 dark:text-white"
-                                    :class="fieldError('silence.after_minutes')
+                                    :class="fieldError('silence.after_penalties')
                                         ? 'border-error-400 dark:border-error-500/60'
                                         : 'border-gray-300 dark:border-gray-700'"
                                 >
                                 <span class="text-[11px] text-gray-400 dark:text-gray-500">
-                                    {{ __('telegram.auto_replies.silence.after_minutes_hint') }}
+                                    {{ __('telegram.auto_replies.silence.after_penalties_hint') }}
                                 </span>
                             </label>
 
@@ -483,6 +550,12 @@
                                 </template>
                             </div>
 
+                            {{-- GIFs and voice messages: picked at random among the texts --}}
+                            <div class="flex flex-col gap-2">
+                                <span class="text-[13px] font-medium text-gray-700 dark:text-gray-300" x-text="translations.media.title"></span>
+                                @include('pages.driver-check.partials.auto-reply-media', ['owner' => "'silence'"])
+                            </div>
+
                             <p
                                 x-show="fieldError('silence.answers')"
                                 x-cloak
@@ -495,8 +568,8 @@
             </section>
 
             {{-- ========================================================
-                 Aside: the switch, when to answer, the tester,
-                 placeholders, the file
+                 Aside: the switch, when to answer, placeholders,
+                 the file
             ========================================================= --}}
             <aside class="flex flex-col gap-4 xl:sticky xl:top-24">
 
@@ -587,57 +660,6 @@
                                 >
                             </label>
                         @endforeach
-                    </div>
-                </x-driver-check.surface>
-
-                {{-- Try a message, against the form as it is now --}}
-                <x-driver-check.surface class="p-4">
-                    <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                        {{ __('telegram.auto_replies.sections.test') }}
-                    </h3>
-
-                    <input
-                        type="text"
-                        x-model="test.text"
-                        :placeholder="translations.test.placeholder"
-                        class="mt-3 h-10 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none transition
-                               focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                    >
-
-                    <div class="mt-2 flex items-center gap-2 text-[11px] text-gray-500 dark:text-gray-400">
-                        <span x-text="translations.test.as"></span>
-                        <select
-                            x-model="test.language"
-                            class="h-7 rounded-lg border border-gray-300 bg-white px-2 text-[12px] text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
-                        >
-                            <template x-for="lang in languages" :key="'tl-' + lang">
-                                <option :value="lang" x-text="lang.toUpperCase()"></option>
-                            </template>
-                        </select>
-                        <select
-                            x-model="test.tone"
-                            class="h-7 rounded-lg border border-gray-300 bg-white px-2 text-[12px] text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
-                        >
-                            <template x-for="t in tones" :key="'tt-' + t">
-                                <option :value="t" x-text="translations.tones[t]"></option>
-                            </template>
-                        </select>
-                    </div>
-
-                    <div x-show="tried().state !== 'empty'" x-cloak class="mt-3 flex flex-col gap-1.5">
-                        <p
-                            class="text-[12px] font-medium"
-                            :class="tried().state === 'match' ? 'text-success-700 dark:text-success-400' : 'text-gray-500 dark:text-gray-400'"
-                            x-text="triedText()"
-                        ></p>
-
-                        {{-- Already reduced to Telegram's tags by telegramHtml(). --}}
-                        <p
-                            x-show="tried().answer"
-                            class="dc-break self-start whitespace-pre-wrap rounded-xl bg-brand-25 px-3 py-2 text-[13px] leading-relaxed
-                                   text-gray-800 dark:bg-brand-500/[0.07] dark:text-gray-200"
-                            x-html="tried().answer"
-                        ></p>
                     </div>
                 </x-driver-check.surface>
 

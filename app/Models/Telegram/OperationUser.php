@@ -52,6 +52,7 @@ class OperationUser extends Model
         'dm_enabled',
         'dm_last_sent_at',
         'dm_last_error',
+        'last_private_message_at',
     ];
 
     protected function casts(): array
@@ -63,6 +64,7 @@ class OperationUser extends Model
             'respectful' => 'boolean',
             'address' => 'array',
             'dm_last_sent_at' => 'datetime',
+            'last_private_message_at' => 'datetime',
         ];
     }
 

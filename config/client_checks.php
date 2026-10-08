@@ -46,6 +46,16 @@ return [
     'retry_minutes' => 30,
 
     /*
+     * A penalty in one of these statuses is looked up in the CRM API
+     * (services.crm): when the request already has a carrier price, the
+     * operator has done their part and it is the sales manager's turn -
+     * the penalty goes to the request's sales manager, whoever the bot
+     * names as responsible. No price, no answer from the CRM: as before.
+     * Compared without case. Empty: never looked up.
+     */
+    'sales_turn_statuses' => ['Актуальный'],
+
+    /*
      * Penalties are only handled inside these hours (app timezone,
      * Asia/Tashkent): what the bot posts before 09:00 or from 18:00 on is
      * recorded and ignored - nothing is forwarded, no comment follows.

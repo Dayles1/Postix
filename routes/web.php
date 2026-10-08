@@ -405,6 +405,16 @@ Route::middleware(['auth', 'role:driverCheck,superadmin'])
             [AutoReplyController::class, 'download']
         )->name('api.telegram.auto-replies.download');
 
+        Route::post(
+            '/auto-replies/media',
+            [AutoReplyController::class, 'upload']
+        )->name('api.telegram.auto-replies.media.upload');
+
+        Route::get(
+            '/auto-replies/media/{file}',
+            [AutoReplyController::class, 'media']
+        )->where('file', '[a-f0-9]{24}\.[a-z0-9]+')->name('api.telegram.auto-replies.media');
+
         /*
          * Watched chats (management CRUD)
          */

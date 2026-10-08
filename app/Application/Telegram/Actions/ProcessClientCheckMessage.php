@@ -7,6 +7,7 @@ namespace App\Application\Telegram\Actions;
 use App\Application\Telegram\Services\ClientCheckEscalation;
 use App\Application\Telegram\Services\ClientCheckRules;
 use App\Application\Telegram\Services\ClientCheckSender;
+use App\Application\Telegram\Services\CrmSalesTurn;
 use App\Application\Telegram\Services\TelegramPenaltyMessageParser;
 use App\Enums\Telegram\TelegramClientCheckStatus;
 use App\Models\Telegram\OperationUser;
@@ -32,6 +33,7 @@ final class ProcessClientCheckMessage
         private readonly ResolveOperationUser $resolveOperationUser,
         private readonly ClientCheckEscalation $escalation,
         private readonly ClientCheckSender $sender,
+        private readonly CrmSalesTurn $salesTurn,
     ) {
     }
 
@@ -72,10 +74,25 @@ final class ProcessClientCheckMessage
             return $check;
         }
 
-        $person = $this->resolveOperationUser->execute(
-            $name,
-            $parsed['responsible_role'] ?? OperationUser::ROLE_OPERATION,
-        );
+        $role = $parsed['responsible_role'] ?? OperationUser::ROLE_OPERATION;
+
+        /*
+         * "Актуальный" with a carrier price in the CRM: the operator has
+         * done their part, the penalty is the sales manager's - whoever
+         * the bot names. Kept in parsed.sales_turn for the journal.
+         */
+        $salesTurn = $this->salesTurn->find($check->request_number, $check->crm_status);
+
+        if ($salesTurn !== null) {
+            $name = $salesTurn['sales_name'];
+            $role = OperationUser::ROLE_SALES;
+
+            $check->update([
+                'parsed' => [...$parsed, 'sales_turn' => $salesTurn],
+            ]);
+        }
+
+        $person = $this->resolveOperationUser->execute($name, $role);
 
         $check->update([
             'operation_user_id' => $person->id,

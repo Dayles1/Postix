@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Application\Telegram\Actions;
 
+use App\Application\Telegram\Services\AutoReplyDelivery;
 use App\Application\Telegram\Services\AutoReplyMatcher;
 use App\Application\Telegram\Services\AutoReplyStore;
-use App\Application\Telegram\Services\ClientCheckEscalation;
 use App\Application\Telegram\Services\ClientCheckRules;
 use App\Models\Telegram\OperationUser;
 use App\Models\Telegram\TelegramClientCheck;
@@ -20,9 +20,12 @@ use Throwable;
  * "хоп".
  *
  * Read as one of the kinds of the auto replies file (AutoReplyMatcher) and,
- * when it is one, answered with that kind's answer - in the person's
- * language and tone, calling them as their card says ("Rahmat, Ali aka").
- * Strangers are not answered.
+ * when it is one, answered with that kind's answer - a text in the person's
+ * language and tone, calling them as their card says ("Rahmat, Ali aka"),
+ * or one of the kind's GIFs or voice messages. Strangers are not answered.
+ *
+ * Any message of theirs is noted on the card (last_private_message_at):
+ * the nudge counts the penalties nobody answered since.
  *
  * A message soon after a penalty is that penalty's reply: kept on it for
  * the journal, matched or not, and answered once. Any other message is
@@ -36,7 +39,7 @@ final class ProcessAutoReply
     public function __construct(
         private readonly AutoReplyStore $store,
         private readonly AutoReplyMatcher $matcher,
-        private readonly ClientCheckEscalation $escalation,
+        private readonly AutoReplyDelivery $delivery,
     ) {
     }
 
@@ -66,6 +69,8 @@ final class ProcessAutoReply
         if ($person === null) {
             return null;
         }
+
+        $person->update(['last_private_message_at' => now()]);
 
         $check = TelegramClientCheck::query()
             ->where('operation_user_id', $person->id)
@@ -111,37 +116,28 @@ final class ProcessAutoReply
             return null;
         }
 
-        $variant = $rules->answers(
+        $choices = $rules->choices(
             $kind,
             $person->messageLanguage(),
             $person->respectful ? ClientCheckRules::TONE_RESPECTFUL : ClientCheckRules::TONE_PLAIN,
         );
 
-        if ($variant['answers'] === []) {
+        if ($choices['items'] === []) {
             return null;
         }
 
-        /*
-         * Without a penalty, {request} reads "—".
-         */
-        $answer = $this->escalation->render(
-            $variant['answers'][array_rand($variant['answers'])],
-            $check ?? new TelegramClientCheck(),
-            $person,
-            $variant['language'],
-        );
-
         try {
-            $telegram->messages->sendMessage([
-                'peer' => $senderId,
-                'message' => $answer,
-                'parse_mode' => 'html',
-                'no_webpage' => true,
-                'reply_to' => [
-                    '_' => 'inputReplyToMessage',
-                    'reply_to_msg_id' => $messageId,
-                ],
-            ]);
+            /*
+             * Without a penalty, {request} reads "—".
+             */
+            $answer = $this->delivery->send(
+                $telegram,
+                $senderId,
+                $choices,
+                $check ?? new TelegramClientCheck(),
+                $person,
+                replyTo: $messageId,
+            );
         } catch (Throwable $e) {
             /*
              * Left unanswered: their next message gets another go.

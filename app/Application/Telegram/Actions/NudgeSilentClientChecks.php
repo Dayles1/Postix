@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Application\Telegram\Actions;
 
+use App\Application\Telegram\Services\AutoReplyDelivery;
+use App\Application\Telegram\Services\AutoReplyRules;
 use App\Application\Telegram\Services\AutoReplyStore;
 use App\Application\Telegram\Services\ClientCheckEscalation;
 use App\Application\Telegram\Services\ClientCheckRules;
@@ -11,31 +13,46 @@ use App\Models\Telegram\OperationUser;
 use App\Models\Telegram\TelegramClientCheck;
 use App\Models\Telegram\TelegramSetting;
 use danog\MadelineProto\SimpleEventHandler;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * A penalty nobody answered: once, `silence.after_minutes` after its
- * comment, a nudge from the auto replies file - what was done by hand on
- * 2026-10-06 ("Рушана апа, илтимос").
+ * Someone who ignores the penalties: after `silence.after_penalties` of
+ * them in a row with not a word back, a nudge from the auto replies file -
+ * what was done by hand on 2026-10-06 ("Рушана апа, илтимос").
  *
- * Runs on the listener's cron, after the comments. Not when the person
- * wrote anything since the comment, not when a newer comment went to them
- * (that one is nudged instead), not outside the penalties' working hours,
- * and only for a fresh comment: a backlog after a restart is not nudged.
+ * Counted from their last private message, their last nudge, or
+ * COUNT_DAYS back, whichever is latest; so after a nudge it takes as many
+ * penalties again for the next one. It goes a little after the comment of
+ * the penalty that made the count (DELAY_MINUTES), not glued to it.
+ *
+ * Runs on the listener's cron, after the comments. Not outside the
+ * penalties' working hours, and only for a fresh comment: a backlog after
+ * a restart is not nudged.
  */
 final class NudgeSilentClientChecks
 {
+    /**
+     * Between the comment and the nudge: a quick "ok" still spares it.
+     */
+    private const DELAY_MINUTES = 2;
+
     /**
      * How late a nudge may still go out, past its time.
      */
     private const GRACE_MINUTES = 30;
 
+    /**
+     * Older penalties do not count: silence a week ago is not today's.
+     */
+    private const COUNT_DAYS = 7;
+
     public function __construct(
         private readonly AutoReplyStore $store,
         private readonly ClientCheckEscalation $escalation,
+        private readonly AutoReplyDelivery $delivery,
     ) {
     }
 
@@ -52,81 +69,103 @@ final class NudgeSilentClientChecks
             return;
         }
 
-        $due = now()->subMinutes($rules->silence['after_minutes']);
+        $due = now()->subMinutes(self::DELAY_MINUTES);
 
+        /*
+         * Each person's latest comment, if it is fresh: the one a nudge
+         * would follow.
+         */
         $checks = TelegramClientCheck::query()
             ->with('operationUser')
+            ->whereNotNull('operation_user_id')
             ->whereNotNull('comment')
             ->whereNotNull('peer')
             ->whereNull('nudged_at')
             ->whereBetween('sent_at', [$due->copy()->subMinutes(self::GRACE_MINUTES), $due])
             ->whereNotExists(function (QueryBuilder $later): void {
-                /*
-                 * They wrote something since - answered or not, it was not
-                 * silence - or a newer comment went to them.
-                 */
                 $later->selectRaw('1')
                     ->from('telegram_client_checks as later')
                     ->whereColumn('later.operation_user_id', 'telegram_client_checks.operation_user_id')
-                    ->where(function (QueryBuilder $q): void {
-                        $q->whereColumn('later.replied_at', '>=', 'telegram_client_checks.forwarded_at')
-                            ->orWhere(function (QueryBuilder $newer): void {
-                                $newer->whereNotNull('later.comment')
-                                    ->whereColumn('later.sent_at', '>', 'telegram_client_checks.sent_at');
-                            });
-                    });
+                    ->whereNotNull('later.comment')
+                    ->whereColumn('later.sent_at', '>', 'telegram_client_checks.sent_at');
             })
             ->orderBy('id')
             ->limit(20)
             ->get();
 
         foreach ($checks as $check) {
-            $this->nudge($telegram, $check, $rules->silenceAnswers(...));
+            $person = $check->operationUser;
+
+            if (! $person instanceof OperationUser) {
+                continue;
+            }
+
+            if ($this->ignored($person, $check) >= $rules->silence['after_penalties']) {
+                $this->nudge($telegram, $check, $person, $rules);
+            }
         }
     }
 
     /**
-     * @param callable(string, string): array{answers: list<string>, language: string, tone: string} $answers
+     * Penalties forwarded to them since they last wrote or were nudged, up
+     * to and including $check.
      */
-    private function nudge(SimpleEventHandler $telegram, TelegramClientCheck $check, callable $answers): void
+    private function ignored(OperationUser $person, TelegramClientCheck $check): int
     {
-        $person = $check->operationUser;
+        $since = collect([
+            now()->subDays(self::COUNT_DAYS),
+            $person->last_private_message_at,
+            TelegramClientCheck::query()->where('operation_user_id', $person->id)->max('nudged_at'),
+            TelegramClientCheck::query()->where('operation_user_id', $person->id)->max('replied_at'),
+        ])
+            ->filter()
+            ->map(fn (mixed $at): Carbon => Carbon::parse($at))
+            ->max();
 
+        return TelegramClientCheck::query()
+            ->where('operation_user_id', $person->id)
+            ->whereNotNull('forwarded_at')
+            ->where('forwarded_at', '>', $since)
+            ->where('forwarded_at', '<=', $check->forwarded_at ?? $check->sent_at)
+            ->count();
+    }
+
+    private function nudge(
+        SimpleEventHandler $telegram,
+        TelegramClientCheck $check,
+        OperationUser $person,
+        AutoReplyRules $rules,
+    ): void {
         /*
          * Set first: whatever happens below, this penalty is not nudged
-         * again.
+         * again, and the count starts over.
          */
         $check->update(['nudged_at' => now()]);
 
-        if (! $person instanceof OperationUser || ! $person->dm_enabled) {
+        if (! $person->dm_enabled) {
             return;
         }
 
-        $variant = $answers(
+        $choices = $rules->choices(
+            'silence',
             $person->messageLanguage(),
             $person->respectful ? ClientCheckRules::TONE_RESPECTFUL : ClientCheckRules::TONE_PLAIN,
         );
 
-        if ($variant['answers'] === []) {
+        if ($choices['items'] === []) {
             return;
         }
-
-        $text = $this->escalation->render(
-            $variant['answers'][array_rand($variant['answers'])],
-            $check,
-            $person,
-            $variant['language'],
-        );
 
         $peer = (string) $check->peer;
 
         try {
-            $telegram->messages->sendMessage([
-                'peer' => preg_match('/^-?\d+$/', $peer) === 1 ? (int) $peer : $peer,
-                'message' => $text,
-                'parse_mode' => 'html',
-                'no_webpage' => true,
-            ]);
+            $text = $this->delivery->send(
+                $telegram,
+                preg_match('/^-?\d+$/', $peer) === 1 ? (int) $peer : $peer,
+                $choices,
+                $check,
+                $person,
+            );
         } catch (Throwable $e) {
             Log::warning(
                 'Client check nudge was not sent',

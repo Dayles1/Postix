@@ -20,6 +20,15 @@ final readonly class AutoReplyRules
     public const MAX_ANSWERS = 30;
 
     /**
+     * GIFs of a kind, and voice messages per language.
+     */
+    public const MAX_MEDIA = 20;
+
+    public const MEDIA_GIF = 'gif';
+
+    public const MEDIA_VOICE = 'voice';
+
+    /**
      * What an answer may contain; filled in by ClientCheckEscalation::render().
      */
     public const PLACEHOLDERS = ['address', 'name', 'request'];
@@ -30,13 +39,16 @@ final readonly class AutoReplyRules
      *     keywords: list<string>,
      *     max_words: int|null,
      *     answers: array<string, array<string, list<string>>>,
+     *     media: array{gifs: list<array{file: string, name: string}>, voices: array<string, list<array{file: string, name: string}>>},
      * }> $replies  tried top to bottom, the first match wins; max_words
      *              null is the file's own
      * @param array{
      *     enabled: bool,
-     *     after_minutes: int,
+     *     after_penalties: int,
      *     answers: array<string, array<string, list<string>>>,
-     * } $silence  the nudge after a penalty nobody answered
+     *     media: array{gifs: list<array{file: string, name: string}>, voices: array<string, list<array{file: string, name: string}>>},
+     * } $silence  the nudge after this many penalties in a row nobody
+     *             answered
      */
     public function __construct(
         public bool $enabled,
@@ -45,7 +57,7 @@ final readonly class AutoReplyRules
         public int $cooldownMinutes,
         public int $maxWords,
         public array $replies,
-        public array $silence = ['enabled' => false, 'after_minutes' => 15, 'answers' => []],
+        public array $silence = ['enabled' => false, 'after_penalties' => 5, 'answers' => [], 'media' => ['gifs' => [], 'voices' => []]],
     ) {
     }
 
@@ -88,6 +100,7 @@ final readonly class AutoReplyRules
                 'keywords' => array_slice($keywords, 0, self::MAX_KEYWORDS),
                 'max_words' => is_numeric($maxWords) ? self::clamp($maxWords, 1, 50) : null,
                 'answers' => self::sets($reply['answers'] ?? []),
+                'media' => self::media($reply['media'] ?? []),
             ];
         }
 
@@ -102,8 +115,13 @@ final readonly class AutoReplyRules
             replies: $replies,
             silence: [
                 'enabled' => (bool) ($silence['enabled'] ?? false),
-                'after_minutes' => self::clamp($silence['after_minutes'] ?? 15, 1, 1440),
+                /*
+                 * Files from before it counted penalties had after_minutes:
+                 * they get the default.
+                 */
+                'after_penalties' => self::clamp($silence['after_penalties'] ?? 5, 1, 50),
                 'answers' => self::sets($silence['answers'] ?? []),
+                'media' => self::media($silence['media'] ?? []),
             ],
         );
     }
@@ -156,6 +174,65 @@ final readonly class AutoReplyRules
     }
 
     /**
+     * Everything a kind (or the nudge, $kind = 'silence') may answer this
+     * person with, one to be picked at random: the texts as answers()
+     * finds them, the GIFs, and the voice messages in the person's own
+     * language - a voice in the other language is not understood, so
+     * there is no falling back for those.
+     *
+     * @return array{
+     *     language: string,
+     *     items: list<array{type: 'text', text: string}|array{type: 'gif'|'voice', file: string, name: string}>,
+     * }
+     */
+    public function choices(int|string $kind, string $language, string $tone): array
+    {
+        $owner = $kind === 'silence' ? $this->silence : ($this->replies[$kind] ?? null);
+
+        if ($owner === null) {
+            return ['language' => $language, 'items' => []];
+        }
+
+        $texts = self::pick($owner['answers'], $language, $tone);
+
+        $items = array_map(static fn (string $text): array => ['type' => 'text', 'text' => $text], $texts['answers']);
+
+        foreach ($owner['media']['gifs'] ?? [] as $gif) {
+            $items[] = ['type' => self::MEDIA_GIF, ...$gif];
+        }
+
+        foreach ($owner['media']['voices'][$language] ?? [] as $voice) {
+            $items[] = ['type' => self::MEDIA_VOICE, ...$voice];
+        }
+
+        return ['language' => $texts['answers'] !== [] ? $texts['language'] : $language, 'items' => $items];
+    }
+
+    /**
+     * Every media file the rules use, to tell the ones left behind.
+     *
+     * @return list<string>
+     */
+    public function mediaFiles(): array
+    {
+        $files = [];
+
+        foreach ([...$this->replies, $this->silence] as $owner) {
+            foreach ($owner['media']['gifs'] ?? [] as $gif) {
+                $files[] = $gif['file'];
+            }
+
+            foreach ($owner['media']['voices'] ?? [] as $voices) {
+                foreach ($voices as $voice) {
+                    $files[] = $voice['file'];
+                }
+            }
+        }
+
+        return array_values(array_unique($files));
+    }
+
+    /**
      * @param array<string, array<string, list<string>>> $sets
      * @return array{answers: list<string>, language: string, tone: string}
      */
@@ -192,6 +269,56 @@ final readonly class AutoReplyRules
         }
 
         return $sets;
+    }
+
+    /**
+     * Only names AutoReplyMedia could have given: a hand edit cannot point
+     * the listener at any other file.
+     *
+     * @return array{gifs: list<array{file: string, name: string}>, voices: array<string, list<array{file: string, name: string}>>}
+     */
+    private static function media(mixed $media): array
+    {
+        $media = (array) $media;
+
+        $voices = [];
+
+        foreach (OperationUser::LANGUAGES as $language) {
+            $voices[$language] = self::files(((array) ($media['voices'] ?? []))[$language] ?? [], AutoReplyMedia::VOICE_EXTENSIONS);
+        }
+
+        return [
+            'gifs' => self::files($media['gifs'] ?? [], AutoReplyMedia::GIF_EXTENSIONS),
+            'voices' => $voices,
+        ];
+    }
+
+    /**
+     * @param list<string> $extensions
+     * @return list<array{file: string, name: string}>
+     */
+    private static function files(mixed $items, array $extensions): array
+    {
+        $list = [];
+
+        foreach ((array) $items as $item) {
+            $item = (array) $item;
+            $file = is_string($item['file'] ?? null) ? $item['file'] : '';
+
+            if (! AutoReplyMedia::validName($file, $extensions)) {
+                continue;
+            }
+
+            $name = is_string($item['name'] ?? null) && trim($item['name']) !== '' ? trim($item['name']) : $file;
+
+            $list[] = ['file' => $file, 'name' => mb_substr($name, 0, 120)];
+
+            if (count($list) >= self::MAX_MEDIA) {
+                break;
+            }
+        }
+
+        return $list;
     }
 
     private static function clamp(mixed $value, int $min, int $max): int

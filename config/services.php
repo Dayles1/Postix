@@ -39,6 +39,16 @@ return [
         'login' => env('WAREHOUSE_API_LOGIN'),
         'password' => env('WAREHOUSE_API_PASSWORD'),
     ],
+    /*
+     * The CRM's API (crm.zanjeer.uz): the penalty bot's requests are looked
+     * up here. URL without "/v1"; the token is logged in and cached.
+     */
+    'crm' => [
+        'api_url' => env('CRM_API_URL', 'https://crm.zanjeer.uz/api'),
+        'email' => env('CRM_API_EMAIL'),
+        'password' => env('CRM_API_PASSWORD'),
+    ],
+    
     'telegram' => [
 
         'api_id' => env('TELEGRAM_API_ID'),

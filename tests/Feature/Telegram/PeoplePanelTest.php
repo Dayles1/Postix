@@ -11,6 +11,7 @@ use App\Models\Telegram\TelegramClientCheck;
 use App\Models\Telegram\TelegramSetting;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Schema;
 use ReflectionMethod;
 use Tests\TestCase;
@@ -82,6 +83,7 @@ class PeoplePanelTest extends TestCase
             $table->boolean('dm_enabled')->default(true);
             $table->timestamp('dm_last_sent_at')->nullable();
             $table->text('dm_last_error')->nullable();
+            $table->timestamp('last_private_message_at')->nullable();
             $table->timestamps();
         });
 
@@ -443,11 +445,65 @@ class PeoplePanelTest extends TestCase
             ],
             'silence' => [
                 'enabled' => true,
-                'after_minutes' => 20,
+                'after_penalties' => 7,
                 'answers' => ['uz' => ['plain' => ['Iltimos, {address}'], 'respectful' => []]],
             ],
             ...$override,
         ];
+    }
+
+    public function test_gifs_and_voices_are_uploaded_saved_and_served(): void
+    {
+        $directory = storage_path('framework/testing/auto-replies-media-' . bin2hex(random_bytes(4)));
+        config()->set('auto_replies.path', storage_path('framework/testing/auto-replies-' . bin2hex(random_bytes(4)) . '.json'));
+        config()->set('auto_replies.media_path', $directory);
+
+        try {
+            $gif = $this->post('/api/telegram/auto-replies/media', [
+                'type' => 'gif',
+                'file' => UploadedFile::fake()->create('clap.mp4', 100, 'video/mp4'),
+            ], ['Accept' => 'application/json'])
+                ->assertCreated()
+                ->assertJsonPath('data.name', 'clap.mp4')
+                ->json('data');
+
+            $this->assertMatchesRegularExpression('/^[a-f0-9]{24}\.mp4$/', $gif['file']);
+            $this->assertFileExists($directory . DIRECTORY_SEPARATOR . $gif['file']);
+
+            /* An mp3 is not a voice message Telegram can play. */
+            $this->post('/api/telegram/auto-replies/media', [
+                'type' => 'voice',
+                'file' => UploadedFile::fake()->create('rahmat.mp3', 50, 'audio/mpeg'),
+            ], ['Accept' => 'application/json'])
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors(['file']);
+
+            $voice = $this->post('/api/telegram/auto-replies/media', [
+                'type' => 'voice',
+                'file' => UploadedFile::fake()->create('rahmat.ogg', 50, 'audio/ogg'),
+            ], ['Accept' => 'application/json'])
+                ->assertCreated()
+                ->json('data');
+
+            /* Media alone is an answer. */
+            $this->putJson('/api/telegram/auto-replies', $this->autoReplies([
+                'replies' => [[
+                    'name' => 'Thanks',
+                    'keywords' => ['ok'],
+                    'answers' => [],
+                    'media' => ['gifs' => [$gif], 'voices' => ['uz' => [$voice], 'ru' => []]],
+                ]],
+            ]))
+                ->assertOk()
+                ->assertJsonPath('data.replies.0.media.gifs.0.file', $gif['file'])
+                ->assertJsonPath('data.replies.0.media.voices.uz.0.name', 'rahmat.ogg');
+
+            $this->get('/api/telegram/auto-replies/media/' . $gif['file'])->assertOk();
+            $this->get('/api/telegram/auto-replies/media/' . str_repeat('0', 24) . '.mp4')->assertNotFound();
+        } finally {
+            array_map('unlink', glob($directory . '/*') ?: []);
+            @rmdir($directory);
+        }
     }
 
     public function test_auto_replies_are_kept_in_one_file(): void
@@ -465,7 +521,7 @@ class PeoplePanelTest extends TestCase
                 ->assertOk()
                 ->assertJsonPath('customised', false)
                 ->assertJsonPath('file_error', null)
-                ->assertJsonPath('data.replies.0.name', 'Ждём клиента');
+                ->assertJsonPath('data.replies.0.name', 'Благодарность');
 
             $this->putJson('/api/telegram/auto-replies', $this->autoReplies())
                 ->assertOk()
@@ -478,7 +534,7 @@ class PeoplePanelTest extends TestCase
                 ->assertJsonPath('data.replies.0.max_words', null)
                 ->assertJsonPath('data.replies.1.max_words', 12)
                 ->assertJsonPath('data.replies.1.keywords', ['клиент*'])
-                ->assertJsonPath('data.silence.after_minutes', 20)
+                ->assertJsonPath('data.silence.after_penalties', 7)
                 ->assertJsonPath('data.silence.answers.uz.plain', ['Iltimos, {address}']);
 
             /* Everything is in the file, readable by hand. */
@@ -498,7 +554,7 @@ class PeoplePanelTest extends TestCase
                     ['name' => null, 'keywords' => ['ok'], 'answers' => ['uz' => ['plain' => ['  ']]]],
                 ],
                 'max_words' => 0,
-                'silence' => ['enabled' => true, 'after_minutes' => 15, 'answers' => ['uz' => ['plain' => [' ']]]],
+                'silence' => ['enabled' => true, 'after_penalties' => 5, 'answers' => ['uz' => ['plain' => [' ']]]],
             ]))
                 ->assertUnprocessable()
                 ->assertJsonValidationErrors(['replies.0.keywords', 'replies.1.answers', 'max_words', 'silence.answers'])
@@ -517,7 +573,7 @@ class PeoplePanelTest extends TestCase
             $this->deleteJson('/api/telegram/auto-replies')
                 ->assertOk()
                 ->assertJsonPath('customised', false)
-                ->assertJsonPath('data.replies.0.name', 'Ждём клиента');
+                ->assertJsonPath('data.replies.0.name', 'Благодарность');
 
             $this->assertFileDoesNotExist($path);
         } finally {

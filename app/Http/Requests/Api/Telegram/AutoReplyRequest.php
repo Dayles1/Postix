@@ -41,9 +41,26 @@ final class AutoReplyRequest extends FormRequest
 
             'silence' => ['required', 'array'],
             'silence.enabled' => ['required', 'boolean'],
-            'silence.after_minutes' => ['required', 'integer', 'min:1', 'max:1440'],
+            'silence.after_penalties' => ['required', 'integer', 'min:1', 'max:50'],
             'silence.answers' => ['present', 'array'],
         ];
+
+        /*
+         * GIFs for every language, voices per language: names
+         * AutoReplyMedia::store() gave, checked again by AutoReplyRules.
+         */
+        foreach (['replies.*.media', 'silence.media'] as $media) {
+            $rules["{$media}"] = ['nullable', 'array'];
+            $rules["{$media}.gifs"] = ['nullable', 'array', 'max:' . AutoReplyRules::MAX_MEDIA];
+            $rules["{$media}.gifs.*.file"] = ['required', 'string', 'regex:/^[a-f0-9]{24}\.(gif|mp4)$/'];
+            $rules["{$media}.gifs.*.name"] = ['nullable', 'string', 'max:120'];
+
+            foreach (OperationUser::LANGUAGES as $language) {
+                $rules["{$media}.voices.{$language}"] = ['nullable', 'array', 'max:' . AutoReplyRules::MAX_MEDIA];
+                $rules["{$media}.voices.{$language}.*.file"] = ['required', 'string', 'regex:/^[a-f0-9]{24}\.(ogg|oga|opus)$/'];
+                $rules["{$media}.voices.{$language}.*.name"] = ['nullable', 'string', 'max:120'];
+            }
+        }
 
         foreach (OperationUser::LANGUAGES as $language) {
             foreach (ClientCheckRules::TONES as $tone) {
@@ -58,8 +75,8 @@ final class AutoReplyRequest extends FormRequest
     }
 
     /**
-     * A kind without a keyword never matches; without an answer it matches
-     * and says nothing - both are half made.
+     * A kind without a keyword never matches; without an answer (a text, a
+     * GIF or a voice) it matches and says nothing - both are half made.
      */
     public function after(): array
     {
@@ -75,7 +92,7 @@ final class AutoReplyRequest extends FormRequest
                         );
                     }
 
-                    if (! $this->hasAnswer($reply['answers'] ?? [])) {
+                    if (! $this->hasAnswer($reply['answers'] ?? []) && ! $this->hasMedia($reply['media'] ?? [])) {
                         $validator->errors()->add(
                             "replies.{$index}.answers",
                             __('telegram.auto_replies.validation.answers'),
@@ -84,9 +101,13 @@ final class AutoReplyRequest extends FormRequest
                 }
 
                 /*
-                 * A nudge switched on with nothing to say.
+                 * A nudge switched on with nothing to say - no text, no GIF, no voice.
                  */
-                if ($this->boolean('silence.enabled') && ! $this->hasAnswer($this->input('silence.answers', []))) {
+                if (
+                    $this->boolean('silence.enabled')
+                    && ! $this->hasAnswer($this->input('silence.answers', []))
+                    && ! $this->hasMedia($this->input('silence.media', []))
+                ) {
                     $validator->errors()->add(
                         'silence.answers',
                         __('telegram.auto_replies.validation.silence'),
@@ -107,6 +128,26 @@ final class AutoReplyRequest extends FormRequest
         }
 
         return $this->hasText($answers);
+    }
+
+    /**
+     * A GIF or a voice message is an answer too.
+     */
+    private function hasMedia(mixed $media): bool
+    {
+        $media = (array) $media;
+
+        if ((array) ($media['gifs'] ?? []) !== []) {
+            return true;
+        }
+
+        foreach ((array) ($media['voices'] ?? []) as $voices) {
+            if ((array) $voices !== []) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function hasText(mixed $values): bool

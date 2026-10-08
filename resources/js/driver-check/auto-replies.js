@@ -120,6 +120,19 @@ function setsToPayload(sets) {
     ]));
 }
 
+/** GIFs for every language, voices per language: {file, name} each. */
+function mediaToForm(media) {
+    return {
+        gifs: (media?.gifs || []).map((item) => ({ file: item.file, name: item.name })),
+        voices: Object.fromEntries(LANGUAGES.map((lang) => [
+            lang,
+            (media?.voices?.[lang] || []).map((item) => ({ file: item.file, name: item.name })),
+        ])),
+    };
+}
+
+const mediaToPayload = mediaToForm;
+
 function kindToForm(kind) {
     return {
         key: nextKey(),
@@ -128,6 +141,7 @@ function kindToForm(kind) {
         /* '' = the file's own max_words */
         max_words: kind.max_words ?? '',
         answers: setsToForm(kind.answers),
+        media: mediaToForm(kind.media),
     };
 }
 
@@ -137,6 +151,7 @@ function kindToPayload(kind) {
         keywords: splitKeywords(kind.keywords),
         max_words: toNumber(kind.max_words),
         answers: setsToPayload(kind.answers),
+        media: mediaToPayload(kind.media),
     };
 }
 
@@ -150,8 +165,9 @@ function toForm(data) {
         replies: (data.replies || []).map(kindToForm),
         silence: {
             enabled: !!data.silence?.enabled,
-            after_minutes: data.silence?.after_minutes ?? 15,
+            after_penalties: data.silence?.after_penalties ?? 5,
             answers: setsToForm(data.silence?.answers),
+            media: mediaToForm(data.silence?.media),
         },
     };
 }
@@ -166,8 +182,9 @@ function toPayload(form) {
         replies: form.replies.map(kindToPayload),
         silence: {
             enabled: !!form.silence.enabled,
-            after_minutes: toNumber(form.silence.after_minutes),
+            after_penalties: toNumber(form.silence.after_penalties),
             answers: setsToPayload(form.silence.answers),
+            media: mediaToPayload(form.silence.media),
         },
     };
 }
@@ -223,6 +240,9 @@ export function autoRepliesPage(config) {
 
         /** Where a placeholder chip inserts: the answer edited last. */
         target: null,
+
+        /** Uploads in flight, by uploadKey(). */
+        uploading: {},
 
         /** The tester: a message, and the person it is tried as. */
         test: { text: '', language: 'uz', tone: 'plain' },
@@ -381,7 +401,9 @@ export function autoRepliesPage(config) {
 
             answers[this.language].plain.push({ key: nextKey(), text: '' });
 
-            this.form.replies.push({ key: nextKey(), name: '', keywords: '', max_words: '', answers });
+            this.form.replies.push({
+                key: nextKey(), name: '', keywords: '', max_words: '', answers, media: mediaToForm({}),
+            });
 
             this.$nextTick(() => {
                 this.$refs.kindsEnd?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -476,6 +498,88 @@ export function autoRepliesPage(config) {
 
         /*
         |----------------------------------------------------------------
+        | GIFs and voice messages
+        |----------------------------------------------------------------
+        */
+
+        /** GIFs of kind k (or 'silence'), or its voices in the language being edited. */
+        mediaList(k, type) {
+            const owner = k === 'silence' ? this.form.silence : this.form.replies[k];
+
+            return type === 'gif' ? owner.media.gifs : owner.media.voices[this.language];
+        },
+
+        uploadKey(k, type) {
+            return `${k}-${type}-${type === 'gif' ? '' : this.language}`;
+        },
+
+        mediaUrl(file) {
+            return `${this.endpoints.media}/${encodeURIComponent(file)}`;
+        },
+
+        /**
+         * Stored on the server at once, put into the rules with the next
+         * save - like any other change on the page.
+         */
+        async uploadMedia(k, type, event) {
+            const input = event.target;
+            const file = input.files?.[0];
+
+            input.value = '';
+
+            if (!file) {
+                return;
+            }
+
+            const key = this.uploadKey(k, type);
+            const list = this.mediaList(k, type);
+            const body = new FormData();
+
+            body.append('type', type);
+            body.append('file', file);
+
+            this.uploading = { ...this.uploading, [key]: true };
+
+            try {
+                const response = await fetch(this.endpoints.upload, {
+                    method: 'POST',
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': this.csrf,
+                    },
+                    credentials: 'same-origin',
+                    body,
+                });
+
+                let json = {};
+
+                try {
+                    json = await response.json();
+                } catch (_) {
+                    json = {};
+                }
+
+                if (!response.ok) {
+                    const errors = Object.values(json.errors || {}).flat();
+
+                    throw new Error(errors[0] || json.message || `HTTP ${response.status}`);
+                }
+
+                list.push({ file: json.data.file, name: json.data.name });
+            } catch (error) {
+                this.notify(error?.message || t.media.failed, false);
+            } finally {
+                this.uploading = { ...this.uploading, [key]: false };
+            }
+        },
+
+        removeMedia(k, type, m) {
+            this.mediaList(k, type).splice(m, 1);
+        },
+
+        /*
+        |----------------------------------------------------------------
         | Presentation
         |----------------------------------------------------------------
         */
@@ -547,15 +651,15 @@ export function autoRepliesPage(config) {
             const otherLanguage = LANGUAGES.find((lang) => lang !== this.test.language);
             const otherTone = TONES.find((tone) => tone !== this.test.tone);
 
-            /* The same fallback as AutoReplyRules::answers(). */
-            let answer = null;
+            /* The same fallback as AutoReplyRules::answers(): the first set that has texts. */
+            let answers = [];
 
             for (const lang of [this.test.language, otherLanguage]) {
                 for (const tone of [this.test.tone, otherTone]) {
-                    const first = filled(kind.answers[lang][tone])[0];
+                    const set = filled(kind.answers[lang][tone]);
 
-                    if (!answer && first) {
-                        answer = this.preview(first.text, lang);
+                    if (answers.length === 0 && set.length > 0) {
+                        answers = set.map((answer) => this.preview(answer.text, lang));
                     }
                 }
             }
@@ -563,7 +667,9 @@ export function autoRepliesPage(config) {
             return {
                 state: 'match',
                 kind: String(kind.name || '').trim() || this.kindTitle(index),
-                answer,
+                answers,
+                gifs: kind.media.gifs.length,
+                voices: (kind.media.voices[this.test.language] || []).length,
             };
         },
 

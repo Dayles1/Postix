@@ -12,6 +12,7 @@ use App\Application\Telegram\Services\AutoReplyStore;
 use App\Application\Telegram\Services\ClientCheckRules;
 use App\Application\Telegram\Services\ClientCheckRulesStore;
 use App\Application\Telegram\Services\ClientCheckSender;
+use App\Application\Telegram\Services\CrmApiClient;
 use App\Application\Telegram\Services\TelegramMessageTypeDetector;
 use App\Application\Telegram\Services\TelegramPenaltyMessageParser;
 use App\Enums\Drivers\TelegramDriverMessageType;
@@ -22,6 +23,8 @@ use App\Models\Telegram\TelegramSetting;
 use danog\MadelineProto\SimpleEventHandler;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use ReflectionClass;
 use RuntimeException;
@@ -49,6 +52,13 @@ final class FakeClientCheckMessages
         $this->calls[] = ['forward', $params];
 
         return [];
+    }
+
+    public function sendMedia(array $params): array
+    {
+        $this->calls[] = ['media', $params];
+
+        return ['id' => count($this->calls)];
     }
 
     public function sendMessage(array $params): array
@@ -199,10 +209,17 @@ class ClientCheckTest extends TestCase
             ],
             'silence' => [
                 'enabled' => true,
-                'after_minutes' => 15,
+                'after_penalties' => 3,
                 'answers' => ['uz' => ['plain' => ['Javob kutyapman, {address}'], 'respectful' => ['Iltimos, {address}']]],
             ],
         ]);
+
+        /*
+         * No CRM unless a test says so: credentials in .env must not
+         * send the tests to the real one.
+         */
+        config()->set('services.crm', ['api_url' => null, 'email' => null, 'password' => null]);
+        Http::preventStrayRequests();
 
         Carbon::setTestNow('2026-10-02 10:00:00');
     }
@@ -243,6 +260,7 @@ class ClientCheckTest extends TestCase
             $table->boolean('dm_enabled')->default(true);
             $table->timestamp('dm_last_sent_at')->nullable();
             $table->text('dm_last_error')->nullable();
+            $table->timestamp('last_private_message_at')->nullable();
             $table->timestamps();
         });
 
@@ -1304,7 +1322,8 @@ class ClientCheckTest extends TestCase
 
     /**
      * Real answers to "обновите статус" / "Narx berib yubor" (2026-10-06),
-     * against the kinds config/auto_replies.php ships with.
+     * against the one kind config/auto_replies.php ships with: anything
+     * that is an "ok", a "done" or a "will do" is thanked.
      */
     public function test_the_shipped_kinds_read_real_answers(): void
     {
@@ -1312,17 +1331,16 @@ class ClientCheckTest extends TestCase
         $matcher = new AutoReplyMatcher();
 
         $cases = [
-            'хали клент билан гаплашолмадим телефонни кутармади .' => 'Ждём клиента',
-            'гаплашиб кейин узгартирсам буладими?' => 'Ждём клиента',
-            'Ещё ждем ответ от клиента' => 'Ждём клиента',
-            'обновила' => 'Готово',
-            'Обновила' => 'Готово',
-            'Done ✅' => 'Готово',
-            'Aka narx berdimku' => 'Уже сделано',
-            'Ассалому алайкум Ёпаман акажон узим' => 'Сделаю',
-            "Assalomu aleykum xo'p bo'ladi" => 'Согласие',
-            '+' => 'Согласие',
+            'обновила' => 'Благодарность',
+            'Обновила' => 'Благодарность',
+            'Done ✅' => 'Благодарность',
+            'Ассалому алайкум Ёпаман акажон узим' => 'Благодарность',
+            "Assalomu aleykum xo'p bo'ladi" => 'Благодарность',
+            '+' => 'Благодарность',
             /* For a person to read: no answer. */
+            'хали клент билан гаплашолмадим телефонни кутармади .' => null,
+            'Ещё ждем ответ от клиента' => null,
+            'Aka narx berdimku' => null,
             'буни системада бошка нарх беришди' => null,
             '66 берганди' => null,
             '66 млн перечисления хисобини олинг' => null,
@@ -1369,17 +1387,36 @@ class ClientCheckTest extends TestCase
         app(NudgeSilentClientChecks::class)->execute($this->telegram);
     }
 
-    public function test_a_penalty_nobody_answered_is_nudged_once(): void
+    /**
+     * $count penalties to the same person, each forwarded and commented a
+     * few minutes apart; the messages cleared.
+     */
+    private function ignoredPenalties(int $count): TelegramClientCheck
+    {
+        for ($i = 1; $i <= $count; $i++) {
+            $check = $this->penaltySent(repeat: $i);
+            Carbon::setTestNow(now()->addMinutes(3));
+        }
+
+        return $check;
+    }
+
+    public function test_the_third_ignored_penalty_is_nudged(): void
     {
         $this->person(attributes: ['address' => ['uz' => 'Afzal aka']]);
-        $check = $this->penaltySent();
 
-        /* Not yet. */
-        Carbon::setTestNow(now()->addMinutes(14));
+        /* Two ignored: not yet. */
+        $this->ignoredPenalties(2);
         $this->nudge();
         $this->assertSame([], $this->messages->kinds());
 
-        Carbon::setTestNow(now()->addMinutes(2));
+        $third = $this->penaltySent(repeat: 3);
+
+        /* Not glued to the comment. */
+        $this->nudge();
+        $this->assertSame([], $this->messages->kinds());
+
+        Carbon::setTestNow(now()->addMinutes(3));
         $this->nudge();
         $this->nudge();
 
@@ -1388,69 +1425,303 @@ class ClientCheckTest extends TestCase
         $this->assertSame('@afzal', $sent['peer']);
         $this->assertSame('Javob kutyapman, Afzal aka', $sent['message']);
 
-        $check->refresh();
-        $this->assertNotNull($check->nudged_at);
-        $this->assertSame('Javob kutyapman, Afzal aka', $check->nudge_text);
+        $third->refresh();
+        $this->assertNotNull($third->nudged_at);
+        $this->assertSame('Javob kutyapman, Afzal aka', $third->nudge_text);
 
-        /* An answer to the nudge is the penalty's reply. */
-        $this->assertSame('Rahmat, Afzal aka', $this->reply('+'));
+        /* The count starts over: two more are not enough. */
+        $this->messages->calls = [];
+        Carbon::setTestNow(now()->addMinute());
+        $this->ignoredPenalties(2);
+        $this->nudge();
+        $this->assertSame([], $this->messages->kinds());
+
+        $this->penaltySent();
+        Carbon::setTestNow(now()->addMinutes(3));
+        $this->nudge();
+        $this->assertSame(['send'], $this->messages->kinds());
     }
 
-    public function test_someone_who_wrote_back_is_not_nudged(): void
+    public function test_any_message_of_theirs_starts_the_count_over(): void
     {
         $this->person();
-        $this->penaltySent();
+        $this->ignoredPenalties(2);
 
         /* Not something we answer - still not silence. */
-        $this->reply('mashina hali topilmadi');
+        $this->reply('mashina hali topilmadi, kutyapmiz, keyin aytaman albatta sizga');
         $this->messages->calls = [];
+        Carbon::setTestNow(now()->addMinute());
 
-        Carbon::setTestNow(now()->addMinutes(16));
+        $this->ignoredPenalties(2);
         $this->nudge();
-
         $this->assertSame([], $this->messages->kinds());
+
+        $this->ignoredPenalties(1);
+        $this->nudge();
+        $this->assertSame(['send'], $this->messages->kinds());
     }
 
-    public function test_only_the_latest_comment_is_nudged_and_only_while_fresh(): void
+    public function test_a_backlog_is_not_nudged(): void
     {
         $this->person();
-        $first = $this->penaltySent();
+        $this->ignoredPenalties(3);
 
-        Carbon::setTestNow(now()->addMinutes(5));
-        $second = $this->penaltySent(repeat: 2);
-
-        Carbon::setTestNow(now()->addMinutes(16));
-        $this->nudge();
-
-        $this->assertSame(['send'], $this->messages->kinds());
-        $this->assertNull($first->refresh()->nudged_at);
-        $this->assertNotNull($second->refresh()->nudged_at);
-
-        /* A backlog, say after a restart, is left alone. */
-        $this->messages->calls = [];
-        Carbon::setTestNow(now()->addHours(2));
-        $this->penaltySent(repeat: 3);
+        /* The listener was down: the comment is long past. */
         Carbon::setTestNow(now()->addHours(2));
         $this->nudge();
+
         $this->assertSame([], $this->messages->kinds());
     }
 
     public function test_no_nudge_when_switched_off_or_after_hours(): void
     {
         $this->person();
-        $this->penaltySent();
 
-        $this->saveAutoReplies(['silence' => ['enabled' => false, 'after_minutes' => 15, 'answers' => []]]);
-        Carbon::setTestNow(now()->addMinutes(16));
+        $this->saveAutoReplies(['silence' => ['enabled' => false, 'after_penalties' => 3, 'answers' => []]]);
+        $this->ignoredPenalties(3);
         $this->nudge();
         $this->assertSame([], $this->messages->kinds());
 
         /* On again, but past 18:00. */
         app(AutoReplyStore::class)->reset();
-        $this->at('17:55:00');
-        $this->penaltySent();
-        Carbon::setTestNow(now()->addMinutes(16));
+        $this->at('17:50:00');
+        $this->ignoredPenalties(3);
+        Carbon::setTestNow(now()->addMinutes(2));
         $this->nudge();
         $this->assertSame([], $this->messages->kinds());
+    }
+
+    /*
+     * ------------------------------------------------------------------
+     * GIFs and voice messages
+     * ------------------------------------------------------------------
+     */
+
+    /**
+     * A file in the media folder, as AutoReplyMedia::store() names it.
+     */
+    private function mediaFile(string $extension): string
+    {
+        $directory = storage_path('framework/testing/auto-replies-media');
+        config()->set('auto_replies.media_path', $directory);
+
+        if (! is_dir($directory)) {
+            mkdir($directory, 0775, true);
+        }
+
+        $file = bin2hex(random_bytes(12)) . '.' . $extension;
+        file_put_contents($directory . DIRECTORY_SEPARATOR . $file, 'x');
+
+        return $file;
+    }
+
+    public function test_a_gif_may_be_the_answer_but_not_a_voice_in_another_language(): void
+    {
+        $this->person();
+        $gif = $this->mediaFile('mp4');
+        $voiceRu = $this->mediaFile('ogg');
+
+        $this->saveAutoReplies(['replies' => [[
+            'name' => 'Thanks',
+            'keywords' => ['ok'],
+            'answers' => [],
+            'media' => ['gifs' => [['file' => $gif, 'name' => 'clap.mp4']], 'voices' => ['ru' => [['file' => $voiceRu, 'name' => 'spasibo.ogg']]]],
+        ]]]);
+
+        /* An Uzbek operator: no Russian voice, the GIF is all there is. */
+        $this->assertSame('GIF · clap.mp4', $this->reply('ok'));
+
+        [$kind, $params] = $this->messages->calls[0];
+        $this->assertSame('media', $kind);
+        $this->assertSame(555, $params['peer']);
+        $this->assertSame('inputMediaUploadedDocument', $params['media']['_']);
+        $this->assertSame('video/mp4', $params['media']['mime_type']);
+        $this->assertSame('documentAttributeAnimated', $params['media']['attributes'][1]['_']);
+    }
+
+    public function test_a_voice_goes_as_a_voice_message(): void
+    {
+        $this->person(attributes: ['language' => 'ru']);
+        $voice = $this->mediaFile('ogg');
+
+        $this->saveAutoReplies(['replies' => [[
+            'name' => 'Thanks',
+            'keywords' => ['ok'],
+            'answers' => [],
+            'media' => ['gifs' => [], 'voices' => ['ru' => [['file' => $voice, 'name' => 'spasibo.ogg']]]],
+        ]]]);
+
+        $this->assertSame('🎤 spasibo.ogg', $this->reply('ok'));
+
+        $media = $this->messages->calls[0][1]['media'];
+        $this->assertSame('audio/ogg', $media['mime_type']);
+        $this->assertTrue($media['attributes'][0]['voice']);
+    }
+
+    public function test_media_names_from_a_hand_edit_are_not_trusted(): void
+    {
+        $rules = AutoReplyRules::fromArray(['replies' => [[
+            'keywords' => ['ok'],
+            'media' => ['gifs' => [['file' => '../../.env'], ['file' => 'abc.gif']], 'voices' => ['uz' => [['file' => str_repeat('a', 24) . '.mp3']]]],
+        ]]]);
+
+        $this->assertSame([], $rules->mediaFiles());
+    }
+
+    /*
+     * ------------------------------------------------------------------
+     * "Актуальный" with a carrier price: the sales manager's turn
+     * ------------------------------------------------------------------
+     */
+
+    private const ACTUAL = <<<'TXT'
+        ⚠️ Штраф по запросу #LOG00665
+        Статус: Актуальный
+        Время на статус: 3 ч
+        В статусе с: 02.10.2026 08:53
+        Стоит в статусе: 1 ч 1 мин
+        Ответственный (Operation): PULATOV AFZAL AHMADJON O'G'LI
+
+        PULATOV AFZAL AHMADJON O'G'LI: 331 / 623
+
+        Открыть запрос (https://crm.zanjeer.uz/queries/queries?filter[search]=LOG00665)
+        TXT;
+
+    /**
+     * The CRM API answering a search for LOG00665.
+     *
+     * @param list<array<string, mixed>> $payments
+     */
+    private function crm(array $payments, string $customId = 'LOG00665', int $loginStatus = 200): void
+    {
+        Cache::forget('crm_api_token');
+
+        config()->set('services.crm', [
+            'api_url' => 'https://crm.test/api',
+            'email' => 'bot@test',
+            'password' => 'secret',
+        ]);
+
+        Http::fake([
+            'crm.test/api/v1/login' => Http::response(['token' => 'T1'], $loginStatus),
+            'crm.test/api/v1/queries*' => Http::response(['success' => true, 'data' => ['data' => [[
+                'custom_id' => $customId,
+                'sales' => ['id' => 25, 'name' => 'BELYAKOVA ANNA VLADIMIROVNA'],
+                'payments' => $payments,
+            ]]]]),
+        ]);
+    }
+
+    private function carrierPrice(string $price = '56000000.00'): array
+    {
+        return ['payment_type' => 'carrier', 'price' => $price, 'currency' => ['name' => 'UZS']];
+    }
+
+    public function test_actual_with_a_carrier_price_goes_to_the_sales_manager(): void
+    {
+        $this->person();
+        $anna = $this->anna();
+        $this->crm([['payment_type' => 'customer', 'price' => '60000000.00'], $this->carrierPrice()]);
+
+        $check = $this->penalty(text: self::ACTUAL);
+
+        $this->assertSame($anna->id, $check->refresh()->operation_user_id);
+        $this->assertSame('@anna', $this->messages->calls[0][1]['to_peer']);
+        $this->assertSame("PULATOV AFZAL AHMADJON O'G'LI", $check->responsible_name);
+        $this->assertSame('56000000.00', $check->parsed['sales_turn']['carrier_price']);
+        $this->assertSame('UZS', $check->parsed['sales_turn']['currency']);
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'search=LOG00665')
+            && str_contains(urldecode($request->url()), 'include=operations,sales,payments.currency')
+            && $request->hasHeader('Authorization', 'Bearer T1'));
+    }
+
+    public function test_an_unknown_sales_manager_is_created_as_sales(): void
+    {
+        $this->person();
+        $this->crm([$this->carrierPrice()]);
+
+        $check = $this->penalty(text: self::ACTUAL);
+
+        $this->assertSame('BELYAKOVA ANNA VLADIMIROVNA', $check->refresh()->operationUser->name);
+        $this->assertSame(OperationUser::ROLE_SALES, $check->operationUser->role);
+    }
+
+    public function test_without_a_carrier_price_it_stays_with_the_operator(): void
+    {
+        $person = $this->person();
+        $this->anna();
+        $this->crm([$this->carrierPrice('0.00'), ['payment_type' => 'customer', 'price' => '60000000.00']]);
+
+        $check = $this->penalty(text: self::ACTUAL);
+
+        $this->assertSame($person->id, $check->refresh()->operation_user_id);
+        $this->assertArrayNotHasKey('sales_turn', $check->parsed);
+    }
+
+    public function test_another_request_in_the_search_is_not_taken(): void
+    {
+        $person = $this->person();
+        $this->anna();
+        $this->crm([$this->carrierPrice()], customId: 'LOG006650');
+
+        $this->assertSame($person->id, $this->penalty(text: self::ACTUAL)->refresh()->operation_user_id);
+    }
+
+    public function test_other_statuses_are_not_looked_up(): void
+    {
+        $person = $this->person();
+        $this->anna();
+        $this->crm([$this->carrierPrice()]);
+
+        $this->assertSame($person->id, $this->penalty()->refresh()->operation_user_id);
+        Http::assertNothingSent();
+    }
+
+    public function test_a_crm_that_fails_leaves_it_with_the_operator(): void
+    {
+        $person = $this->person();
+        $this->crm([$this->carrierPrice()], loginStatus: 500);
+
+        $check = $this->penalty(text: self::ACTUAL);
+
+        $this->assertSame($person->id, $check->refresh()->operation_user_id);
+        $this->assertSame(['forward'], $this->messages->kinds());
+    }
+
+    public function test_the_token_is_cached_for_the_next_penalty(): void
+    {
+        $this->person();
+        $this->anna();
+        $this->crm([$this->carrierPrice()]);
+
+        $this->penalty(text: self::ACTUAL);
+        $this->penalty(text: self::ACTUAL);
+
+        /* One login, two searches. */
+        Http::assertSentCount(3);
+        $this->assertSame('T1', Cache::get('crm_api_token'));
+    }
+
+    public function test_a_dropped_token_is_logged_in_again_once(): void
+    {
+        config()->set('services.crm', [
+            'api_url' => 'https://crm.test/api',
+            'email' => 'bot@test',
+            'password' => 'secret',
+        ]);
+        Cache::put('crm_api_token', 'OLD', now()->addDay());
+
+        Http::fake([
+            'crm.test/api/v1/login' => Http::response(['data' => ['token' => 'T2']]),
+            'crm.test/api/v1/queries*' => fn ($request) => $request->hasHeader('Authorization', 'Bearer OLD')
+                ? Http::response([], 401)
+                : Http::response(['data' => ['data' => []]]),
+        ]);
+
+        app(CrmApiClient::class)->searchQueries('LOG00665');
+
+        Http::assertSentCount(3);
+        $this->assertSame('T2', Cache::get('crm_api_token'));
     }
 }

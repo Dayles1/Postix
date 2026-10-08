@@ -39,6 +39,12 @@ final class ClientCheckResource extends JsonResource
 
             'responsible_name' => $this->responsible_name,
 
+            /*
+             * The CRM had a carrier price: sent to this sales manager
+             * instead of the one named above (CrmSalesTurn).
+             */
+            'sales_turn' => $parsed['sales_turn'] ?? null,
+
             'person' => $person instanceof OperationUser
                 ? [
                     'id' => $person->id,

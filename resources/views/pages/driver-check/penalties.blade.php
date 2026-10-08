@@ -593,6 +593,24 @@
                     >{{ __('telegram.penalties.detail.comment_on_last') }}</p>
                 </section>
 
+                {{-- The CRM had a carrier price: the sales manager's turn --}}
+                <section x-show="detail.sales_turn" x-cloak>
+                    <h3 class="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                        {{ __('telegram.penalties.detail.sales_turn') }}
+                    </h3>
+                    <p class="rounded-xl bg-gray-50 px-3 py-2 text-[13px] leading-relaxed text-gray-800 dark:bg-white/[0.04] dark:text-gray-200">
+                        {{ __('telegram.penalties.detail.sales_turn_price') }}:
+                        <span
+                            class="font-medium tabular-nums"
+                            x-text="detail.sales_turn ? Number(detail.sales_turn.carrier_price).toLocaleString() + ' ' + (detail.sales_turn.currency || '') : ''"
+                        ></span>
+                        <span class="block text-[12px] text-gray-500 dark:text-gray-400">
+                            {{ __('telegram.penalties.detail.sales_turn_named') }}:
+                            <span x-text="detail.responsible_name || '—'"></span>
+                        </span>
+                    </p>
+                </section>
+
                 {{-- What the person wrote back, and our answer to it --}}
                 <section x-show="detail.nudge_text && !detail.reply_text" x-cloak>
                     <h3 class="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
