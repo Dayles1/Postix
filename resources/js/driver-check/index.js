@@ -12,6 +12,7 @@ import { createListPage } from './list-page';
 import { sessionsPage } from './sessions';
 import { penaltiesPage } from './penalties';
 import { autoRepliesPage } from './auto-replies';
+import { personalAnswersPage } from './personal-answers';
 import { penaltySettingsPage } from './penalty-settings';
 import { queuePage, watchdogPage } from './monitoring';
 import { statusType } from './status';
@@ -1192,6 +1193,7 @@ export function registerDriverCheck(Alpine) {
     Alpine.data('dcPenalties', penaltiesPage);
     Alpine.data('dcPenaltySettings', penaltySettingsPage);
     Alpine.data('dcAutoReplies', autoRepliesPage);
+    Alpine.data('dcPersonalAnswers', personalAnswersPage);
     Alpine.data('dcWatchdog', watchdogPage);
     Alpine.data('dcQueue', queuePage);
 }

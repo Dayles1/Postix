@@ -30,6 +30,7 @@ final class ClientCheckSender
 
     public function __construct(
         private readonly ClientCheckEscalation $escalation,
+        private readonly AutoReplyDelivery $delivery,
     ) {
     }
 
@@ -247,13 +248,19 @@ final class ClientCheckSender
         TelegramClientCheck::query()->whereIn('id', $ids)->increment('attempts');
 
         try {
-            $comment = $this->escalation->comment($batch, $person);
+            /*
+             * The person's own answer for this level, when it comes up -
+             * a voice with their name, say - otherwise the shared phrase.
+             */
+            $personal = $this->escalation->personal($batch, $person);
+
+            $comment = $personal === null ? $this->escalation->comment($batch, $person) : null;
 
             /*
              * No comment at this level for this role: the forward was the
              * whole message. Done, and said so on the row.
              */
-            if ($comment === null && ! $this->escalation->commentAllowed($batch, $person)) {
+            if ($personal === null && $comment === null && ! $this->escalation->commentAllowed($batch, $person)) {
                 TelegramClientCheck::query()->whereIn('id', $ids)->update([
                     'status' => TelegramClientCheckStatus::Sent,
                     'reason' => TelegramClientCheck::REASON_FORWARD_ONLY,
@@ -264,7 +271,23 @@ final class ClientCheckSender
                 return;
             }
 
-            if ($comment !== null) {
+            if ($personal !== null) {
+                $sent = $this->delivery->send(
+                    $telegram,
+                    $this->peer($last),
+                    ['language' => $personal['language'], 'items' => [$personal['item']]],
+                    $personal['check'],
+                    $person,
+                );
+
+                $personal['check']->update([
+                    'phrase_index' => null,
+                    'comment_level' => $personal['level'],
+                    'comment' => $sent,
+                    'batch_count' => $batch->count(),
+                    'metrics' => ['personal' => true, 'language' => $personal['language']],
+                ]);
+            } elseif ($comment !== null) {
                 $telegram->messages->sendMessage([
                     'peer' => $this->peer($last),
                     'message' => $comment,
@@ -286,6 +309,7 @@ final class ClientCheckSender
                     'operation_user_id' => $person->id,
                     'check_ids' => $ids,
                     'level' => $last->refresh()->comment_level,
+                    'personal' => $personal !== null,
                 ],
             );
         } catch (Throwable $e) {

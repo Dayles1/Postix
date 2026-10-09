@@ -12,6 +12,7 @@ use App\Application\Telegram\Actions\ProcessCreatedDriverMessage;
 use App\Application\Telegram\Actions\ProcessTelegramDriverCheckResults;
 use App\Application\Telegram\Actions\ProcessUpdatedDriverMessage;
 use App\Application\Telegram\Actions\TelegramDriverCheckStarter;
+use App\Application\Telegram\Services\AutoReplyTelegramGifs;
 use App\Application\Telegram\Services\ClientCheckSender;
 use App\Application\Telegram\Services\TelegramDriverCheckChats;
 use App\Application\Telegram\Services\TelegramDriverCheckRecorder;
@@ -410,6 +411,32 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
         } catch (Throwable $e) {
             Log::error(
                 'TelegramDriverCheckHandler: client check nudge failed',
+                [
+                    'error' => $e->getMessage(),
+                    'exception' => $e::class,
+                ],
+            );
+        }
+    }
+
+    /**
+     * The auto replies page looking for a GIF in Telegram: only this
+     * process owns the session, so the panel leaves the search here.
+     */
+    #[Cron(period: 1.0)]
+    public function answerGifSearches(): void
+    {
+        if ($this->restartRequested) {
+            return;
+        }
+
+        try {
+            app(
+                AutoReplyTelegramGifs::class,
+            )->serve($this);
+        } catch (Throwable $e) {
+            Log::error(
+                'TelegramDriverCheckHandler: GIF search failed',
                 [
                     'error' => $e->getMessage(),
                     'exception' => $e::class,

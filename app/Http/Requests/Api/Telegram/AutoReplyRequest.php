@@ -30,6 +30,11 @@ final class AutoReplyRequest extends FormRequest
             'max_words' => ['required', 'integer', 'min:1', 'max:50'],
 
             'replies' => ['present', 'array', 'max:' . AutoReplyRules::MAX_REPLIES],
+            /*
+             * What personal answers point at; a new kind gets one in the
+             * panel, a missing one is made up by AutoReplyRules.
+             */
+            'replies.*.id' => ['nullable', 'string', 'regex:/^[a-z0-9]{1,24}$/'],
             'replies.*.name' => ['nullable', 'string', 'max:60'],
             'replies.*.keywords' => ['present', 'array', 'max:' . AutoReplyRules::MAX_KEYWORDS],
             'replies.*.keywords.*' => ['nullable', 'string', 'max:60'],
@@ -43,6 +48,20 @@ final class AutoReplyRequest extends FormRequest
             'silence.enabled' => ['required', 'boolean'],
             'silence.after_penalties' => ['required', 'integer', 'min:1', 'max:50'],
             'silence.answers' => ['present', 'array'],
+
+            /*
+             * Left out: the file keeps the config's greetings.
+             */
+            'greetings' => ['sometimes', 'array'],
+            'greetings.enabled' => ['required_with:greetings', 'boolean'],
+            'greetings.fillers' => ['present_with:greetings', 'array', 'max:' . AutoReplyRules::MAX_FILLERS],
+            'greetings.fillers.*' => ['nullable', 'string', 'max:60'],
+            'greetings.list' => ['present_with:greetings', 'array', 'max:' . AutoReplyRules::MAX_GREETINGS],
+            'greetings.list.*.id' => ['nullable', 'string', 'regex:/^[a-z0-9]{1,24}$/'],
+            'greetings.list.*.name' => ['nullable', 'string', 'max:60'],
+            'greetings.list.*.keywords' => ['present', 'array', 'max:' . AutoReplyRules::MAX_KEYWORDS],
+            'greetings.list.*.keywords.*' => ['nullable', 'string', 'max:60'],
+            'greetings.list.*.answers' => ['present', 'array'],
         ];
 
         /*
@@ -54,6 +73,13 @@ final class AutoReplyRequest extends FormRequest
             $rules["{$media}.gifs"] = ['nullable', 'array', 'max:' . AutoReplyRules::MAX_MEDIA];
             $rules["{$media}.gifs.*.file"] = ['required', 'string', 'regex:/^[a-f0-9]{24}\.(gif|mp4)$/'];
             $rules["{$media}.gifs.*.name"] = ['nullable', 'string', 'max:120'];
+            /*
+             * Found in Telegram: the document it goes as (AutoReplyTelegramGifs).
+             */
+            $rules["{$media}.gifs.*.telegram"] = ['nullable', 'array'];
+            $rules["{$media}.gifs.*.telegram.id"] = ['required_with:' . "{$media}.gifs.*.telegram", 'string', 'regex:/^-?\d{1,20}$/'];
+            $rules["{$media}.gifs.*.telegram.access_hash"] = ['required_with:' . "{$media}.gifs.*.telegram", 'string', 'regex:/^-?\d{1,20}$/'];
+            $rules["{$media}.gifs.*.telegram.file_reference"] = ['present_with:' . "{$media}.gifs.*.telegram", 'nullable', 'string', 'max:400'];
 
             foreach (OperationUser::LANGUAGES as $language) {
                 $rules["{$media}.voices.{$language}"] = ['nullable', 'array', 'max:' . AutoReplyRules::MAX_MEDIA];
@@ -64,7 +90,7 @@ final class AutoReplyRequest extends FormRequest
 
         foreach (OperationUser::LANGUAGES as $language) {
             foreach (ClientCheckRules::TONES as $tone) {
-                foreach (['replies.*.answers', 'silence.answers'] as $answers) {
+                foreach (['replies.*.answers', 'silence.answers', 'greetings.list.*.answers'] as $answers) {
                     $rules["{$answers}.{$language}.{$tone}"] = ['nullable', 'array', 'max:' . AutoReplyRules::MAX_ANSWERS];
                     $rules["{$answers}.{$language}.{$tone}.*"] = ['nullable', 'string', 'max:1000'];
                 }
@@ -96,6 +122,27 @@ final class AutoReplyRequest extends FormRequest
                         $validator->errors()->add(
                             "replies.{$index}.answers",
                             __('telegram.auto_replies.validation.answers'),
+                        );
+                    }
+                }
+
+                /*
+                 * A greeting answers with a text only: no GIF, no voice.
+                 */
+                foreach (array_values((array) $this->input('greetings.list', [])) as $index => $greeting) {
+                    $greeting = (array) $greeting;
+
+                    if (! $this->hasText($greeting['keywords'] ?? [])) {
+                        $validator->errors()->add(
+                            "greetings.list.{$index}.keywords",
+                            __('telegram.auto_replies.validation.greeting_keywords'),
+                        );
+                    }
+
+                    if (! $this->hasAnswer($greeting['answers'] ?? [])) {
+                        $validator->errors()->add(
+                            "greetings.list.{$index}.answers",
+                            __('telegram.auto_replies.validation.greeting_answers'),
                         );
                     }
                 }

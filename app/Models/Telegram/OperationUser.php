@@ -46,6 +46,7 @@ class OperationUser extends Model
         'language',
         'respectful',
         'address',
+        'personal_answers',
         'telegram_username',
         'telegram_id',
         'is_active',
@@ -63,6 +64,7 @@ class OperationUser extends Model
             'dm_enabled' => 'boolean',
             'respectful' => 'boolean',
             'address' => 'array',
+            'personal_answers' => 'array',
             'dm_last_sent_at' => 'datetime',
             'last_private_message_at' => 'datetime',
         ];

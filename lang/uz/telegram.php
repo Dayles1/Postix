@@ -77,6 +77,7 @@ return [
             'sales' => 'Sales',
             'penalty_settings' => 'Jarima sozlamalari',
             'auto_replies' => 'Avto-javoblar',
+            'personal_answers' => 'Shaxsiy javoblar',
             'chats' => 'Chatlar',
             'sessions' => 'Telegram sessiyalari',
             'watchdog' => 'Watchdog',
@@ -391,7 +392,6 @@ return [
         ],
     ],
 
-
     'penalty_settings' => [
         'title' => 'Jarima sozlamalari',
         'description' => 'Bitta so\'rov bo\'yicha 1-, 2-, 3- va keyingi jarimalarda odamga nima yozish. Raqam bot xabaridan olinadi. Matnlar ikki tilda, oddiy va hurmatli - yoshi kattalar uchun.',
@@ -498,6 +498,96 @@ return [
         'copied' => '«:role» dan nusxa olindi. Saqlashni unutmang.',
     ],
 
+    'personal_answers' => [
+        'title' => 'Shaxsiy javoblar',
+        'description' => 'Bitta odam uchun o\'z ovozli xabarlari, GIF va matnlari: jarimaga, «xayrli tong»ga, avto-javobga',
+        'progress' => 'Ovozlisi borlar: :done / :total',
+        'how' => 'Vaziyatni tanlang va shu odamning javoblarini qo\'shing. Ular umumiylar bilan teng tushadi (yana bitta umumiy ibora kabi) yoki «Faqat shaxsiy» bilan ularning o\'rniga. Ovozli xabar - .ogg, Telegram yozganidek; GIF - Telegramdan yoki fayl qilib.',
+        'add' => 'Qo\'shish',
+        'add_placeholder' => 'Vaziyat: jarima, salomlashish, avto-javob...',
+        'no_slots' => 'Hozircha shaxsiy javoblar yo\'q: odam umumiylarini oladi.',
+        'no_items' => 'Bo\'sh: matn, ovozli xabar yoki GIF qo\'shing. Bo\'sh vaziyat saqlanmaydi.',
+        'remove_slot' => 'Vaziyatni olib tashlash',
+        'remove' => 'O\'chirish',
+        'only' => 'Faqat shaxsiy',
+        'only_on' => 'Bu vaziyatning umumiy javoblari unga yuborilmaydi - faqat shular',
+        'only_off' => 'Umumiylarga qo\'shilgan: ular bilan teng tushadi',
+        'add_text' => 'Matn',
+        'add_voice' => 'Ovozli xabar',
+        'add_gif' => 'GIF fayl',
+        'text_placeholder' => 'Javob matni, {address} bilan ham bo\'ladi',
+        'placeholders_title' => 'Qo\'yiladiganlar',
+        'placeholders_hint' => 'Oxirgi tahrirlangan matnga qo\'yiladi. So\'rov, vaqt va status faqat jarimada bor.',
+        'types' => [
+            'text' => 'Matn',
+            'voice' => '🎤',
+            'gif' => 'GIF',
+        ],
+        'roles' => [
+            'operation' => 'Operator',
+            'sales' => 'Sales',
+        ],
+        'languages' => [
+            'uz' => 'O\'zbekcha',
+            'ru' => 'Русский',
+        ],
+        'groups' => [
+            'penalty' => 'Jarima',
+            'greeting' => 'Salomlashish',
+            'reply' => 'Avto-javob',
+            'silence' => 'Eslatma',
+        ],
+        'situations' => [
+            'penalty' => ':name (:from-chidan)',
+            'level' => ':n-chidan daraja',
+            'greeting' => 'Salomlashish :n',
+            'reply' => 'Tur :n',
+            'silence' => 'Jarimalarga javob bermaganda',
+            'gone' => 'Bu vaziyat endi yo\'q',
+            'gone_hint' => 'Tur, salomlashish yoki daraja sozlamalarda o\'chirilgan: bu javoblar yuborilmaydi. Olib tashlang yoki qaytguncha qoldiring.',
+        ],
+        'people' => [
+            'search' => 'Ism yoki @username',
+            'role' => 'Rol',
+            'all' => 'Hammasi',
+            'without_voice' => 'Ovozlisi yo\'q',
+            'none' => 'Hech kim topilmadi',
+        ],
+        'person' => [
+            'respectful' => '«siz»',
+            'plain' => '«sen»',
+            'address' => 'murojaat «:address»',
+            'muted' => 'Kartochkada unga shaxsiy xabarlar o\'chirilgan: hech narsa yuborilmaydi.',
+        ],
+        'empty' => [
+            'title' => 'Chapdan odamni tanlang',
+            'description' => 'Masalan, birinchi jarima uchun ismi bilan ovozli xabar yozilgan operatorni.',
+        ],
+        'placeholders' => [
+            'address' => 'Murojaat (kartochkadan)',
+            'name' => 'Odamning ismi',
+            'request' => 'So\'rov raqami',
+            'repeat_number' => 'Jarima nechanchi marta',
+            'status_limit' => 'Statusga berilgan vaqt',
+            'time_in_status' => 'Statusda qancha turibdi',
+            'crm_status' => 'CRM dagi status',
+        ],
+        'actions' => [
+            'dirty' => 'Saqlanmagan o\'zgarishlar bor: :name',
+            'save' => 'Saqlash',
+            'saving' => 'Saqlanmoqda...',
+            'discard' => 'Bekor qilish',
+        ],
+        'messages' => [
+            'saved' => 'Shaxsiy javoblar saqlandi',
+            'failed' => 'Yuklab bo\'lmadi',
+            'leave' => 'Saqlanmagan o\'zgarishlar bor. Saqlamasdan chiqasizmi?',
+        ],
+        'validation' => [
+            'slot' => 'Noma\'lum vaziyat: :slot',
+        ],
+    ],
+
     'auto_replies' => [
         'title' => 'Avto-javoblar',
         'description' => 'Operator yoki sales bot akkauntiga shaxsiy chatda yozsa, unga nima deb javob beriladi: «+», «ok», «hop» -> «Rahmat, Ali aka». Hammasi bitta JSON faylda saqlanadi va keyingi xabardan boshlab ishlaydi.',
@@ -511,6 +601,7 @@ return [
             'test' => 'Xabarni sinash',
             'file' => 'Fayl',
             'silence' => 'Javob bermasa',
+            'greetings' => 'Salomlashish',
         ],
         'tones' => [
             'plain' => 'Oddiy',
@@ -557,10 +648,21 @@ return [
             'after_penalties_hint' => 'Uning shaxsiyga yozgan har qanday xabari hisobni nolga tushiradi.',
             'answers' => 'Eslatma',
         ],
+        'greetings' => [
+            'enabled' => 'Salomga alik olish',
+            'enabled_hint' => '«Доброе утро. Готово» - avval alohida javob bilan «Доброе утро, Анна!», bir-ikki soniyadan keyin turning javobi. Faqat salom bo\'lsa ham alik olinadi; savoldan oldingi salomga - yo\'q. Har bir odamga kuniga bir marta.',
+            'title' => 'Salom :n',
+            'add' => 'Salom qo\'shish',
+            'remove' => 'Salomni o\'chirish',
+            'none' => 'Salomlar yo\'q: hech kimga alik olinmaydi.',
+            'order_hint' => 'Yuqoridan pastga tekshiriladi: xabarda birinchi topilgan salom javobni tanlaydi. Faqat matn, GIF va ovozli xabarsiz.',
+            'fillers' => 'Salomdan keyin hisobga olinmaydigan so\'zlar',
+            'fillers_hint' => '«Assalomu alaykum aka 🙂» - shunchaki salom: unga alik olinadi. Vergul yoki yangi qator bilan.',
+        ],
         'media' => [
             'title' => 'GIF va ovozli xabarlar',
             'gifs' => 'GIF',
-            'gif_hint' => 'Barcha tillar uchun · .gif, .mp4',
+            'gif_hint' => 'Barcha tillar uchun · Telegramdan yoki .gif, .mp4',
             'voices' => 'Ovozli xabarlar: :language',
             'voice_hint' => 'Faqat shu til uchun · .ogg',
             'add_gif' => 'GIF',
@@ -568,6 +670,22 @@ return [
             'remove' => 'O\'chirish',
             'uploading' => 'Yuklanmoqda...',
             'failed' => 'Fayl yuklanmadi',
+            'add_telegram' => 'Telegramdan',
+            'file_badge' => 'Fayl',
+            'file_badge_hint' => 'Fayl qilib yuklangan: video bo\'lib borishi mumkin',
+            'telegram_badge' => 'Telegram',
+            'telegram_badge_hint' => 'Telegramdagi GIF: haqiqiy GIF bo\'lib boradi',
+            'telegram_title' => 'Telegramdan GIF',
+            'telegram_search' => 'GIF qidirish: ok, rahmat, thumbs up',
+            'telegram_search_hint' => 'Telegramdagi GIF bo\'limidagidek qidiruv. Bo\'sh qidiruv - akkauntning saqlangan GIF\'lari.',
+            'telegram_saved' => 'Saqlangan GIF',
+            'telegram_searching' => 'Telegramdan qidirilmoqda...',
+            'telegram_empty' => 'Hech narsa topilmadi',
+            'telegram_more' => 'Yana',
+            'telegram_timeout' => 'Tinglovchi javob bermadi - qidiruv u orqali ishlaydi. U ishga tushganmi?',
+            'telegram_failed' => 'Telegram javob bermadi: :error',
+            'telegram_gone' => 'Bu GIF endi topilmaydi - qaytadan qidiring',
+            'telegram_pick' => 'Tanlash',
         ],
         'placeholders' => [
             'address' => 'Murojaat (kartochkadan)',
@@ -582,6 +700,9 @@ return [
             'answer' => 'Oladi',
             'as' => 'Kimdek',
             'media' => 'Yana GIF: :gifs, ovozli xabar: :voices - ular ham tushishi mumkin',
+            'greeting' => 'Salom: :greeting - avval alik olinadi',
+            'greeting_only' => 'Salom: :greeting - faqat alik olinadi',
+            'greeted_once' => 'Kuniga bir marta: bugun alik olingan odam faqat turning javobini oladi',
         ],
         'file' => [
             'customised' => 'Faylga saqlangan',
@@ -609,7 +730,10 @@ return [
             'fix' => 'Belgilangan maydonlarni tuzating',
             'silence' => 'Yoqilgan eslatmada kamida bitta matn, GIF yoki ovozli xabar bo\'lishi kerak',
             'media_gif' => 'GIF - .gif yoki .mp4 fayl',
+            'media_gif_sound' => 'Bu .mp4 da ovoz bor: Telegram uni GIF emas, video qilib ko\'rsatadi. Ovozsizini yuklang',
             'media_voice' => 'Ovozli xabar - .ogg (Opus) fayl, Telegram yozgandek',
+            'greeting_keywords' => 'Salomda kamida bitta kalit so\'z bo\'lishi kerak',
+            'greeting_answers' => 'Salomda kamida bitta matn bo\'lishi kerak',
         ],
     ],
 
@@ -1382,7 +1506,6 @@ return [
         ],
     ],
 
-
     /*
     |--------------------------------------------------------------------------
     | Operation User
@@ -1404,7 +1527,6 @@ return [
         'no_username' => 'Username mavjud emas',
 
         'unknown' => 'Noma’lum',
-
 
         /*
         |--------------------------------------------------------------------------
@@ -1428,7 +1550,6 @@ return [
 
             'match_rate' => 'Moslik darajasi',
         ],
-
 
         /*
         |--------------------------------------------------------------------------
@@ -1472,7 +1593,6 @@ return [
             'hint' => 'Eksport joriy filtr va davrni hisobga oladi.',
         ],
 
-
         /*
         |--------------------------------------------------------------------------
         | Drivers
@@ -1504,7 +1624,6 @@ return [
 
             'unknown_date' => 'Sana noma’lum',
 
-
             /*
             |--------------------------------------------------------------------------
             | Driver statuses
@@ -1526,7 +1645,6 @@ return [
             'unknown_description' => 'Haydovchi holati noma’lum.',
         ],
 
-
         /*
         |--------------------------------------------------------------------------
         | Pagination
@@ -1544,7 +1662,6 @@ return [
             'next' => 'Keyingi',
         ],
 
-
         /*
         |--------------------------------------------------------------------------
         | Errors
@@ -1560,7 +1677,6 @@ return [
             'unknown' => 'Noma’lum xatolik yuz berdi',
         ],
     ],
-
 
     /*
     |--------------------------------------------------------------------------
@@ -1731,7 +1847,6 @@ return [
             'never' => 'Hali yo‘q',
         ],
     ],
-
 
     /*
     |--------------------------------------------------------------------------

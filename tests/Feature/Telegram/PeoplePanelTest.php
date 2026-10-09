@@ -77,6 +77,7 @@ class PeoplePanelTest extends TestCase
             $table->string('language', 5)->nullable();
             $table->boolean('respectful')->default(false);
             $table->json('address')->nullable();
+            $table->json('personal_answers')->nullable();
             $table->string('telegram_username')->nullable()->unique();
             $table->unsignedBigInteger('telegram_id')->nullable()->unique();
             $table->boolean('is_active')->default(true);
@@ -148,6 +149,13 @@ class PeoplePanelTest extends TestCase
             $table->json('value')->nullable();
             $table->timestamps();
         });
+
+        /*
+         * Saving personal answers prunes the media folder: never the real
+         * one, nor the real auto replies file.
+         */
+        config()->set('auto_replies.path', storage_path('framework/testing/auto-replies-' . bin2hex(random_bytes(4)) . '.json'));
+        config()->set('auto_replies.media_path', storage_path('framework/testing/auto-replies-media'));
 
         $role = Role::query()->create(['name' => 'driverCheck']);
 
@@ -581,6 +589,58 @@ class PeoplePanelTest extends TestCase
         }
     }
 
+    public function test_greetings_are_edited_in_the_panel(): void
+    {
+        $path = storage_path('framework/testing/auto-replies-' . bin2hex(random_bytes(4)) . '.json');
+        config()->set('auto_replies.path', $path);
+
+        try {
+            $this->getJson('/api/telegram/auto-replies')
+                ->assertJsonPath('data.greetings.enabled', true)
+                ->assertJsonPath('data.greetings.list.0.name', 'Утро');
+
+            /* Left out, as by a page from before them: the config's are kept. */
+            $this->putJson('/api/telegram/auto-replies', $this->autoReplies())
+                ->assertOk()
+                ->assertJsonPath('data.greetings.list.0.name', 'Утро');
+
+            $this->putJson('/api/telegram/auto-replies', $this->autoReplies([
+                'greetings' => [
+                    'enabled' => true,
+                    'fillers' => ['aka', ' ', 'aka'],
+                    'list' => [
+                        ['name' => 'Tong', 'keywords' => ['xayrli tong', ''], 'answers' => [
+                            'uz' => ['plain' => ['Xayrli tong, {address}!', ' ']],
+                        ]],
+                    ],
+                ],
+            ]))
+                ->assertOk()
+                ->assertJsonPath('data.greetings.fillers', ['aka'])
+                ->assertJsonPath('data.greetings.list.0.keywords', ['xayrli tong'])
+                ->assertJsonPath('data.greetings.list.0.answers.uz.plain', ['Xayrli tong, {address}!']);
+
+            $this->assertSame('Tong', json_decode((string) file_get_contents($path), true)['greetings']['list'][0]['name']);
+
+            /* A half-made greeting is refused. */
+            $this->putJson('/api/telegram/auto-replies', $this->autoReplies([
+                'greetings' => [
+                    'enabled' => true,
+                    'fillers' => [],
+                    'list' => [
+                        ['keywords' => [' '], 'answers' => ['uz' => ['plain' => ['Salom']]]],
+                        ['keywords' => ['salom'], 'answers' => []],
+                    ],
+                ],
+            ]))
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors(['greetings.list.0.keywords', 'greetings.list.1.answers'])
+                ->assertJsonMissingValidationErrors(['greetings.list.0.answers', 'greetings.list.1.keywords']);
+        } finally {
+            @unlink($path);
+        }
+    }
+
     /*
     |--------------------------------------------------------------------------
     | People API
@@ -820,5 +880,65 @@ class PeoplePanelTest extends TestCase
         $this->get('/driver-check/penalties/settings')->assertForbidden();
         $this->get('/driver-check/penalties')->assertForbidden();
         $this->get('/driver-check/sales')->assertForbidden();
+        $this->get('/driver-check/personal-answers')->assertForbidden();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Personal answers
+    |--------------------------------------------------------------------------
+    */
+
+    public function test_personal_answers_page_lists_people_and_situations(): void
+    {
+        $this->get('/driver-check/personal-answers')->assertOk()->assertSee(__('telegram.personal_answers.title'));
+
+        $ali = $this->person('ALI', attributes: ['personal_answers' => [
+            'penalty:0' => ['only' => false, 'items' => [['type' => 'text', 'text' => 'Ali, narx!']]],
+        ]]);
+        $this->person('ANNA', OperationUser::ROLE_SALES);
+
+        $json = $this->getJson('/api/telegram/personal-answers')->assertOk()->json();
+
+        $this->assertSame(['ALI', 'ANNA'], array_column($json['data'], 'name'));
+        $this->assertSame(1, $json['data'][0]['counts']['text']);
+        $this->assertSame('penalty:0', $json['situations']['penalties']['operation'][0]['slot']);
+        $this->assertSame('silence', $json['situations']['silence']);
+        $this->assertNotEmpty($json['situations']['greetings']);
+
+        $this->getJson("/api/telegram/personal-answers/{$ali->id}")
+            ->assertOk()
+            ->assertJsonPath('data.slots.penalty:0.items.0.text', 'Ali, narx!');
+    }
+
+    public function test_personal_answers_are_saved_cleaned_up(): void
+    {
+        $ali = $this->person('ALI');
+        $voice = str_repeat('a', 24) . '.ogg';
+
+        $this->putJson("/api/telegram/personal-answers/{$ali->id}", ['slots' => [
+            'penalty:1' => ['only' => true, 'items' => [
+                ['type' => 'voice', 'file' => $voice, 'name' => 'ali.ogg'],
+                ['type' => 'text', 'text' => ''],
+            ]],
+            'silence' => ['only' => false, 'items' => []],
+        ]])->assertOk()->assertJsonPath('data.counts.voice', 1);
+
+        $this->assertSame(
+            ['penalty:1' => ['only' => true, 'items' => [['type' => 'voice', 'file' => $voice, 'name' => 'ali.ogg']]]],
+            $ali->refresh()->personal_answers,
+        );
+
+        /* Nothing left: the card goes back to null. */
+        $this->putJson("/api/telegram/personal-answers/{$ali->id}", ['slots' => []])->assertOk();
+        $this->assertNull($ali->refresh()->personal_answers);
+
+        $this->putJson("/api/telegram/personal-answers/{$ali->id}", ['slots' => [
+            'somewhere' => ['items' => [['type' => 'text', 'text' => 'x']]],
+        ]])->assertUnprocessable();
+
+        $this->putJson("/api/telegram/personal-answers/{$ali->id}", ['slots' => [
+            'silence' => ['items' => [['type' => 'voice', 'file' => '../../.env']]],
+        ]])->assertUnprocessable();
     }
 }

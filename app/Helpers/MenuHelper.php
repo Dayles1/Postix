@@ -137,6 +137,11 @@ class MenuHelper
                         'path' => '/driver-check/auto-replies',
                     ],
                     [
+                        'icon' => 'user-profile',
+                        'name' => __('telegram.menu.items.personal_answers'),
+                        'path' => '/driver-check/personal-answers',
+                    ],
+                    [
                         'icon' => 'chat',
                         'name' => __('telegram.menu.items.chats'),
                         'path' => '/driver-check/chats',

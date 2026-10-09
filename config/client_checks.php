@@ -22,6 +22,25 @@
 |
 */
 
+/*
+ * Sales: the plain and the respectful sets say the same (see `sales` below).
+ */
+$salesUz = [
+    'Statusni yangilang, iltimos',
+    'Iltimos, statusni yangilab qo\'ying',
+    'Zayavka statusini yangilang, iltimos',
+    'Statusni yangilab qo\'ying, {address}, iltimos',
+    'Statusni yangilashni unutmang, iltimos',
+];
+
+$salesRu = [
+    'Обновите, пожалуйста, статус',
+    'Обновите статус, пожалуйста',
+    'Поменяйте, пожалуйста, статус запроса',
+    'Статус обновите, {address}, пожалуйста',
+    'Не забудьте обновить статус, пожалуйста',
+];
+
 return [
 
     /*
@@ -90,12 +109,32 @@ return [
                     'from' => 1,
                     'phrases' => [
                         'uz' => [
-                            'plain' => ['Narx berib yubor, {status_limit} vaqt o\'tdi'],
-                            'respectful' => ['Narx berib yuboring, iltimos, {status_limit} vaqt o\'tdi'],
+                            'plain' => [
+                                'Narx berib yubor, {status_limit} vaqt o\'tdi',
+                                'Narx tashla, {status_limit} bo\'ldi',
+                                'Narx kerak, {address}, {status_limit} o\'tib ketdi',
+                                'Zayavkaga narx ber, {status_limit} vaqt o\'tdi',
+                            ],
+                            'respectful' => [
+                                'Narx berib yuboring, iltimos, {status_limit} vaqt o\'tdi',
+                                'Narx bera olasizmi, {address}? {status_limit} o\'tdi',
+                                'Iltimos, narxni yuboring, {status_limit} vaqt bo\'ldi',
+                                'Narxingizni kutyapmiz, {status_limit} o\'tib ketdi',
+                            ],
                         ],
                         'ru' => [
-                            'plain' => ['Дай цену, уже {status_limit} прошло'],
-                            'respectful' => ['Дайте, пожалуйста, цену, уже {status_limit} прошло'],
+                            'plain' => [
+                                'Дай цену, уже {status_limit} прошло',
+                                'Скинь цену, {status_limit} уже прошло',
+                                'Нужна цена, {address}, прошло {status_limit}',
+                                'Дай цену по запросу, уже {status_limit}',
+                            ],
+                            'respectful' => [
+                                'Дайте, пожалуйста, цену, уже {status_limit} прошло',
+                                'Подскажите, пожалуйста, цену, {address}, прошло {status_limit}',
+                                'Пришлите, пожалуйста, цену, уже {status_limit} прошло',
+                                'Ждём вашу цену, уже {status_limit} прошло',
+                            ],
                         ],
                     ],
                 ],
@@ -104,12 +143,32 @@ return [
                     'from' => 2,
                     'phrases' => [
                         'uz' => [
-                            'plain' => ['Narx berasanmi?'],
-                            'respectful' => ['Moshina chiqmadimi?'],
+                            'plain' => [
+                                'Narx berasanmi?',
+                                'Narx qani?',
+                                'Hali ham narx yo\'qmi?',
+                                'Moshina topilmadimi?',
+                            ],
+                            'respectful' => [
+                                'Moshina chiqmadimi?',
+                                'Narx bo\'ladimi?',
+                                'Hali moshina topilmadimi?',
+                                'Narx qachon bo\'ladi, {address}?',
+                            ],
                         ],
                         'ru' => [
-                            'plain' => ['Цену дашь?'],
-                            'respectful' => ['Машина не нашлась?'],
+                            'plain' => [
+                                'Цену дашь?',
+                                'Где цена?',
+                                'Цены всё ещё нет?',
+                                'Машину не нашёл?',
+                            ],
+                            'respectful' => [
+                                'Машина не нашлась?',
+                                'Цена будет?',
+                                'Машину пока не нашли?',
+                                'Когда будет цена, {address}?',
+                            ],
                         ],
                     ],
                 ],
@@ -118,12 +177,32 @@ return [
                     'from' => 3,
                     'phrases' => [
                         'uz' => [
-                            'plain' => ['Baraka topkur, qancha kutish mumkin?'],
-                            'respectful' => ['Baraka toping, yana qancha kutaylik?'],
+                            'plain' => [
+                                'Baraka topkur, qancha kutish mumkin?',
+                                'Yana qancha kutamiz?',
+                                'Klient kutyapti, tezroq bo\'l',
+                                'Narx hali ham yo\'q, nima bo\'ldi?',
+                            ],
+                            'respectful' => [
+                                'Baraka toping, yana qancha kutaylik?',
+                                'Klient kutyapti, tezroq bo\'larmikan?',
+                                'Narx hali ham yo\'q, biror muammo bormi?',
+                                'Yana qancha kutishimiz kerak, {address}?',
+                            ],
                         ],
                         'ru' => [
-                            'plain' => ['Ну сколько можно ждать?'],
-                            'respectful' => ['Подскажите, пожалуйста, сколько ещё ждать?'],
+                            'plain' => [
+                                'Ну сколько можно ждать?',
+                                'Долго ещё?',
+                                'Клиент ждёт, давай быстрее',
+                                'Цены всё ещё нет, что случилось?',
+                            ],
+                            'respectful' => [
+                                'Подскажите, пожалуйста, сколько ещё ждать?',
+                                'Клиент ждёт, можно побыстрее?',
+                                'Цены всё ещё нет, какая-то проблема?',
+                                'Сколько ещё ждать, {address}, подскажите?',
+                            ],
                         ],
                     ],
                 ],
@@ -132,12 +211,36 @@ return [
                     'from' => 4,
                     'phrases' => [
                         'uz' => [
-                            'plain' => ['Nima qilay, boshqaga olaymi?'],
-                            'respectful' => ['Nima qilasiz, yopa olasizmi yoki boshqaga beramizmi?'],
+                            'plain' => [
+                                'Nima qilay, boshqaga olaymi?',
+                                'Boshqaga beraymi?',
+                                'Yopasanmi yoki boshqaga beraymi?',
+                                'Uddalay olmayapsanmi? Boshqaga beraymi?',
+                                'Qila olmasang ayt, boshqaga beraman',
+                            ],
+                            'respectful' => [
+                                'Nima qilasiz, yopa olasizmi yoki boshqaga beramizmi?',
+                                'Boshqaga beraylikmi?',
+                                'Yopasizmi yoki boshqa hamkasbga beraylikmi?',
+                                'Uddalay olmasangiz, boshqaga beraylikmi?',
+                                'Qila olmasangiz ayting, {address}, boshqaga beramiz',
+                            ],
                         ],
                         'ru' => [
-                            'plain' => ['Что делать, отдать другому?'],
-                            'respectful' => ['Как поступим, передать запрос другому?'],
+                            'plain' => [
+                                'Что делать, отдать другому?',
+                                'Отдать другому?',
+                                'Закроешь или отдать другому?',
+                                'Не успеваешь? Передать другому?',
+                                'Если не получается, скажи, отдам другому',
+                            ],
+                            'respectful' => [
+                                'Как поступим, передать запрос другому?',
+                                'Передадим другому?',
+                                'Закроете или передадим коллеге?',
+                                'Если не получается, давайте передадим другому?',
+                                'Если не успеваете, {address}, скажите, передадим другому',
+                            ],
                         ],
                     ],
                 ],
@@ -157,12 +260,12 @@ return [
                     'mode' => 'all',
                     'phrases' => [
                         'uz' => [
-                            'plain' => ['Statusni yangilang, iltimos'],
-                            'respectful' => ['Statusni yangilang, iltimos'],
+                            'plain' => $salesUz,
+                            'respectful' => $salesUz,
                         ],
                         'ru' => [
-                            'plain' => ['Обновите, пожалуйста, статус'],
-                            'respectful' => ['Обновите, пожалуйста, статус'],
+                            'plain' => $salesRu,
+                            'respectful' => $salesRu,
                         ],
                     ],
                 ],

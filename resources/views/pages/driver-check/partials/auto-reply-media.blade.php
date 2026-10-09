@@ -2,6 +2,8 @@
     GIFs and voice messages of a kind - or of the nudge. $owner is the JS
     expression for it: "k" inside the kinds loop, "'silence'" for the nudge.
     GIFs serve every language; voices belong to the language being edited.
+    A GIF comes from Telegram (the dialog in auto-replies.blade.php) or is
+    uploaded.
 --}}
 <div class="grid gap-4 md:grid-cols-2">
     @foreach (['gif', 'voice'] as $type)
@@ -29,6 +31,15 @@
                             <img :src="mediaUrl(item.file)" alt="" class="h-12 w-16 shrink-0 rounded-md bg-gray-100 object-cover dark:bg-gray-800">
                         </template>
                         <span class="dc-break min-w-0 flex-1 truncate text-[12px] text-gray-600 dark:text-gray-300" x-text="item.name"></span>
+                        {{-- From Telegram: a real GIF; an upload may arrive as a video --}}
+                        <span
+                            class="shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold"
+                            :class="item.telegram
+                                ? 'bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400'
+                                : 'bg-gray-100 text-gray-500 dark:bg-white/[0.06] dark:text-gray-400'"
+                            :title="item.telegram ? translations.media.telegram_badge_hint : translations.media.file_badge_hint"
+                            x-text="item.telegram ? translations.media.telegram_badge : translations.media.file_badge"
+                        ></span>
                     @else
                         <audio :src="mediaUrl(item.file)" controls preload="none" class="h-9 min-w-0 flex-1"></audio>
                     @endif
@@ -46,6 +57,20 @@
                     </button>
                 </div>
             </template>
+
+            <div class="flex flex-wrap items-center gap-1">
+            @if ($type === 'gif')
+                <button
+                    type="button"
+                    x-on:click="openTelegramGifs({{ $owner }})"
+                    class="dc-tap inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-[12px] font-medium
+                           text-brand-600 transition hover:bg-white hover:text-brand-700 dark:text-brand-400
+                           dark:hover:bg-white/[0.06] dark:hover:text-brand-300"
+                >
+                    <x-driver-check.icon name="search" class="h-3.5 w-3.5" />
+                    <span x-text="translations.media.add_telegram"></span>
+                </button>
+            @endif
 
             <label
                 class="dc-tap inline-flex h-8 cursor-pointer items-center gap-1.5 self-start rounded-lg px-2 text-[12px] font-medium
@@ -66,6 +91,7 @@
                     x-on:change="uploadMedia({{ $owner }}, '{{ $type }}', $event)"
                 >
             </label>
+            </div>
         </div>
     @endforeach
 </div>

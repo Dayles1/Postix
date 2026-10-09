@@ -4,8 +4,8 @@
 |--------------------------------------------------------------------------
 |
 | One form over the auto replies file (AutoReplyRules): the kinds - what an
-| operator or a sales manager writes, what they are told back - and when
-| to answer at all. One language is edited at a time, plain and respectful
+| operator or a sales manager writes, what they are told back - the
+| greetings answered before them, and when to answer at all. One language is edited at a time, plain and respectful
 | side by side. Edited locally, saved in one go from the bar at the bottom.
 |
 | The tester runs the same matching as AutoReplyMatcher, here in the
@@ -14,6 +14,7 @@
 */
 
 import { escapeHtml, telegramHtml } from './telegram-html';
+import { telegramGifPicker, uploadAnswerMedia } from './media-picker';
 
 const LANGUAGES = ['uz', 'ru'];
 
@@ -32,6 +33,12 @@ const nextKey = () => {
 
     return `k${keySeed}`;
 };
+
+/** A kind's or a greeting's lasting id (AutoReplyRules::id()): personal answers point at it. */
+const newId = () => Array.from(
+    crypto.getRandomValues(new Uint8Array(8)),
+    (byte) => byte.toString(16).padStart(2, '0'),
+).join('');
 
 const toNumber = (value, min = 1) => {
     if (value === '' || value === null || value === undefined) {
@@ -71,28 +78,72 @@ export function words(text) {
         .filter((word) => word !== '');
 }
 
-/** With `prefix`, the needle's last word only has to start a word ("клиент*"). */
-const contains = (haystack, needle, prefix) => {
+/**
+ * Where the needle starts in the haystack, -1 when it is not there. With
+ * `prefix`, the needle's last word only has to start a word ("клиент*").
+ */
+const position = (haystack, needle, prefix) => {
     const last = needle.length - 1;
 
     for (let i = 0; i + needle.length <= haystack.length; i += 1) {
         if (needle.every((word, j) => (prefix && j === last
             ? haystack[i + j].startsWith(word)
             : haystack[i + j] === word))) {
-            return true;
+            return i;
         }
     }
 
-    return false;
+    return -1;
+};
+
+/** A keyword as AutoReplyMatcher reads it: its words, and whether "*" ends it. */
+const needleOf = (keyword) => {
+    const trimmed = String(keyword).trim();
+    const prefix = trimmed.endsWith('*');
+
+    return { needle: words(prefix ? trimmed.replace(/\*+$/, '') : trimmed), prefix };
 };
 
 /** A keyword against a message's words, "*" at its end included. */
 const keywordIn = (message, keyword) => {
-    const trimmed = String(keyword).trim();
-    const prefix = trimmed.endsWith('*');
-    const needle = words(prefix ? trimmed.replace(/\*+$/, '') : trimmed);
+    const { needle, prefix } = needleOf(keyword);
 
-    return needle.length > 0 && contains(message, needle, prefix);
+    return needle.length > 0 && position(message, needle, prefix) >= 0;
+};
+
+/**
+ * AutoReplyMatcher::greeting(): the first greeting found, the words left
+ * once every greeting is taken out, and whether only fillers are left.
+ */
+const findGreeting = (greetings, message) => {
+    const rest = [...message];
+    let found = -1;
+
+    greetings.list.forEach((greeting, index) => {
+        splitKeywords(greeting.keywords).forEach((keyword) => {
+            const { needle, prefix } = needleOf(keyword);
+
+            if (needle.length === 0) {
+                return;
+            }
+
+            for (let at = position(rest, needle, prefix); at >= 0; at = position(rest, needle, prefix)) {
+                rest.splice(at, needle.length);
+
+                if (found < 0) {
+                    found = index;
+                }
+            }
+        });
+    });
+
+    if (found < 0) {
+        return null;
+    }
+
+    const fillers = splitKeywords(greetings.fillers).flatMap((filler) => words(filler));
+
+    return { index: found, rest, alone: rest.every((word) => fillers.includes(word)) };
 };
 
 const emptySets = () => Object.fromEntries(
@@ -120,10 +171,17 @@ function setsToPayload(sets) {
     ]));
 }
 
-/** GIFs for every language, voices per language: {file, name} each. */
+/**
+ * GIFs for every language, voices per language: {file, name} each; a GIF
+ * found in Telegram has its document too ({id, access_hash, file_reference}).
+ */
 function mediaToForm(media) {
     return {
-        gifs: (media?.gifs || []).map((item) => ({ file: item.file, name: item.name })),
+        gifs: (media?.gifs || []).map((item) => ({
+            file: item.file,
+            name: item.name,
+            ...(item.telegram ? { telegram: { ...item.telegram } } : {}),
+        })),
         voices: Object.fromEntries(LANGUAGES.map((lang) => [
             lang,
             (media?.voices?.[lang] || []).map((item) => ({ file: item.file, name: item.name })),
@@ -136,6 +194,7 @@ const mediaToPayload = mediaToForm;
 function kindToForm(kind) {
     return {
         key: nextKey(),
+        id: kind.id || newId(),
         name: kind.name ?? '',
         keywords: (kind.keywords || []).join(', '),
         /* '' = the file's own max_words */
@@ -147,11 +206,32 @@ function kindToForm(kind) {
 
 function kindToPayload(kind) {
     return {
+        id: kind.id,
         name: String(kind.name || '').trim() || null,
         keywords: splitKeywords(kind.keywords),
         max_words: toNumber(kind.max_words),
         answers: setsToPayload(kind.answers),
         media: mediaToPayload(kind.media),
+    };
+}
+
+/** Greetings answer with texts only. */
+function greetingToForm(greeting) {
+    return {
+        key: nextKey(),
+        id: greeting.id || newId(),
+        name: greeting.name ?? '',
+        keywords: (greeting.keywords || []).join(', '),
+        answers: setsToForm(greeting.answers),
+    };
+}
+
+function greetingToPayload(greeting) {
+    return {
+        id: greeting.id,
+        name: String(greeting.name || '').trim() || null,
+        keywords: splitKeywords(greeting.keywords),
+        answers: setsToPayload(greeting.answers),
     };
 }
 
@@ -168,6 +248,11 @@ function toForm(data) {
             after_penalties: data.silence?.after_penalties ?? 5,
             answers: setsToForm(data.silence?.answers),
             media: mediaToForm(data.silence?.media),
+        },
+        greetings: {
+            enabled: !!data.greetings?.enabled,
+            fillers: (data.greetings?.fillers || []).join(', '),
+            list: (data.greetings?.list || []).map(greetingToForm),
         },
     };
 }
@@ -186,20 +271,47 @@ function toPayload(form) {
             answers: setsToPayload(form.silence.answers),
             media: mediaToPayload(form.silence.media),
         },
+        greetings: {
+            enabled: !!form.greetings.enabled,
+            fillers: splitKeywords(form.greetings.fillers),
+            list: form.greetings.list.map(greetingToPayload),
+        },
     };
 }
 
 const filled = (list) => list.filter((a) => String(a.text || '').trim() !== '');
 
+/** The answers that hold texts, as AutoReplyRules::pick() falls back: the other tone, then the other language. */
+const pickSet = (sets, language, tone) => {
+    const otherLanguage = LANGUAGES.find((lang) => lang !== language);
+    const otherTone = TONES.find((t) => t !== tone);
+
+    for (const lang of [language, otherLanguage]) {
+        for (const t of [tone, otherTone]) {
+            const set = filled(sets[lang][t]);
+
+            if (set.length > 0) {
+                return { lang, set };
+            }
+        }
+    }
+
+    return { lang: language, set: [] };
+};
+
 export function autoRepliesPage(config) {
     const t = config.translations;
 
     return {
+        ...telegramGifPicker(t.media),
+
         translations: t,
 
         endpoints: config.endpoints,
 
         maxReplies: config.maxReplies,
+
+        maxGreetings: config.maxGreetings,
 
         placeholders: config.placeholders,
 
@@ -243,6 +355,7 @@ export function autoRepliesPage(config) {
 
         /** Uploads in flight, by uploadKey(). */
         uploading: {},
+
 
         /** The tester: a message, and the person it is tried as. */
         test: { text: '', language: 'uz', tone: 'plain' },
@@ -402,7 +515,7 @@ export function autoRepliesPage(config) {
             answers[this.language].plain.push({ key: nextKey(), text: '' });
 
             this.form.replies.push({
-                key: nextKey(), name: '', keywords: '', max_words: '', answers, media: mediaToForm({}),
+                key: nextKey(), id: newId(), name: '', keywords: '', max_words: '', answers, media: mediaToForm({}),
             });
 
             this.$nextTick(() => {
@@ -433,11 +546,76 @@ export function autoRepliesPage(config) {
             return t.kind.title.replace(':n', k + 1);
         },
 
-        /** The answers of kind k - or of the nudge, k = 'silence'. */
-        answers(k, tone) {
-            const owner = k === 'silence' ? this.form.silence : this.form.replies[k];
+        /*
+        |----------------------------------------------------------------
+        | Greetings: answered before the kind, texts only
+        |----------------------------------------------------------------
+        */
 
-            return owner.answers[this.language][tone];
+        addGreeting() {
+            if (this.form.greetings.list.length >= this.maxGreetings) {
+                return;
+            }
+
+            const answers = emptySets();
+
+            answers[this.language].plain.push({ key: nextKey(), text: '' });
+
+            this.form.greetings.list.push({ key: nextKey(), id: newId(), name: '', keywords: '', answers });
+        },
+
+        removeGreeting(g) {
+            this.form.greetings.list.splice(g, 1);
+            this.target = null;
+        },
+
+        /** The order matters: the first greeting found picks the answer. */
+        moveGreeting(g, step) {
+            const list = this.form.greetings.list;
+            const to = g + step;
+
+            if (to < 0 || to >= list.length) {
+                return;
+            }
+
+            const [greeting] = list.splice(g, 1);
+
+            list.splice(to, 0, greeting);
+            this.target = null;
+        },
+
+        greetingTitle(g) {
+            return t.greetings.title.replace(':n', g + 1);
+        },
+
+        greetingKeywordCount(g) {
+            return splitKeywords(this.form.greetings.list[g].keywords).length;
+        },
+
+        greetingErrors(g) {
+            return ['keywords', 'answers']
+                .map((field) => this.fieldError(`greetings.list.${g}.${field}`))
+                .filter((message) => message);
+        },
+
+        /**
+         * Kind k, the nudge (k = 'silence') or greeting g (k = 'g' + g):
+         * whatever has answers.
+         */
+        owner(k) {
+            if (k === 'silence') {
+                return this.form.silence;
+            }
+
+            if (typeof k === 'string' && k.startsWith('g')) {
+                return this.form.greetings.list[Number(k.slice(1))];
+            }
+
+            return this.form.replies[k];
+        },
+
+        answers(k, tone) {
+            return this.owner(k).answers[this.language][tone];
         },
 
         answerId(k, tone, a) {
@@ -473,8 +651,7 @@ export function autoRepliesPage(config) {
                 return;
             }
 
-            const owner = target.kind === 'silence' ? this.form.silence : this.form.replies[target.kind];
-            const item = owner?.answers[target.language][target.tone][target.answer];
+            const item = this.owner(target.kind)?.answers[target.language][target.tone][target.answer];
 
             if (!item) {
                 return;
@@ -504,7 +681,7 @@ export function autoRepliesPage(config) {
 
         /** GIFs of kind k (or 'silence'), or its voices in the language being edited. */
         mediaList(k, type) {
-            const owner = k === 'silence' ? this.form.silence : this.form.replies[k];
+            const owner = this.owner(k);
 
             return type === 'gif' ? owner.media.gifs : owner.media.voices[this.language];
         },
@@ -533,40 +710,11 @@ export function autoRepliesPage(config) {
 
             const key = this.uploadKey(k, type);
             const list = this.mediaList(k, type);
-            const body = new FormData();
-
-            body.append('type', type);
-            body.append('file', file);
 
             this.uploading = { ...this.uploading, [key]: true };
 
             try {
-                const response = await fetch(this.endpoints.upload, {
-                    method: 'POST',
-                    headers: {
-                        Accept: 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'X-CSRF-TOKEN': this.csrf,
-                    },
-                    credentials: 'same-origin',
-                    body,
-                });
-
-                let json = {};
-
-                try {
-                    json = await response.json();
-                } catch (_) {
-                    json = {};
-                }
-
-                if (!response.ok) {
-                    const errors = Object.values(json.errors || {}).flat();
-
-                    throw new Error(errors[0] || json.message || `HTTP ${response.status}`);
-                }
-
-                list.push({ file: json.data.file, name: json.data.name });
+                list.push(await uploadAnswerMedia(this.endpoints.upload, this.csrf, type, file));
             } catch (error) {
                 this.notify(error?.message || t.media.failed, false);
             } finally {
@@ -576,6 +724,11 @@ export function autoRepliesPage(config) {
 
         removeMedia(k, type, m) {
             this.mediaList(k, type).splice(m, 1);
+        },
+
+        /** Where the Telegram GIF search (media-picker.js) puts a GIF. */
+        telegramGifPicked(k, gif) {
+            this.mediaList(k, 'gif').push(gif);
         },
 
         /*
@@ -629,47 +782,57 @@ export function autoRepliesPage(config) {
          * What the listener would do with the test message, from the form
          * as it is now - saved or not.
          *
-         * @returns {{state: 'empty'|'long'|'none'|'match', kind?: string, answer?: string}}
+         * A greeting is read apart, as ProcessAutoReply does: greeted back
+         * when the rest is a kind or nothing but fillers.
+         *
+         * @returns {{state: 'empty'|'long'|'none'|'greeting'|'match', kind?: string, answers?: string[], greeting?: string, greetingAnswers?: string[]}}
          */
         tried() {
-            const message = words(this.test.text);
+            const all = words(this.test.text);
 
-            if (message.length === 0) {
+            if (all.length === 0) {
                 return { state: 'empty' };
             }
 
+            const found = this.form.greetings.enabled ? findGreeting(this.form.greetings, all) : null;
+            const message = found ? found.rest : all;
             const max = toNumber(this.form.max_words) ?? 5;
 
-            const index = this.form.replies.findIndex((kind) => message.length <= (toNumber(kind.max_words) ?? max)
+            const index = message.length === 0 ? -1 : this.form.replies.findIndex((kind) => message.length <= (toNumber(kind.max_words) ?? max)
                 && splitKeywords(kind.keywords).some((keyword) => keywordIn(message, keyword)));
 
+            let hello = null;
+
+            if (found && (index >= 0 || found.alone)) {
+                const greeting = this.form.greetings.list[found.index];
+                const { lang, set } = pickSet(greeting.answers, this.test.language, this.test.tone);
+
+                hello = {
+                    greeting: String(greeting.name || '').trim() || this.greetingTitle(found.index),
+                    greetingAnswers: set.map((answer) => this.preview(answer.text, lang)),
+                };
+            }
+
             if (index < 0) {
+                if (hello) {
+                    return { state: 'greeting', answers: [], ...hello };
+                }
+
                 return { state: message.length > max ? 'long' : 'none' };
             }
 
             const kind = this.form.replies[index];
-            const otherLanguage = LANGUAGES.find((lang) => lang !== this.test.language);
-            const otherTone = TONES.find((tone) => tone !== this.test.tone);
 
             /* The same fallback as AutoReplyRules::answers(): the first set that has texts. */
-            let answers = [];
-
-            for (const lang of [this.test.language, otherLanguage]) {
-                for (const tone of [this.test.tone, otherTone]) {
-                    const set = filled(kind.answers[lang][tone]);
-
-                    if (answers.length === 0 && set.length > 0) {
-                        answers = set.map((answer) => this.preview(answer.text, lang));
-                    }
-                }
-            }
+            const { lang, set } = pickSet(kind.answers, this.test.language, this.test.tone);
 
             return {
                 state: 'match',
                 kind: String(kind.name || '').trim() || this.kindTitle(index),
-                answers,
+                answers: set.map((answer) => this.preview(answer.text, lang)),
                 gifs: kind.media.gifs.length,
                 voices: (kind.media.voices[this.test.language] || []).length,
+                ...(hello || {}),
             };
         },
 
@@ -681,6 +844,17 @@ export function autoRepliesPage(config) {
                 none: t.test.none,
                 match: t.test.match.replace(':kind', result.kind ?? ''),
             }[result.state] ?? '';
+        },
+
+        triedGreeting() {
+            const result = this.tried();
+
+            if (!result.greeting) {
+                return '';
+            }
+
+            return (result.state === 'greeting' ? t.test.greeting_only : t.test.greeting)
+                .replace(':greeting', result.greeting);
         },
     };
 }

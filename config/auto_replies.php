@@ -28,6 +28,9 @@
 |                             "ok": it is not answered
 |   replies                 - the kinds, tried top to bottom, the first
 |                             whose keyword is in the message wins:
+|       id                  - what personal answers ("Личные ответы",
+|                             PersonalAnswers) point at; kept when the
+|                             kind is renamed or moved (greetings too)
 |       name                - shown in the panel and the journal
 |       keywords            - what they write; case, Uzbek apostrophes
 |                             (bo'ldi = boldi), ё/е, ў/у, қ/к, ғ/г, ҳ/х
@@ -44,8 +47,11 @@
 |                             to call them, left out with its comma when
 |                             empty; {name}; {request} - the penalty's
 |                             request, "—" without one.
-|       media               - gifs: [{file, name}] for every language;
-|                             voices: {uz: [...], ru: [...]}, only in the
+|       media               - gifs: [{file, name}] for every language; one
+|                             found in Telegram has telegram: {id,
+|                             access_hash, file_reference} too and goes
+|                             as that document, a real GIF (the file is
+|                             its preview); voices: {uz: [...], ru: [...]}, only in the
 |                             person's own language. Files are uploaded in
 |                             the panel. The answer is one random pick out
 |                             of the texts, the GIFs and the voices.
@@ -53,6 +59,13 @@
 |       penalties: enabled, after_penalties (this many in a row without a
 |       word back from them), answers and media (as above). In the
 |       penalties' working hours; the count starts over after it.
+|   greetings               - "Доброе утро. Готово": greeted back first, in
+|       a reply of its own, then the kind's answer `greeting_pause` later.
+|       enabled; list - tried top to bottom, the first found picks the
+|       answer: name, keywords, answers (as above, texts only); fillers -
+|       words that do not count after a greeting ("aka", "всем", "🙂"): a
+|       greeting with only these is greeted back alone. A greeting before
+|       a question is not answered, as any question. Once a day per person.
 |
 */
 
@@ -64,6 +77,25 @@ return [
      * The GIFs and voice messages uploaded in the panel (AutoReplyMedia).
      */
     'media_path' => env('AUTO_REPLIES_MEDIA_PATH', storage_path('app/telegram/auto-replies-media')),
+
+    /*
+     * An answer in a second gives the bot away: it waits a random few
+     * seconds, "typing…" (or "recording a voice message…") meanwhile.
+     * Seconds; both 0 answers at once.
+     */
+    'reply_delay' => [
+        'min' => 5,
+        'max' => 6,
+    ],
+
+    /*
+     * Between the greeting and the kind's answer after it (greetings
+     * below): a second message is typed faster than the first.
+     */
+    'greeting_pause' => [
+        'min' => 2,
+        'max' => 3,
+    ],
 
     'defaults' => [
 
@@ -186,6 +218,69 @@ return [
                 ],
             ],
             'media' => ['gifs' => [], 'voices' => ['uz' => [], 'ru' => []]],
+        ],
+
+        /*
+         * "Доброе утро. Готово" -> "Доброе утро, Анна!", then the thanks.
+         * Names are only for the panel.
+         */
+        'greetings' => [
+            'enabled' => true,
+
+            'fillers' => [
+                'aka', 'akajon', 'opa', 'opajon', 'apa', 'uka', 'ukam', 'brat', 'hammaga',
+                'ака', 'акажон', 'опа', 'опажон', 'апа', 'ука', 'укам', 'брат', 'хаммага',
+                'всем', 'коллеги', 'вам', 'тебе',
+                '🙂', '😊', '☺', '🤝', '👋', '🌞', '☀',
+            ],
+
+            'list' => [
+                [
+                    'name' => 'Утро',
+                    'keywords' => ['доброе утро', 'доброго утра', 'утро доброе', 'xayrli tong', 'hayrli tong', 'хайрли тонг', 'good morning'],
+                    'answers' => [
+                        'uz' => ['plain' => ['Xayrli tong, {address}!'], 'respectful' => ['Xayrli tong, {address}!']],
+                        'ru' => ['plain' => ['Доброе утро, {address}!'], 'respectful' => ['Доброе утро, {address}!']],
+                    ],
+                ],
+                [
+                    'name' => 'День',
+                    'keywords' => ['добрый день', 'xayrli kun', 'hayrli kun', 'хайрли кун'],
+                    'answers' => [
+                        'uz' => ['plain' => ['Xayrli kun, {address}!'], 'respectful' => ['Xayrli kun, {address}!']],
+                        'ru' => ['plain' => ['Добрый день, {address}!'], 'respectful' => ['Добрый день, {address}!']],
+                    ],
+                ],
+                [
+                    'name' => 'Вечер',
+                    'keywords' => ['добрый вечер', 'xayrli kech', 'hayrli kech', 'хайрли кеч'],
+                    'answers' => [
+                        'uz' => ['plain' => ['Xayrli kech, {address}!'], 'respectful' => ['Xayrli kech, {address}!']],
+                        'ru' => ['plain' => ['Добрый вечер, {address}!'], 'respectful' => ['Добрый вечер, {address}!']],
+                    ],
+                ],
+                [
+                    'name' => 'Ассалому алайкум',
+                    'keywords' => [
+                        'assalomu alaykum', 'assalomu aleykum', 'assalamu alaykum', 'assalamu aleykum',
+                        'ассалому алайкум', 'ассалому алейкум', 'ассаламу алайкум', 'ассаламу алейкум',
+                        'salom alaykum', 'salam aleykum', 'салом алайкум', 'салам алейкум',
+                        'assalom', 'ассалом', 'ассалам',
+                    ],
+                    'answers' => [
+                        'uz' => ['plain' => ['Va alaykum assalom, {address}!'], 'respectful' => ['Va alaykum assalom, {address}!']],
+                        'ru' => ['plain' => ['Ва алейкум ассалам, {address}!'], 'respectful' => ['Ва алейкум ассалам, {address}!']],
+                    ],
+                ],
+                [
+                    'name' => 'Салом',
+                    'keywords' => ['здравствуйте', 'здраствуйте', 'здравствуй', 'приветствую', 'привет', 'salom', 'salam', 'салом', 'салам', 'hello'],
+                    'answers' => [
+                        'uz' => ['plain' => ['Salom, {address}!'], 'respectful' => ['Assalomu alaykum, {address}!']],
+                        'ru' => ['plain' => ['Привет, {address}!'], 'respectful' => ['Здравствуйте, {address}!']],
+                    ],
+                ],
+            ],
         ],
     ],
 

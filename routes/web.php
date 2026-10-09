@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\Telegram\DriverCheckExportController;
 use App\Http\Controllers\Api\Telegram\DriverCheckQueueController;
 use App\Http\Controllers\Api\Telegram\DriverCheckWatchdogController;
 use App\Http\Controllers\Api\Telegram\OperationUserController;
+use App\Http\Controllers\Api\Telegram\PersonalAnswerController;
 use App\Http\Controllers\Api\Telegram\OperatorController;
 use App\Http\Controllers\Api\Telegram\ResolvedPhoneController;
 use App\Http\Controllers\Api\Telegram\TelegramDriverController;
@@ -221,6 +222,15 @@ Route::middleware(['auth', 'role:driverCheck,superadmin'])
         )->name('driver-check.auto-replies');
 
         /*
+         * Personal answers: a person's own voice messages, GIFs and texts
+         * for a penalty level, an auto reply kind, a greeting.
+         */
+        Route::get(
+            '/personal-answers',
+            [DriverCheckController::class, 'personalAnswers']
+        )->name('driver-check.personal-answers');
+
+        /*
          * Watched chats
          *
          * The groups the listener follows. Editable here so a new group can
@@ -414,6 +424,47 @@ Route::middleware(['auth', 'role:driverCheck,superadmin'])
             '/auto-replies/media/{file}',
             [AutoReplyController::class, 'media']
         )->where('file', '[a-f0-9]{24}\.[a-z0-9]+')->name('api.telegram.auto-replies.media');
+
+        /*
+         * GIFs out of Telegram: the listener searches, the panel waits
+         */
+        Route::post(
+            '/auto-replies/telegram-gifs',
+            [AutoReplyController::class, 'searchTelegramGifs']
+        )->name('api.telegram.auto-replies.telegram-gifs.search');
+
+        Route::get(
+            '/auto-replies/telegram-gifs/preview/{file}',
+            [AutoReplyController::class, 'telegramGifPreview']
+        )->where('file', '-?[0-9]{1,20}\.(mp4|gif)')->name('api.telegram.auto-replies.telegram-gifs.preview');
+
+        Route::get(
+            '/auto-replies/telegram-gifs/{id}',
+            [AutoReplyController::class, 'telegramGifs']
+        )->where('id', '[a-f0-9]{24}')->name('api.telegram.auto-replies.telegram-gifs');
+
+        Route::post(
+            '/auto-replies/telegram-gifs/{id}/pick',
+            [AutoReplyController::class, 'pickTelegramGif']
+        )->where('id', '[a-f0-9]{24}')->name('api.telegram.auto-replies.telegram-gifs.pick');
+
+        /*
+         * Personal answers, one person at a time
+         */
+        Route::get(
+            '/personal-answers',
+            [PersonalAnswerController::class, 'index']
+        )->name('api.telegram.personal-answers');
+
+        Route::get(
+            '/personal-answers/{operationUser}',
+            [PersonalAnswerController::class, 'show']
+        )->name('api.telegram.personal-answers.show');
+
+        Route::put(
+            '/personal-answers/{operationUser}',
+            [PersonalAnswerController::class, 'update']
+        )->name('api.telegram.personal-answers.update');
 
         /*
          * Watched chats (management CRUD)

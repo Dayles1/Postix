@@ -2,17 +2,18 @@
 
 namespace Tests\Feature\Telegram;
 
-use App\Application\Telegram\Actions\ProcessClientCheckMessage;
 use App\Application\Telegram\Actions\NudgeSilentClientChecks;
 use App\Application\Telegram\Actions\ProcessAutoReply;
-use App\Application\Telegram\Services\ClientCheckEscalation;
+use App\Application\Telegram\Actions\ProcessClientCheckMessage;
 use App\Application\Telegram\Services\AutoReplyMatcher;
 use App\Application\Telegram\Services\AutoReplyRules;
 use App\Application\Telegram\Services\AutoReplyStore;
+use App\Application\Telegram\Services\ClientCheckEscalation;
 use App\Application\Telegram\Services\ClientCheckRules;
 use App\Application\Telegram\Services\ClientCheckRulesStore;
 use App\Application\Telegram\Services\ClientCheckSender;
 use App\Application\Telegram\Services\CrmApiClient;
+use App\Application\Telegram\Services\PersonalAnswers;
 use App\Application\Telegram\Services\TelegramMessageTypeDetector;
 use App\Application\Telegram\Services\TelegramPenaltyMessageParser;
 use App\Enums\Drivers\TelegramDriverMessageType;
@@ -29,6 +30,7 @@ use Illuminate\Support\Facades\Schema;
 use ReflectionClass;
 use RuntimeException;
 use Tests\TestCase;
+use Tests\Unit\Telegram\Mp4InfoTest;
 
 /**
  * Records the forwards and messages a client check produces.
@@ -43,6 +45,24 @@ final class FakeClientCheckMessages
 
     public bool $commentFails = false;
 
+    /** @var list<array<string, mixed>> the account's saved GIFs */
+    public array $savedGifs = [];
+
+    /** Telegram refuses the GIF of its own. */
+    public bool $documentFails = false;
+
+    public function getSavedGifs(array $params): array
+    {
+        return ['_' => 'messages.savedGifs', 'gifs' => $this->savedGifs];
+    }
+
+    public function saveGif(array $params): bool
+    {
+        $this->calls[] = ['save_gif', $params];
+
+        return true;
+    }
+
     public function forwardMessages(array $params): array
     {
         if (in_array($params['to_peer'], $this->forwardFailsFor, true)) {
@@ -56,9 +76,20 @@ final class FakeClientCheckMessages
 
     public function sendMedia(array $params): array
     {
+        if ($this->documentFails && $params['media']['_'] === 'inputMediaDocument') {
+            throw new RuntimeException('MEDIA_EMPTY');
+        }
+
         $this->calls[] = ['media', $params];
 
         return ['id' => count($this->calls)];
+    }
+
+    public function setTyping(array $params): bool
+    {
+        $this->calls[] = ['typing', $params];
+
+        return true;
     }
 
     public function sendMessage(array $params): array
@@ -194,6 +225,13 @@ class ClientCheckTest extends TestCase
          * The auto replies file: a fresh one per test, and one kind apart
          * from the config's own.
          */
+        /*
+         * The few seconds a person would take: none here, but the one
+         * test that looks at the wait.
+         */
+        config()->set('auto_replies.reply_delay', ['min' => 0, 'max' => 0]);
+        config()->set('auto_replies.greeting_pause', ['min' => 0, 'max' => 0]);
+
         config()->set('auto_replies.path', storage_path('framework/testing/auto-replies-' . bin2hex(random_bytes(4)) . '.json'));
         config()->set('auto_replies.defaults', [
             'enabled' => true,
@@ -211,6 +249,18 @@ class ClientCheckTest extends TestCase
                 'enabled' => true,
                 'after_penalties' => 3,
                 'answers' => ['uz' => ['plain' => ['Javob kutyapman, {address}'], 'respectful' => ['Iltimos, {address}']]],
+            ],
+            'greetings' => [
+                'enabled' => true,
+                'fillers' => ['aka', '🙂'],
+                'list' => [
+                    ['keywords' => ['доброе утро', 'xayrli tong'], 'answers' => [
+                        'uz' => ['plain' => ['Xayrli tong, {address}!']],
+                        'ru' => ['plain' => ['Доброе утро, {address}!']],
+                    ]],
+                    ['keywords' => ['assalomu alaykum'], 'answers' => ['uz' => ['plain' => ['Va alaykum assalom, {address}!']]]],
+                    ['keywords' => ['salom'], 'answers' => ['uz' => ['plain' => ['Salom, {address}!']]]],
+                ],
             ],
         ]);
 
@@ -254,6 +304,7 @@ class ClientCheckTest extends TestCase
             $table->string('language', 5)->nullable();
             $table->boolean('respectful')->default(false);
             $table->json('address')->nullable();
+            $table->json('personal_answers')->nullable();
             $table->string('telegram_username')->nullable();
             $table->unsignedBigInteger('telegram_id')->nullable();
             $table->boolean('is_active')->default(true);
@@ -471,7 +522,7 @@ class ClientCheckTest extends TestCase
         $this->assertSame(['forward', 'send'], $this->messages->kinds());
         /* An operator: Uzbek, and the bot's "2 ч" in Uzbek too. */
         $this->assertSame(
-            "U1 PULATOV AFZAL AHMADJON O&#039;G&#039;LI #TLS04834 2 soat",
+            'U1 PULATOV AFZAL AHMADJON O&#039;G&#039;LI #TLS04834 2 soat',
             $this->messages->sent()[0]['message'],
         );
         $this->assertSame('@afzal', $this->messages->sent()[0]['peer']);
@@ -593,7 +644,7 @@ class ClientCheckTest extends TestCase
         $this->flushAfterQuiet();
 
         $this->assertSame(
-            ["U1R PULATOV AFZAL AHMADJON O&#039;G&#039;LI", 'U2 №2'],
+            ['U1R PULATOV AFZAL AHMADJON O&#039;G&#039;LI', 'U2 №2'],
             array_column($this->messages->sent(), 'message'),
         );
     }
@@ -995,9 +1046,17 @@ class ClientCheckTest extends TestCase
         $this->penalty(text: self::SALES);
         $this->flushAfterQuiet();
 
-        $this->assertSame('Обновите, пожалуйста, статус', $this->messages->sent()[0]['message']);
-
         $rules = app(ClientCheckRulesStore::class)->current();
+
+        /* One of several; {address} is left out, she has none. */
+        $this->assertContains(
+            $this->messages->sent()[0]['message'],
+            array_map(
+                static fn (string $phrase): string => (string) preg_replace('/,?\h*\{address\}/u', '', $phrase),
+                $rules->levels('sales')[0]['phrases']['ru']['respectful'],
+            ),
+        );
+        $this->assertContains('Обновите, пожалуйста, статус', $rules->levels('sales')[0]['phrases']['ru']['respectful']);
         $this->assertSame(
             $rules->levels('sales')[0]['phrases']['ru']['respectful'],
             $rules->levels('sales')[0]['phrases']['ru']['plain'],
@@ -1163,6 +1222,70 @@ class ClientCheckTest extends TestCase
         $this->assertNull($this->reply('+', from: 999));
 
         $this->assertSame(['send'], $this->messages->kinds());
+    }
+
+    /**
+     * An answer in a second gives the bot away: "typing…", a pause, then
+     * the answer.
+     */
+    public function test_the_answer_waits_a_moment_typing(): void
+    {
+        config()->set('auto_replies.reply_delay', ['min' => 0.2, 'max' => 0.3]);
+
+        $this->person();
+
+        $started = microtime(true);
+
+        $this->assertSame('Rahmat', $this->reply('+'));
+
+        $this->assertGreaterThanOrEqual(0.2, microtime(true) - $started);
+        $this->assertSame(['typing', 'send'], $this->messages->kinds());
+        $this->assertSame('sendMessageTypingAction', $this->messages->calls[0][1]['action']['_']);
+    }
+
+    /**
+     * "Доброе утро. Готово": greeted back first, in a reply to theirs, then
+     * thanked in a message of its own.
+     */
+    public function test_a_greeting_is_answered_on_its_own(): void
+    {
+        $this->person(attributes: ['language' => 'ru', 'address' => ['ru' => 'Анна']]);
+        $check = $this->penaltySent();
+
+        $this->assertSame("Доброе утро, Анна!\nСпасибо, Анна", $this->reply('Доброе утро. +'));
+
+        $sent = $this->messages->sent();
+        $this->assertSame(['Доброе утро, Анна!', 'Спасибо, Анна'], array_column($sent, 'message'));
+        $this->assertSame($this->messageId, $sent[0]['reply_to']['reply_to_msg_id']);
+        $this->assertArrayNotHasKey('reply_to', $sent[1]);
+
+        $check->refresh();
+        $this->assertSame('Agreed', $check->reply_kind);
+        $this->assertSame("Доброе утро, Анна!\nСпасибо, Анна", $check->reply_answer);
+    }
+
+    public function test_a_greeting_alone_is_greeted_back_once_a_day(): void
+    {
+        $this->person(attributes: ['address' => ['uz' => 'Afzal aka']]);
+
+        $this->assertSame('Va alaykum assalom, Afzal aka!', $this->reply('Assalomu alaykum aka 🙂'));
+
+        /* Greeted already today: another greeting alone gets nothing, an "ok" only its thanks. */
+        Carbon::setTestNow(now()->addMinutes(11));
+        $this->assertNull($this->reply('Salom'));
+        $this->assertSame('Rahmat, Afzal aka', $this->reply('Salom, ok'));
+
+        /* The next day, greeted again. */
+        Carbon::setTestNow(now()->addDay());
+        $this->assertSame('Xayrli tong, Afzal aka!', $this->reply('Xayrli tong'));
+    }
+
+    public function test_a_greeting_before_a_question_is_not_answered(): void
+    {
+        $this->person();
+
+        $this->assertNull($this->reply('Salom, mashina hali topilmadi'));
+        $this->assertSame([], $this->messages->kinds());
     }
 
     public function test_the_cooldown_keeps_ok_ok_ok_to_one_thanks(): void
@@ -1500,7 +1623,7 @@ class ClientCheckTest extends TestCase
     /**
      * A file in the media folder, as AutoReplyMedia::store() names it.
      */
-    private function mediaFile(string $extension): string
+    private function mediaFile(string $extension, string $contents = 'x'): string
     {
         $directory = storage_path('framework/testing/auto-replies-media');
         config()->set('auto_replies.media_path', $directory);
@@ -1510,7 +1633,7 @@ class ClientCheckTest extends TestCase
         }
 
         $file = bin2hex(random_bytes(12)) . '.' . $extension;
-        file_put_contents($directory . DIRECTORY_SEPARATOR . $file, 'x');
+        file_put_contents($directory . DIRECTORY_SEPARATOR . $file, $contents);
 
         return $file;
     }
@@ -1518,7 +1641,7 @@ class ClientCheckTest extends TestCase
     public function test_a_gif_may_be_the_answer_but_not_a_voice_in_another_language(): void
     {
         $this->person();
-        $gif = $this->mediaFile('mp4');
+        $gif = $this->mediaFile('mp4', Mp4InfoTest::mp4(480, 270, 1000, 2400));
         $voiceRu = $this->mediaFile('ogg');
 
         $this->saveAutoReplies(['replies' => [[
@@ -1537,6 +1660,12 @@ class ClientCheckTest extends TestCase
         $this->assertSame('inputMediaUploadedDocument', $params['media']['_']);
         $this->assertSame('video/mp4', $params['media']['mime_type']);
         $this->assertSame('documentAttributeAnimated', $params['media']['attributes'][1]['_']);
+
+        /* With zero for these Telegram shows a plain video, not a GIF. */
+        $video = $params['media']['attributes'][0];
+        $this->assertSame('documentAttributeVideo', $video['_']);
+        $this->assertSame([480, 270, 3], [$video['w'], $video['h'], $video['duration']]);
+        $this->assertSame('animation.mp4', $params['media']['attributes'][2]['file_name']);
     }
 
     public function test_a_voice_goes_as_a_voice_message(): void
@@ -1556,6 +1685,226 @@ class ClientCheckTest extends TestCase
         $media = $this->messages->calls[0][1]['media'];
         $this->assertSame('audio/ogg', $media['mime_type']);
         $this->assertTrue($media['attributes'][0]['voice']);
+    }
+
+    /**
+     * A GIF picked in Telegram: the preview on disk, the document it goes as.
+     *
+     * @return array{file: string, name: string, telegram: array{id: string, access_hash: string, file_reference: string}}
+     */
+    private function telegramGif(): array
+    {
+        return [
+            'file' => $this->mediaFile('mp4', Mp4InfoTest::mp4(320, 240, 1000, 2000)),
+            'name' => 'ok',
+            /* Past 2^53: JavaScript would round it, the rules keep strings. */
+            'telegram' => ['id' => '9007199254740993', 'access_hash' => '-42', 'file_reference' => base64_encode('old')],
+        ];
+    }
+
+    public function test_a_gif_from_telegram_goes_as_that_document(): void
+    {
+        $this->person();
+        $gif = $this->telegramGif();
+
+        $this->saveAutoReplies(['replies' => [[
+            'name' => 'Thanks',
+            'keywords' => ['ok'],
+            'answers' => [],
+            'media' => ['gifs' => [$gif], 'voices' => []],
+        ]]]);
+
+        $this->messages->savedGifs = [
+            ['_' => 'document', 'id' => 9007199254740993, 'access_hash' => -42, 'file_reference' => 'fresh'],
+        ];
+
+        $this->assertSame('GIF · ok', $this->reply('ok'));
+
+        [$kind, $params] = $this->messages->calls[0];
+        $this->assertSame('media', $kind);
+        $this->assertSame(
+            ['_' => 'inputMediaDocument', 'id' => [
+                '_' => 'inputDocument', 'id' => 9007199254740993, 'access_hash' => -42, 'file_reference' => 'fresh',
+            ]],
+            $params['media'],
+        );
+    }
+
+    public function test_a_telegram_gif_no_longer_saved_is_saved_again(): void
+    {
+        $this->person();
+        $gif = $this->telegramGif();
+
+        $this->saveAutoReplies(['replies' => [[
+            'name' => 'Thanks',
+            'keywords' => ['ok'],
+            'answers' => [],
+            'media' => ['gifs' => [$gif], 'voices' => []],
+        ]]]);
+
+        $this->assertSame('GIF · ok', $this->reply('ok'));
+
+        $this->assertSame(['save_gif', 'media'], $this->messages->kinds());
+        $this->assertSame('old', $this->messages->calls[1][1]['media']['id']['file_reference']);
+        $this->assertSame(9007199254740993, $this->messages->calls[1][1]['media']['id']['id']);
+    }
+
+    public function test_a_telegram_gif_refused_goes_as_its_file(): void
+    {
+        $this->person();
+        $gif = $this->telegramGif();
+
+        $this->saveAutoReplies(['replies' => [[
+            'name' => 'Thanks',
+            'keywords' => ['ok'],
+            'answers' => [],
+            'media' => ['gifs' => [$gif], 'voices' => []],
+        ]]]);
+
+        $this->messages->documentFails = true;
+
+        $this->assertSame('GIF · ok', $this->reply('ok'));
+        $this->assertSame('inputMediaUploadedDocument', $this->messages->calls[1][1]['media']['_']);
+    }
+
+    /*
+     * ------------------------------------------------------------------
+     * Personal answers
+     * ------------------------------------------------------------------
+     */
+
+    public function test_a_personal_voice_goes_with_the_penalty_instead_of_the_phrase(): void
+    {
+        $voice = $this->mediaFile('ogg');
+
+        $this->saveRules([
+            ['phrases' => ['uz' => ['plain' => ['ONE {request}']]]],
+            ['from' => 2, 'phrases' => ['uz' => ['plain' => ['TWO {request}']]]],
+        ]);
+
+        $this->person(attributes: ['personal_answers' => [
+            PersonalAnswers::penaltySlot(1) => ['only' => true, 'items' => [['type' => 'voice', 'file' => $voice, 'name' => 'afzal-2.ogg']]],
+        ]]);
+
+        /* The first penalty: nothing of his own there, the shared phrase. */
+        $this->penalty(repeat: 1);
+        $this->flushAfterQuiet();
+        $this->assertSame('ONE TLS04834', $this->messages->sent()[0]['message']);
+
+        /* The second: his voice, and only it. */
+        $this->messages->calls = [];
+        $check = $this->penalty(repeat: 2, request: 'TLS04835');
+        $this->flushAfterQuiet();
+
+        $this->assertSame(['forward', 'media'], $this->messages->kinds());
+        $this->assertSame('audio/ogg', $this->messages->calls[1][1]['media']['mime_type']);
+
+        $check->refresh();
+        $this->assertSame(TelegramClientCheckStatus::Sent, $check->status);
+        $this->assertSame('🎤 afzal-2.ogg', $check->comment);
+        $this->assertSame(1, $check->comment_level);
+        $this->assertTrue($check->metrics['personal']);
+    }
+
+    public function test_a_personal_text_answers_a_kind_in_the_persons_words(): void
+    {
+        $this->person(attributes: [
+            'address' => ['uz' => 'Afzal aka'],
+            'personal_answers' => [
+                PersonalAnswers::replySlot(app(AutoReplyStore::class)->current()->replies[0]['id']) => [
+                    'only' => true,
+                    'items' => [['type' => 'text', 'text' => 'Zo\'r, {address}!']],
+                ],
+            ],
+        ]);
+
+        $this->assertSame('Zo\'r, Afzal aka!', $this->reply('ok'));
+    }
+
+    public function test_a_personal_good_morning_may_be_a_voice(): void
+    {
+        $voice = $this->mediaFile('ogg');
+        $greetings = app(AutoReplyStore::class)->current()->greetings['list'];
+        $morning = collect($greetings)->first(fn (array $g): bool => in_array('xayrli tong', array_map('mb_strtolower', $g['keywords']), true));
+
+        $this->person(attributes: ['personal_answers' => [
+            PersonalAnswers::greetingSlot($morning['id']) => ['only' => true, 'items' => [['type' => 'voice', 'file' => $voice, 'name' => 'tong.ogg']]],
+        ]]);
+
+        $this->assertSame('🎤 tong.ogg', $this->reply('Xayrli tong'));
+        $this->assertContains('media', $this->messages->kinds());
+    }
+
+    public function test_personal_answers_join_the_shared_ones_unless_only_theirs(): void
+    {
+        $person = $this->person(attributes: ['personal_answers' => [
+            'silence' => ['only' => false, 'items' => [['type' => 'text', 'text' => 'MINE']]],
+        ]]);
+
+        $shared = ['language' => 'uz', 'items' => [['type' => 'text', 'text' => 'SHARED']]];
+        $personal = app(PersonalAnswers::class);
+
+        $this->assertSame(['SHARED', 'MINE'], array_column($personal->merge($shared, $person, 'silence')['items'], 'text'));
+
+        $person->update(['personal_answers' => ['silence' => ['only' => true, 'items' => [['type' => 'text', 'text' => 'MINE']]]]]);
+
+        $this->assertSame(['MINE'], array_column($personal->merge($shared, $person->refresh(), 'silence')['items'], 'text'));
+        $this->assertSame('uz', $personal->merge($shared, $person, 'silence')['items'][0]['language']);
+
+        /* Nothing of theirs for this one: as it was. */
+        $this->assertSame($shared, $personal->merge($shared, $person, PersonalAnswers::penaltySlot(0)));
+    }
+
+    public function test_personal_answers_from_a_hand_edit_are_not_trusted(): void
+    {
+        $voice = $this->mediaFile('ogg');
+
+        $clean = PersonalAnswers::sanitize([
+            'penalty:0' => ['items' => [
+                ['type' => 'voice', 'file' => '../../.env'],
+                ['type' => 'voice', 'file' => $voice],
+                ['type' => 'text', 'text' => '   '],
+            ]],
+            'somewhere' => ['items' => [['type' => 'text', 'text' => 'x']]],
+            'silence' => ['items' => []],
+        ]);
+
+        $this->assertSame(['penalty:0'], array_keys($clean));
+        $this->assertSame([['type' => 'voice', 'file' => $voice, 'name' => $voice]], $clean['penalty:0']['items']);
+    }
+
+    public function test_personal_media_is_kept_by_the_prune(): void
+    {
+        $voice = $this->mediaFile('ogg');
+
+        $this->person(attributes: ['personal_answers' => [
+            'silence' => ['items' => [['type' => 'voice', 'file' => $voice, 'name' => 'v.ogg']]],
+        ]]);
+
+        $this->assertSame([$voice], app(PersonalAnswers::class)->mediaFiles());
+    }
+
+    public function test_new_penalty_phrases_are_added_to_the_saved_rules(): void
+    {
+        config()->set('client_checks', require config_path('client_checks.php'));
+
+        $this->saveRules([], ['roles' => [
+            'operation' => ['levels' => [
+                ['phrases' => ['uz' => ['plain' => ['MY OWN']]]],
+                ['from' => 4, 'phrases' => ['uz' => ['plain' => ['Nima qilay, boshqaga olaymi?']]]],
+            ]],
+        ]]);
+
+        (require database_path('migrations/2026_10_09_120000_add_penalty_phrase_variants.php'))->up();
+
+        $levels = app(ClientCheckRulesStore::class)->current()->levels('operation');
+
+        /* Theirs first, then the new ones; the old default not twice, not brought back where it was removed. */
+        $this->assertSame('MY OWN', $levels[0]['phrases']['uz']['plain'][0]);
+        $this->assertNotContains('Narx berib yubor, {status_limit} vaqt o\'tdi', $levels[0]['phrases']['uz']['plain']);
+        $this->assertContains('Narx tashla, {status_limit} bo\'ldi', $levels[0]['phrases']['uz']['plain']);
+        $this->assertSame(1, count(array_keys($levels[1]['phrases']['uz']['plain'], 'Nima qilay, boshqaga olaymi?', true)));
+        $this->assertContains('Boshqaga beraymi?', $levels[1]['phrases']['uz']['plain']);
     }
 
     public function test_media_names_from_a_hand_edit_are_not_trusted(): void

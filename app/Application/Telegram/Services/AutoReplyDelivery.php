@@ -10,8 +10,9 @@ use danog\MadelineProto\SimpleEventHandler;
 
 /**
  * Sends one of AutoReplyRules::choices() at random - a text, a GIF or a
- * voice message - for an answer (ProcessAutoReply) or a nudge
- * (NudgeSilentClientChecks).
+ * voice message - for an answer (ProcessAutoReply), a nudge
+ * (NudgeSilentClientChecks) or a personal penalty comment
+ * (ClientCheckSender).
  */
 final class AutoReplyDelivery
 {
@@ -26,7 +27,7 @@ final class AutoReplyDelivery
      * placeholders filled in, "GIF · name" or "🎤 name". Throws when
      * Telegram refuses.
      *
-     * @param array{language: string, items: list<array<string, string>>} $choices non-empty items
+     * @param array{language: string, items: list<array<string, mixed>>} $choices non-empty items
      */
     public function send(
         SimpleEventHandler $telegram,
@@ -44,7 +45,11 @@ final class AutoReplyDelivery
             return ($item['type'] === AutoReplyRules::MEDIA_VOICE ? '🎤 ' : 'GIF · ') . $item['name'];
         }
 
-        $text = $this->escalation->render($item['text'], $check, $person, $choices['language']);
+        /*
+         * A personal text (PersonalAnswers) is in the person's language,
+         * whatever set the shared ones fell back to.
+         */
+        $text = $this->escalation->render($item['text'], $check, $person, $item['language'] ?? $choices['language']);
 
         $telegram->messages->sendMessage([
             'peer' => $peer,

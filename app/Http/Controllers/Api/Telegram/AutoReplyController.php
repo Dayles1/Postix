@@ -7,6 +7,8 @@ namespace App\Http\Controllers\Api\Telegram;
 use App\Application\Telegram\Services\AutoReplyMedia;
 use App\Application\Telegram\Services\AutoReplyRules;
 use App\Application\Telegram\Services\AutoReplyStore;
+use App\Application\Telegram\Services\AutoReplyTelegramGifs;
+use App\Application\Telegram\Services\PersonalAnswers;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\Telegram\AutoReplyRequest;
 use Illuminate\Http\JsonResponse;
@@ -27,6 +29,8 @@ final class AutoReplyController extends Controller
     public function __construct(
         private readonly AutoReplyStore $store,
         private readonly AutoReplyMedia $media,
+        private readonly AutoReplyTelegramGifs $telegramGifs,
+        private readonly PersonalAnswers $personal,
     ) {
     }
 
@@ -41,7 +45,7 @@ final class AutoReplyController extends Controller
 
         $this->store->save($rules);
 
-        $this->media->prune($rules->mediaFiles());
+        $this->media->prune([...$rules->mediaFiles(), ...$this->personal->mediaFiles()]);
 
         return $this->respond(__('telegram.auto_replies.messages.saved'));
     }
@@ -53,7 +57,7 @@ final class AutoReplyController extends Controller
     {
         $this->store->reset();
 
-        $this->media->prune($this->store->current()->mediaFiles());
+        $this->media->prune([...$this->store->current()->mediaFiles(), ...$this->personal->mediaFiles()]);
 
         return $this->respond(__('telegram.auto_replies.messages.reset'));
     }
@@ -99,6 +103,12 @@ final class AutoReplyController extends Controller
 
                     if (! in_array($extension, AutoReplyMedia::extensions($type), true)) {
                         $fail(__('telegram.auto_replies.validation.media_' . $type));
+
+                        return;
+                    }
+
+                    if ($extension === 'mp4' && ! AutoReplyMedia::silentVideo((string) $file->getRealPath())) {
+                        $fail(__('telegram.auto_replies.validation.media_gif_sound'));
                     }
                 },
             ],
@@ -124,6 +134,70 @@ final class AutoReplyController extends Controller
                 'mp4' => 'video/mp4',
                 default => 'audio/ogg',
             },
+        ]);
+    }
+
+    /**
+     * A GIF search in Telegram - the saved GIFs when nothing is typed - left
+     * for the listener; telegramGifs() tells when it is done.
+     */
+    public function searchTelegramGifs(Request $request): JsonResponse
+    {
+        $request->validate([
+            'query' => ['nullable', 'string', 'max:60'],
+            'offset' => ['nullable', 'string', 'max:64'],
+        ]);
+
+        return response()->json([
+            'data' => ['id' => $this->telegramGifs->ask(
+                (string) $request->input('query', ''),
+                (string) $request->input('offset', ''),
+            )],
+        ], 202);
+    }
+
+    public function telegramGifs(string $id): JsonResponse
+    {
+        $answer = $this->telegramGifs->answer($id);
+
+        abort_if($answer === null, 404);
+
+        return response()->json(['data' => $answer]);
+    }
+
+    /**
+     * A GIF found, as the rules keep it: put into them with the next save,
+     * like an upload.
+     */
+    public function pickTelegramGif(Request $request, string $id): JsonResponse
+    {
+        $request->validate([
+            'document' => ['required', 'string', 'regex:/^-?\d{1,20}$/'],
+        ]);
+
+        $gif = $this->telegramGifs->pick($id, (string) $request->input('document'));
+
+        abort_if($gif === null, 404, __('telegram.auto_replies.media.telegram_gone'));
+
+        return response()->json([
+            'data' => [
+                ...$this->media->copy($gif['preview'], $gif['name']),
+                'telegram' => $gif['telegram'],
+            ],
+        ], 201);
+    }
+
+    /**
+     * A GIF found, for the search's preview.
+     */
+    public function telegramGifPreview(string $file): BinaryFileResponse
+    {
+        $path = $this->telegramGifs->previewPath($file);
+
+        abort_if($path === null, 404);
+
+        return response()->file($path, [
+            'Content-Type' => pathinfo($path, PATHINFO_EXTENSION) === 'gif' ? 'image/gif' : 'video/mp4',
         ]);
     }
 

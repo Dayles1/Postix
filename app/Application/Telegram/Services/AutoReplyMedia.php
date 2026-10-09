@@ -7,7 +7,9 @@ namespace App\Application\Telegram\Services;
 use danog\MadelineProto\LocalFile;
 use danog\MadelineProto\SimpleEventHandler;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
+use Throwable;
 
 /**
  * The GIFs and voice messages of the auto replies: files uploaded from the
@@ -15,8 +17,10 @@ use RuntimeException;
  * and referred to by that name from the auto replies file.
  *
  * GIF: .mp4 is what Telegram itself sends as a GIF; a real .gif goes as an
- * animated document. Voice: .ogg (Opus), what Telegram records - any other
- * format would arrive as a voice message nobody can play.
+ * animated document. One found in Telegram (AutoReplyTelegramGifs) goes as
+ * that document, its file here is only the panel's preview. Voice: .ogg
+ * (Opus), what Telegram records - any other format would arrive as a voice
+ * message nobody can play.
  */
 final class AutoReplyMedia
 {
@@ -31,6 +35,11 @@ final class AutoReplyMedia
      * another tab may still be about to save it - then removed.
      */
     private const ORPHAN_HOURS = 24;
+
+    public function __construct(
+        private readonly AutoReplyTelegramGifs $telegramGifs,
+    ) {
+    }
 
     public function directory(): string
     {
@@ -85,6 +94,28 @@ final class AutoReplyMedia
     }
 
     /**
+     * A GIF found in Telegram, its preview copied in under a name of ours.
+     *
+     * @return array{file: string, name: string}
+     */
+    public function copy(string $path, string $name): array
+    {
+        $directory = $this->directory();
+
+        if (! is_dir($directory) && ! @mkdir($directory, 0775, true) && ! is_dir($directory)) {
+            throw new RuntimeException("Cannot create {$directory}");
+        }
+
+        $file = bin2hex(random_bytes(12)) . '.' . pathinfo($path, PATHINFO_EXTENSION);
+
+        if (! copy($path, $directory . DIRECTORY_SEPARATOR . $file)) {
+            throw new RuntimeException("Cannot copy {$path}");
+        }
+
+        return ['file' => $file, 'name' => mb_substr($name, 0, 120)];
+    }
+
+    /**
      * The file on disk, or null when the name is not one of ours or the
      * file is gone.
      */
@@ -100,10 +131,29 @@ final class AutoReplyMedia
     }
 
     /**
-     * @param array{type: string, file: string, name: string} $item
+     * @param array{type: string, file: string, name: string, telegram?: array{id: string, access_hash: string, file_reference: string}} $item
      */
     public function send(SimpleEventHandler $telegram, int|string $peer, array $item, ?int $replyTo = null): void
     {
+        /*
+         * Telegram's own GIF; should Telegram refuse it, the preview goes
+         * as an upload - an answer all the same.
+         */
+        if ($item['type'] === AutoReplyRules::MEDIA_GIF && isset($item['telegram'])) {
+            try {
+                $this->telegramGifs->send($telegram, $peer, $item['telegram'], $replyTo);
+
+                return;
+            } catch (Throwable $e) {
+                Log::warning('Auto reply Telegram GIF refused, sending the file', [
+                    'file' => $item['file'],
+                    'name' => $item['name'],
+                    'id' => $item['telegram']['id'],
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
         $path = $this->path($item['file']);
 
         if ($path === null) {
@@ -119,14 +169,7 @@ final class AutoReplyMedia
                     ['_' => 'documentAttributeAudio', 'voice' => true, 'duration' => 0],
                 ],
             ],
-            $extension === 'mp4' => [
-                'mime_type' => 'video/mp4',
-                'nosound_video' => true,
-                'attributes' => [
-                    ['_' => 'documentAttributeVideo', 'supports_streaming' => true, 'duration' => 0, 'w' => 0, 'h' => 0],
-                    ['_' => 'documentAttributeAnimated'],
-                ],
-            ],
+            $extension === 'mp4' => $this->animation($path, $item),
             default => [
                 'mime_type' => 'image/gif',
                 'attributes' => [
@@ -149,6 +192,59 @@ final class AutoReplyMedia
                 'reply_to_msg_id' => $replyTo,
             ]] : []),
         ]);
+    }
+
+    /**
+     * An .mp4 as a GIF: with zero for size and duration Telegram shows it
+     * as a plain video, so the real ones are read from the file. A sound
+     * track makes it a video all the same - the panel refuses such a file,
+     * one stored before that is logged.
+     *
+     * @param array{type: string, file: string, name: string} $item
+     * @return array<string, mixed>
+     */
+    private function animation(string $path, array $item): array
+    {
+        $info = Mp4Info::read($path);
+
+        if ($info === null || $info['has_audio']) {
+            Log::warning(
+                'Auto reply GIF may arrive as a video',
+                [
+                    'file' => $item['file'],
+                    'name' => $item['name'],
+                    'readable' => $info !== null,
+                    'has_audio' => $info['has_audio'] ?? null,
+                ],
+            );
+        }
+
+        return [
+            'mime_type' => 'video/mp4',
+            'nosound_video' => true,
+            'attributes' => [
+                [
+                    '_' => 'documentAttributeVideo',
+                    'supports_streaming' => true,
+                    'duration' => $info['duration'] ?? 0,
+                    'w' => $info['width'] ?? 0,
+                    'h' => $info['height'] ?? 0,
+                ],
+                ['_' => 'documentAttributeAnimated'],
+                ['_' => 'documentAttributeFilename', 'file_name' => 'animation.mp4'],
+            ],
+        ];
+    }
+
+    /**
+     * Whether an uploaded .mp4 can be a GIF: Telegram shows one with a
+     * sound track as a video.
+     */
+    public static function silentVideo(string $path): bool
+    {
+        $info = Mp4Info::read($path);
+
+        return $info === null || ! $info['has_audio'];
     }
 
     /**

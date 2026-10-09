@@ -19,6 +19,10 @@ final readonly class AutoReplyRules
 
     public const MAX_ANSWERS = 30;
 
+    public const MAX_GREETINGS = 20;
+
+    public const MAX_FILLERS = 100;
+
     /**
      * GIFs of a kind, and voice messages per language.
      */
@@ -35,11 +39,12 @@ final readonly class AutoReplyRules
 
     /**
      * @param list<array{
+     *     id: string,
      *     name: string|null,
      *     keywords: list<string>,
      *     max_words: int|null,
      *     answers: array<string, array<string, list<string>>>,
-     *     media: array{gifs: list<array{file: string, name: string}>, voices: array<string, list<array{file: string, name: string}>>},
+     *     media: array{gifs: list<array{file: string, name: string, telegram?: array{id: string, access_hash: string, file_reference: string}}>, voices: array<string, list<array{file: string, name: string}>>},
      * }> $replies  tried top to bottom, the first match wins; max_words
      *              null is the file's own
      * @param array{
@@ -49,6 +54,12 @@ final readonly class AutoReplyRules
      *     media: array{gifs: list<array{file: string, name: string}>, voices: array<string, list<array{file: string, name: string}>>},
      * } $silence  the nudge after this many penalties in a row nobody
      *             answered
+     * @param array{
+     *     enabled: bool,
+     *     fillers: list<string>,
+     *     list: list<array{id: string, name: string|null, keywords: list<string>, answers: array<string, array<string, list<string>>>}>,
+     * } $greetings  "Доброе утро" answered on its own, before the kind's
+     *               answer; the first of the list found picks the answer
      */
     public function __construct(
         public bool $enabled,
@@ -58,6 +69,7 @@ final readonly class AutoReplyRules
         public int $maxWords,
         public array $replies,
         public array $silence = ['enabled' => false, 'after_penalties' => 5, 'answers' => [], 'media' => ['gifs' => [], 'voices' => []]],
+        public array $greetings = ['enabled' => false, 'fillers' => [], 'list' => []],
     ) {
     }
 
@@ -96,6 +108,7 @@ final readonly class AutoReplyRules
             $maxWords = $reply['max_words'] ?? null;
 
             $replies[] = [
+                'id' => self::id($reply['id'] ?? null, 'r', count($replies), array_column($replies, 'id')),
                 'name' => $name !== '' ? mb_substr($name, 0, 60) : null,
                 'keywords' => array_slice($keywords, 0, self::MAX_KEYWORDS),
                 'max_words' => is_numeric($maxWords) ? self::clamp($maxWords, 1, 50) : null,
@@ -105,6 +118,13 @@ final readonly class AutoReplyRules
         }
 
         $silence = (array) ($data['silence'] ?? []);
+
+        /*
+         * Files saved before there were greetings get the config's.
+         */
+        $greetings = array_key_exists('greetings', $data)
+            ? (array) $data['greetings']
+            : (array) config('auto_replies.defaults.greetings', []);
 
         return new self(
             enabled: (bool) ($data['enabled'] ?? true),
@@ -123,6 +143,7 @@ final readonly class AutoReplyRules
                 'answers' => self::sets($silence['answers'] ?? []),
                 'media' => self::media($silence['media'] ?? []),
             ],
+            greetings: self::greetings($greetings),
         );
     }
 
@@ -139,6 +160,7 @@ final readonly class AutoReplyRules
             'max_words' => $this->maxWords,
             'replies' => $this->replies,
             'silence' => $this->silence,
+            'greetings' => $this->greetings,
         ];
     }
 
@@ -174,6 +196,16 @@ final readonly class AutoReplyRules
     }
 
     /**
+     * The answers of greeting $index, the same way.
+     *
+     * @return array{answers: list<string>, language: string, tone: string}
+     */
+    public function greetingAnswers(int $index, string $language, string $tone): array
+    {
+        return self::pick($this->greetings['list'][$index]['answers'] ?? [], $language, $tone);
+    }
+
+    /**
      * Everything a kind (or the nudge, $kind = 'silence') may answer this
      * person with, one to be picked at random: the texts as answers()
      * finds them, the GIFs, and the voice messages in the person's own
@@ -182,7 +214,7 @@ final readonly class AutoReplyRules
      *
      * @return array{
      *     language: string,
-     *     items: list<array{type: 'text', text: string}|array{type: 'gif'|'voice', file: string, name: string}>,
+     *     items: list<array{type: 'text', text: string}|array{type: 'gif'|'voice', file: string, name: string, telegram?: array{id: string, access_hash: string, file_reference: string}}>,
      * }
      */
     public function choices(int|string $kind, string $language, string $tone): array
@@ -252,6 +284,52 @@ final readonly class AutoReplyRules
     }
 
     /**
+     * @param array<string, mixed> $greetings
+     * @return array{
+     *     enabled: bool,
+     *     fillers: list<string>,
+     *     list: list<array{name: string|null, keywords: list<string>, answers: array<string, array<string, list<string>>>}>,
+     * }
+     */
+    private static function greetings(array $greetings): array
+    {
+        $list = [];
+
+        foreach (array_values((array) ($greetings['list'] ?? [])) as $greeting) {
+            if (count($list) >= self::MAX_GREETINGS) {
+                break;
+            }
+
+            $greeting = (array) $greeting;
+
+            $name = is_string($greeting['name'] ?? null) ? trim($greeting['name']) : '';
+
+            $keywords = array_values(array_unique(array_map(
+                static fn (string $keyword): string => mb_substr($keyword, 0, 60),
+                self::texts($greeting['keywords'] ?? []),
+            )));
+
+            $list[] = [
+                'id' => self::id($greeting['id'] ?? null, 'g', count($list), array_column($list, 'id')),
+                'name' => $name !== '' ? mb_substr($name, 0, 60) : null,
+                'keywords' => array_slice($keywords, 0, self::MAX_KEYWORDS),
+                'answers' => self::sets($greeting['answers'] ?? []),
+            ];
+        }
+
+        $fillers = array_values(array_unique(array_map(
+            static fn (string $filler): string => mb_substr($filler, 0, 60),
+            self::texts($greetings['fillers'] ?? []),
+        )));
+
+        return [
+            'enabled' => (bool) ($greetings['enabled'] ?? false),
+            'fillers' => array_slice($fillers, 0, self::MAX_FILLERS),
+            'list' => $list,
+        ];
+    }
+
+    /**
      * @return array<string, array<string, list<string>>>
      */
     private static function sets(mixed $answers): array
@@ -295,7 +373,7 @@ final readonly class AutoReplyRules
 
     /**
      * @param list<string> $extensions
-     * @return list<array{file: string, name: string}>
+     * @return list<array{file: string, name: string, telegram?: array{id: string, access_hash: string, file_reference: string}}>
      */
     private static function files(mixed $items, array $extensions): array
     {
@@ -311,7 +389,13 @@ final readonly class AutoReplyRules
 
             $name = is_string($item['name'] ?? null) && trim($item['name']) !== '' ? trim($item['name']) : $file;
 
-            $list[] = ['file' => $file, 'name' => mb_substr($name, 0, 120)];
+            $telegram = self::telegram($item['telegram'] ?? null);
+
+            $list[] = [
+                'file' => $file,
+                'name' => mb_substr($name, 0, 120),
+                ...($telegram !== null ? ['telegram' => $telegram] : []),
+            ];
 
             if (count($list) >= self::MAX_MEDIA) {
                 break;
@@ -319,6 +403,68 @@ final readonly class AutoReplyRules
         }
 
         return $list;
+    }
+
+    /**
+     * What a kind or a greeting is known by when it is renamed or moved:
+     * personal answers (PersonalAnswers) point at it. Files from before
+     * there were ids get one by their place ("r0", "g2"), kept from the
+     * first save on.
+     *
+     * @param list<string> $taken
+     */
+    private static function id(mixed $id, string $prefix, int $index, array $taken): string
+    {
+        if (is_string($id) && preg_match('/^[a-z0-9]{1,24}$/', $id) === 1 && ! in_array($id, $taken, true)) {
+            return $id;
+        }
+
+        $id = $prefix . $index;
+
+        while (in_array($id, $taken, true)) {
+            $id .= 'x';
+        }
+
+        return $id;
+    }
+
+    /**
+     * The kind with this id, null when there is none any more.
+     */
+    public function kindById(string $id): ?int
+    {
+        foreach ($this->replies as $index => $reply) {
+            if ($reply['id'] === $id) {
+                return $index;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * A GIF found in Telegram (AutoReplyTelegramGifs): the document it is
+     * sent as. Ids as strings - the panel's JavaScript would round them.
+     *
+     * @return array{id: string, access_hash: string, file_reference: string}|null
+     */
+    public static function telegram(mixed $telegram): ?array
+    {
+        $telegram = (array) $telegram;
+
+        foreach (['id', 'access_hash'] as $key) {
+            if (! is_string($telegram[$key] ?? null) || preg_match('/^-?\d{1,20}$/', $telegram[$key]) !== 1) {
+                return null;
+            }
+        }
+
+        $reference = $telegram['file_reference'] ?? '';
+
+        if (! is_string($reference) || preg_match('#^[A-Za-z0-9+/=]{0,400}$#', $reference) !== 1) {
+            return null;
+        }
+
+        return ['id' => $telegram['id'], 'access_hash' => $telegram['access_hash'], 'file_reference' => $reference];
     }
 
     private static function clamp(mixed $value, int $min, int $max): int

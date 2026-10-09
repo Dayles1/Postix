@@ -16,8 +16,10 @@
             rules: @js(route('api.telegram.auto-replies')),
             upload: @js(route('api.telegram.auto-replies.media.upload')),
             media: @js(url('/api/telegram/auto-replies/media')),
+            telegramGifs: @js(route('api.telegram.auto-replies.telegram-gifs.search')),
         },
         maxReplies: @js(\App\Application\Telegram\Services\AutoReplyRules::MAX_REPLIES),
+        maxGreetings: @js(\App\Application\Telegram\Services\AutoReplyRules::MAX_GREETINGS),
         placeholders: @js($placeholders),
         languages: @js(__('telegram.penalty_settings.languages')),
         translations: @js(__('telegram.auto_replies')),
@@ -107,7 +109,26 @@
             </div>
 
             <div x-show="tried().state !== 'empty'" x-cloak class="mt-3 flex flex-col gap-1.5">
+                {{-- A greeting is answered first, in a message of its own --}}
+                <template x-if="tried().greeting">
+                    <div class="flex flex-col gap-1.5">
+                        <p class="text-[12px] font-medium text-success-700 dark:text-success-400" x-text="triedGreeting()"></p>
+
+                        {{-- One is picked at random. Already reduced to Telegram's tags by telegramHtml(). --}}
+                        <template x-for="(answer, a) in tried().greetingAnswers" :key="'tg-' + a">
+                            <p
+                                class="dc-break self-start whitespace-pre-wrap rounded-xl bg-brand-25 px-3 py-2 text-[13px] leading-relaxed
+                                       text-gray-800 dark:bg-brand-500/[0.07] dark:text-gray-200"
+                                x-html="answer"
+                            ></p>
+                        </template>
+
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400" x-text="translations.test.greeted_once"></p>
+                    </div>
+                </template>
+
                 <p
+                    x-show="triedText() !== ''"
                     class="text-[12px] font-medium"
                     :class="tried().state === 'match' ? 'text-success-700 dark:text-success-400' : 'text-gray-500 dark:text-gray-400'"
                     x-text="triedText()"
@@ -408,6 +429,262 @@
                 <p class="px-1 text-[12px] text-gray-400 dark:text-gray-500">
                     {{ __('telegram.auto_replies.kind.random_hint') }}
                 </p>
+
+                {{-- ====================================================
+                     Greetings: "Доброе утро" answered before the kind
+                ===================================================== --}}
+                <article
+                    x-show="!loading"
+                    x-cloak
+                    class="relative mt-2 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition
+                           dark:border-gray-800 dark:bg-white/[0.03]"
+                >
+                    <span class="absolute inset-y-0 left-0 w-1 bg-brand-400"></span>
+
+                    <div class="flex flex-col gap-4 p-4 pl-5 sm:p-5 sm:pl-6">
+                        <div class="flex items-start justify-between gap-4">
+                            <div class="min-w-0">
+                                <h2 class="text-base font-semibold text-gray-900 dark:text-white">
+                                    {{ __('telegram.auto_replies.sections.greetings') }}
+                                </h2>
+                                <p class="mt-0.5 text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">
+                                    {{ __('telegram.auto_replies.greetings.enabled_hint') }}
+                                </p>
+                            </div>
+
+                            <button
+                                type="button"
+                                role="switch"
+                                :aria-checked="form.greetings.enabled"
+                                aria-label="{{ __('telegram.auto_replies.greetings.enabled') }}"
+                                x-on:click="form.greetings.enabled = !form.greetings.enabled"
+                                :class="form.greetings.enabled ? 'bg-brand-500' : 'bg-gray-200 dark:bg-white/[0.12]'"
+                                class="dc-tap relative mt-0.5 inline-flex h-7 w-12 shrink-0 items-center rounded-full transition
+                                       outline-none focus-visible:ring-4 focus-visible:ring-brand-500/20"
+                            >
+                                <span
+                                    :class="form.greetings.enabled ? 'translate-x-6' : 'translate-x-1'"
+                                    class="inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
+                                ></span>
+                            </button>
+                        </div>
+
+                        <div x-show="form.greetings.enabled" x-collapse class="flex flex-col gap-3">
+                            <p class="text-[12px] text-gray-400 dark:text-gray-500">
+                                {{ __('telegram.auto_replies.greetings.order_hint') }}
+                            </p>
+
+                            <template x-for="(greeting, g) in form.greetings.list" :key="greeting.key">
+                                <div
+                                    class="flex flex-col gap-3 rounded-xl border p-3 sm:p-4"
+                                    :class="greetingErrors(g).length
+                                        ? 'border-error-300 dark:border-error-500/40'
+                                        : 'border-gray-200 dark:border-gray-800'"
+                                >
+                                    {{-- Head: order, name, remove --}}
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <span
+                                            class="inline-flex h-7 min-w-7 shrink-0 items-center justify-center rounded-lg bg-brand-50 px-2 font-mono text-[12px]
+                                                   font-semibold text-brand-700 dark:bg-brand-500/10 dark:text-brand-400"
+                                            x-text="g + 1"
+                                        ></span>
+
+                                        <input
+                                            type="text"
+                                            x-model="greeting.name"
+                                            maxlength="60"
+                                            :placeholder="greetingTitle(g)"
+                                            :aria-label="translations.kind.name"
+                                            class="h-8 min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-2 text-sm font-semibold
+                                                   text-gray-900 outline-none transition placeholder:text-gray-400 hover:border-gray-200
+                                                   focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10
+                                                   dark:text-white dark:placeholder:text-gray-500 dark:hover:border-gray-700"
+                                        >
+
+                                        <span
+                                            class="hidden shrink-0 rounded-full bg-gray-100 px-2 py-0.5 font-mono text-[11px] font-medium text-gray-600
+                                                   sm:inline dark:bg-white/[0.06] dark:text-gray-300"
+                                            x-text="greetingKeywordCount(g)"
+                                        ></span>
+
+                                        <button
+                                            type="button"
+                                            x-on:click="moveGreeting(g, -1)"
+                                            :disabled="g === 0"
+                                            class="dc-tap inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 transition
+                                                   hover:bg-gray-100 disabled:opacity-30 dark:text-gray-400 dark:hover:bg-white/[0.06]"
+                                            :title="translations.kind.move_up"
+                                            :aria-label="translations.kind.move_up"
+                                        >
+                                            <x-driver-check.icon name="arrow-up" class="h-4 w-4" />
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            x-on:click="moveGreeting(g, 1)"
+                                            :disabled="g === form.greetings.list.length - 1"
+                                            class="dc-tap inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 transition
+                                                   hover:bg-gray-100 disabled:opacity-30 dark:text-gray-400 dark:hover:bg-white/[0.06]"
+                                            :title="translations.kind.move_down"
+                                            :aria-label="translations.kind.move_down"
+                                        >
+                                            <x-driver-check.icon name="arrow-down" class="h-4 w-4" />
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            x-on:click="removeGreeting(g)"
+                                            class="dc-tap inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-400
+                                                   transition hover:bg-error-50 hover:text-error-600 dark:hover:bg-error-500/10 dark:hover:text-error-400"
+                                            :title="translations.greetings.remove"
+                                            :aria-label="translations.greetings.remove"
+                                        >
+                                            <x-driver-check.icon name="close" class="h-4 w-4" />
+                                        </button>
+                                    </div>
+
+                                    {{-- What they write --}}
+                                    <label class="flex flex-col gap-1">
+                                        <span class="text-[13px] font-medium text-gray-700 dark:text-gray-300" x-text="translations.kind.keywords"></span>
+                                        <textarea
+                                            x-model="greeting.keywords"
+                                            rows="2"
+                                            class="w-full resize-y rounded-lg border bg-white px-2.5 py-2 font-mono text-[12px] leading-relaxed
+                                                   text-gray-900 outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10
+                                                   dark:bg-gray-900 dark:text-white"
+                                            :class="fieldError('greetings.list.' + g + '.keywords')
+                                                ? 'border-error-400 dark:border-error-500/60'
+                                                : 'border-gray-300 dark:border-gray-700'"
+                                        ></textarea>
+                                    </label>
+
+                                    {{-- What we answer: both tones side by side --}}
+                                    <div class="grid gap-4 md:grid-cols-2">
+                                        <template x-for="t in tones" :key="'gcol-' + t">
+                                            <div
+                                                class="flex min-w-0 flex-col gap-2 rounded-xl p-3"
+                                                :class="t === 'respectful'
+                                                    ? 'bg-brand-25 ring-1 ring-inset ring-brand-100 dark:bg-brand-500/[0.05] dark:ring-brand-500/20'
+                                                    : 'bg-gray-50 ring-1 ring-inset ring-gray-100 dark:bg-white/[0.02] dark:ring-gray-800'"
+                                            >
+                                                <div class="flex items-baseline justify-between gap-2">
+                                                    <p
+                                                        class="text-[12px] font-semibold"
+                                                        :class="t === 'respectful' ? 'text-brand-700 dark:text-brand-300' : 'text-gray-700 dark:text-gray-200'"
+                                                        x-text="translations.tones[t]"
+                                                    ></p>
+                                                    <p class="truncate text-[11px] text-gray-400 dark:text-gray-500" x-text="translations.tones[t + '_hint']"></p>
+                                                </div>
+
+                                                <p
+                                                    x-show="answers('g' + g, t).length === 0"
+                                                    class="rounded-lg border border-dashed border-gray-300 px-2.5 py-2 text-[12px] italic text-gray-400
+                                                           dark:border-gray-700 dark:text-gray-500"
+                                                    x-text="translations.kind.empty"
+                                                ></p>
+
+                                                <template x-for="(answer, a) in answers('g' + g, t)" :key="answer.key">
+                                                    <div class="rounded-lg bg-white p-2 shadow-xs ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-700">
+                                                        <div class="flex items-start gap-1.5">
+                                                            <textarea
+                                                                :id="answerId('g' + g, t, a)"
+                                                                x-model="answer.text"
+                                                                x-on:focus="focusAnswer('g' + g, t, a)"
+                                                                rows="1"
+                                                                maxlength="1000"
+                                                                class="min-h-[2.25rem] w-full resize-y rounded-md border-0 bg-transparent px-1.5 py-1 text-[13px]
+                                                                       leading-relaxed text-gray-900 outline-none focus:ring-0 dark:text-white"
+                                                            ></textarea>
+
+                                                            <button
+                                                                type="button"
+                                                                x-on:click="removeAnswer('g' + g, t, a)"
+                                                                class="dc-tap inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-400
+                                                                       transition hover:bg-error-50 hover:text-error-600 dark:hover:bg-error-500/10
+                                                                       dark:hover:text-error-400"
+                                                                :title="translations.kind.remove_answer"
+                                                                :aria-label="translations.kind.remove_answer"
+                                                            >
+                                                                <x-driver-check.icon name="close" class="h-3.5 w-3.5" />
+                                                            </button>
+                                                        </div>
+
+                                                        {{-- Already reduced to Telegram's tags by telegramHtml(). --}}
+                                                        <div
+                                                            x-show="String(answer.text || '').trim() !== ''"
+                                                            class="mt-1.5 flex items-start gap-1.5 border-t border-gray-100 px-1.5 pt-1.5 dark:border-gray-800"
+                                                        >
+                                                            <x-driver-check.icon name="send" class="mt-0.5 h-3 w-3 shrink-0 text-gray-300 dark:text-gray-600" />
+                                                            <p
+                                                                class="dc-break whitespace-pre-wrap text-[12px] leading-relaxed text-gray-500 dark:text-gray-400"
+                                                                x-html="preview(answer.text)"
+                                                            ></p>
+                                                        </div>
+                                                    </div>
+                                                </template>
+
+                                                <button
+                                                    type="button"
+                                                    x-on:click="addAnswer('g' + g, t)"
+                                                    class="dc-tap inline-flex h-8 items-center gap-1.5 self-start rounded-lg px-2 text-[12px] font-medium
+                                                           text-gray-500 transition hover:bg-white hover:text-gray-900 dark:text-gray-400
+                                                           dark:hover:bg-white/[0.06] dark:hover:text-white"
+                                                >
+                                                    <x-driver-check.icon name="plus" class="h-3.5 w-3.5" />
+                                                    <span x-text="translations.kind.add_answer"></span>
+                                                </button>
+                                            </div>
+                                        </template>
+                                    </div>
+
+                                    <template x-for="message in greetingErrors(g)" :key="message">
+                                        <p class="rounded-lg bg-error-50 px-3 py-2 text-[12px] font-medium text-error-600 dark:bg-error-500/10 dark:text-error-400"
+                                           x-text="message"></p>
+                                    </template>
+                                </div>
+                            </template>
+
+                            <p
+                                x-show="form.greetings.list.length === 0"
+                                class="rounded-xl border border-dashed border-gray-200 px-4 py-3 text-[13px] text-gray-500
+                                       dark:border-gray-800 dark:text-gray-400"
+                            >{{ __('telegram.auto_replies.greetings.none') }}</p>
+
+                            <button
+                                type="button"
+                                x-show="form.greetings.list.length < maxGreetings"
+                                x-on:click="addGreeting()"
+                                class="dc-tap flex h-11 items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-300
+                                       text-sm font-medium text-gray-500 transition hover:border-brand-400 hover:bg-brand-25 hover:text-brand-600
+                                       dark:border-gray-700 dark:text-gray-400 dark:hover:border-brand-500/50 dark:hover:bg-brand-500/[0.06]
+                                       dark:hover:text-brand-400"
+                            >
+                                <x-driver-check.icon name="plus" class="h-4 w-4" />
+                                {{ __('telegram.auto_replies.greetings.add') }}
+                            </button>
+
+                            {{-- What may follow a greeting and still leave it a greeting alone --}}
+                            <label class="flex flex-col gap-1">
+                                <span class="text-[13px] font-medium text-gray-700 dark:text-gray-300">
+                                    {{ __('telegram.auto_replies.greetings.fillers') }}
+                                </span>
+                                <textarea
+                                    x-model="form.greetings.fillers"
+                                    rows="2"
+                                    class="w-full resize-y rounded-lg border bg-white px-2.5 py-2 font-mono text-[12px] leading-relaxed
+                                           text-gray-900 outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10
+                                           dark:bg-gray-900 dark:text-white"
+                                    :class="fieldError('greetings.fillers')
+                                        ? 'border-error-400 dark:border-error-500/60'
+                                        : 'border-gray-300 dark:border-gray-700'"
+                                ></textarea>
+                                <span class="text-[11px] leading-snug text-gray-400 dark:text-gray-500">
+                                    {{ __('telegram.auto_replies.greetings.fillers_hint') }}
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+                </article>
 
                 {{-- ====================================================
                      When they stay silent: one nudge per penalty
@@ -722,6 +999,11 @@
             </aside>
         </div>
     </x-driver-check.shell>
+
+    {{-- ================================================================
+         GIFs out of Telegram: searched by the listener, picked here
+    ================================================================= --}}
+    @include('pages.driver-check.partials.telegram-gif-picker')
 
     {{-- ================================================================
          Save bar: only there when there is something to save

@@ -77,6 +77,7 @@ return [
             'sales' => 'Sales',
             'penalty_settings' => 'Penalty settings',
             'auto_replies' => 'Auto replies',
+            'personal_answers' => 'Personal answers',
             'chats' => 'Chats',
             'sessions' => 'Telegram sessions',
             'watchdog' => 'Watchdog',
@@ -403,7 +404,6 @@ return [
         ],
     ],
 
-
     'penalty_settings' => [
         'title' => 'Penalty settings',
         'description' => 'What to tell a person on the 1st, 2nd, 3rd and later penalty for one request. The number is the bot\'s own. Texts in two languages, plain and respectful - for people who are older.',
@@ -510,6 +510,96 @@ return [
         'copied' => 'Copied from ":role". Remember to save.',
     ],
 
+    'personal_answers' => [
+        'title' => 'Personal answers',
+        'description' => 'One person\'s own voice messages, GIFs and texts: for a penalty, a "good morning", an auto reply',
+        'progress' => 'With voice messages: :done of :total',
+        'how' => 'Pick a situation and add this person\'s answers. They come up as often as the shared ones (like one more shared phrase) or, with "Only theirs", instead of them. A voice message is .ogg, as Telegram records it; a GIF comes from Telegram or a file.',
+        'add' => 'Add',
+        'add_placeholder' => 'Situation: a penalty, a greeting, an auto reply...',
+        'no_slots' => 'No personal answers yet: the person gets the shared ones.',
+        'no_items' => 'Empty: add a text, a voice message or a GIF. An empty situation is not saved.',
+        'remove_slot' => 'Remove the situation',
+        'remove' => 'Remove',
+        'only' => 'Only theirs',
+        'only_on' => 'The shared answers of this situation are not sent to them - only these',
+        'only_off' => 'Added to the shared ones: they come up as often',
+        'add_text' => 'Text',
+        'add_voice' => 'Voice message',
+        'add_gif' => 'GIF file',
+        'text_placeholder' => 'The answer, {address} works too',
+        'placeholders_title' => 'Placeholders',
+        'placeholders_hint' => 'Go into the text edited last. The request, the times and the status exist for a penalty only.',
+        'types' => [
+            'text' => 'Text',
+            'voice' => '🎤',
+            'gif' => 'GIF',
+        ],
+        'roles' => [
+            'operation' => 'Operator',
+            'sales' => 'Sales',
+        ],
+        'languages' => [
+            'uz' => 'O\'zbekcha',
+            'ru' => 'Русский',
+        ],
+        'groups' => [
+            'penalty' => 'Penalty',
+            'greeting' => 'Greeting',
+            'reply' => 'Auto reply',
+            'silence' => 'Nudge',
+        ],
+        'situations' => [
+            'penalty' => ':name (from the :from.)',
+            'level' => 'Level from the :n.',
+            'greeting' => 'Greeting :n',
+            'reply' => 'Kind :n',
+            'silence' => 'After ignored penalties',
+            'gone' => 'This situation is gone',
+            'gone_hint' => 'The kind, greeting or level was removed in the settings: these answers are not sent. Remove them or keep them for its return.',
+        ],
+        'people' => [
+            'search' => 'Name or @username',
+            'role' => 'Role',
+            'all' => 'Everyone',
+            'without_voice' => 'No voice message',
+            'none' => 'Nobody found',
+        ],
+        'person' => [
+            'respectful' => 'formal',
+            'plain' => 'informal',
+            'address' => 'called ":address"',
+            'muted' => 'Private messages are off on their card: nothing is sent.',
+        ],
+        'empty' => [
+            'title' => 'Pick a person on the left',
+            'description' => 'An operator who got a voice message with their name for the first penalty, say.',
+        ],
+        'placeholders' => [
+            'address' => 'How to call them (from the card)',
+            'name' => 'The person\'s name',
+            'request' => 'The request',
+            'repeat_number' => 'Which time the penalty is sent',
+            'status_limit' => 'Time allowed in the status',
+            'time_in_status' => 'Time in the status',
+            'crm_status' => 'The CRM status',
+        ],
+        'actions' => [
+            'dirty' => 'Unsaved changes: :name',
+            'save' => 'Save',
+            'saving' => 'Saving...',
+            'discard' => 'Discard',
+        ],
+        'messages' => [
+            'saved' => 'Personal answers saved',
+            'failed' => 'Could not load',
+            'leave' => 'There are unsaved changes. Leave without saving?',
+        ],
+        'validation' => [
+            'slot' => 'Unknown situation: :slot',
+        ],
+    ],
+
     'auto_replies' => [
         'title' => 'Auto replies',
         'description' => 'What an operator or a sales manager is told when they write to the bot\'s account in private: "+", "ok", "хоп" -> "Rahmat, Ali aka". Everything is kept in one JSON file and applies to the next message at once.',
@@ -523,6 +613,7 @@ return [
             'test' => 'Try a message',
             'file' => 'File',
             'silence' => 'When they stay silent',
+            'greetings' => 'Greetings',
         ],
         'tones' => [
             'plain' => 'Plain',
@@ -569,10 +660,21 @@ return [
             'after_penalties_hint' => 'Any private message of theirs resets the count.',
             'answers' => 'The nudge',
         ],
+        'greetings' => [
+            'enabled' => 'Greet back',
+            'enabled_hint' => '"Good morning. Done" - first "Good morning, Anna!" in a reply of its own, then the kind\'s answer a couple of seconds later. A greeting alone is greeted back too; a greeting before a question is not answered. Once a day per person.',
+            'title' => 'Greeting :n',
+            'add' => 'Add a greeting',
+            'remove' => 'Remove the greeting',
+            'none' => 'No greetings: nobody is greeted back.',
+            'order_hint' => 'Tried top to bottom: the first greeting found in the message picks the answer. Texts only, no GIFs or voices.',
+            'fillers' => 'Words that do not count after a greeting',
+            'fillers_hint' => '"Assalomu alaykum aka 🙂" is a greeting alone: it is greeted back. Commas or new lines between them.',
+        ],
         'media' => [
             'title' => 'GIFs and voice messages',
             'gifs' => 'GIFs',
-            'gif_hint' => 'For every language · .gif, .mp4',
+            'gif_hint' => 'For every language · from Telegram or .gif, .mp4',
             'voices' => 'Voice messages: :language',
             'voice_hint' => 'This language only · .ogg',
             'add_gif' => 'GIF',
@@ -580,6 +682,22 @@ return [
             'remove' => 'Remove',
             'uploading' => 'Uploading...',
             'failed' => 'The file was not uploaded',
+            'add_telegram' => 'From Telegram',
+            'file_badge' => 'File',
+            'file_badge_hint' => 'Uploaded as a file: may arrive as a video',
+            'telegram_badge' => 'Telegram',
+            'telegram_badge_hint' => 'A GIF from Telegram: arrives as a real GIF',
+            'telegram_title' => 'GIFs from Telegram',
+            'telegram_search' => 'Search GIFs: ok, thanks, thumbs up',
+            'telegram_search_hint' => 'The same search as the GIF tab in Telegram. An empty search shows the account\'s saved GIFs.',
+            'telegram_saved' => 'Saved GIF',
+            'telegram_searching' => 'Searching Telegram...',
+            'telegram_empty' => 'Nothing found',
+            'telegram_more' => 'More',
+            'telegram_timeout' => 'The listener did not answer - the search goes through it. Is it running?',
+            'telegram_failed' => 'Telegram did not answer: :error',
+            'telegram_gone' => 'This GIF cannot be found any more - search again',
+            'telegram_pick' => 'Pick',
         ],
         'placeholders' => [
             'address' => 'How to call them (from the card)',
@@ -594,6 +712,9 @@ return [
             'answer' => 'They get',
             'as' => 'As',
             'media' => 'Plus GIFs: :gifs, voice messages: :voices - they may come up too',
+            'greeting' => 'Greeting: :greeting - greeted back first',
+            'greeting_only' => 'Greeting: :greeting - only greeted back',
+            'greeted_once' => 'Once a day: a person greeted today gets only the kind\'s answer',
         ],
         'file' => [
             'customised' => 'Saved to the file',
@@ -621,7 +742,10 @@ return [
             'fix' => 'Fix the highlighted fields',
             'silence' => 'A nudge that is on needs at least one text, GIF or voice message',
             'media_gif' => 'A GIF is a .gif or .mp4 file',
+            'media_gif_sound' => 'This .mp4 has a sound track: Telegram would show it as a video, not a GIF. Upload one without sound',
             'media_voice' => 'A voice message is an .ogg (Opus) file, as Telegram records it',
+            'greeting_keywords' => 'A greeting needs at least one keyword',
+            'greeting_answers' => 'A greeting needs at least one text',
         ],
     ],
 
@@ -1394,7 +1518,6 @@ return [
         ],
     ],
 
-
     /*
     |--------------------------------------------------------------------------
     | Operation User
@@ -1416,7 +1539,6 @@ return [
         'no_username' => 'Username not available',
 
         'unknown' => 'Unknown',
-
 
         /*
         |--------------------------------------------------------------------------
@@ -1440,7 +1562,6 @@ return [
 
             'match_rate' => 'Match rate',
         ],
-
 
         /*
         |--------------------------------------------------------------------------
@@ -1484,7 +1605,6 @@ return [
             'hint' => 'Export respects the current filters and period.',
         ],
 
-
         /*
         |--------------------------------------------------------------------------
         | Drivers
@@ -1516,7 +1636,6 @@ return [
 
             'unknown_date' => 'Date unknown',
 
-
             /*
             |--------------------------------------------------------------------------
             | Driver statuses
@@ -1538,7 +1657,6 @@ return [
             'unknown_description' => 'Driver status is unknown.',
         ],
 
-
         /*
         |--------------------------------------------------------------------------
         | Pagination
@@ -1556,7 +1674,6 @@ return [
             'next' => 'Next',
         ],
 
-
         /*
         |--------------------------------------------------------------------------
         | Errors
@@ -1572,7 +1689,6 @@ return [
             'unknown' => 'An unknown error occurred',
         ],
     ],
-
 
     /*
     |--------------------------------------------------------------------------
@@ -1743,7 +1859,6 @@ return [
             'never' => 'Never',
         ],
     ],
-
 
     /*
     |--------------------------------------------------------------------------

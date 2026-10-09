@@ -9,6 +9,7 @@ use App\Application\Telegram\Services\AutoReplyRules;
 use App\Application\Telegram\Services\AutoReplyStore;
 use App\Application\Telegram\Services\ClientCheckEscalation;
 use App\Application\Telegram\Services\ClientCheckRules;
+use App\Application\Telegram\Services\PersonalAnswers;
 use App\Models\Telegram\OperationUser;
 use App\Models\Telegram\TelegramClientCheck;
 use App\Models\Telegram\TelegramSetting;
@@ -53,6 +54,7 @@ final class NudgeSilentClientChecks
         private readonly AutoReplyStore $store,
         private readonly ClientCheckEscalation $escalation,
         private readonly AutoReplyDelivery $delivery,
+        private readonly PersonalAnswers $personal,
     ) {
     }
 
@@ -146,10 +148,14 @@ final class NudgeSilentClientChecks
             return;
         }
 
-        $choices = $rules->choices(
-            'silence',
-            $person->messageLanguage(),
-            $person->respectful ? ClientCheckRules::TONE_RESPECTFUL : ClientCheckRules::TONE_PLAIN,
+        $choices = $this->personal->merge(
+            $rules->choices(
+                'silence',
+                $person->messageLanguage(),
+                $person->respectful ? ClientCheckRules::TONE_RESPECTFUL : ClientCheckRules::TONE_PLAIN,
+            ),
+            $person,
+            PersonalAnswers::SILENCE,
         );
 
         if ($choices['items'] === []) {

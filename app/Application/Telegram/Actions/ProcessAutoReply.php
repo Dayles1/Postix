@@ -6,14 +6,18 @@ namespace App\Application\Telegram\Actions;
 
 use App\Application\Telegram\Services\AutoReplyDelivery;
 use App\Application\Telegram\Services\AutoReplyMatcher;
+use App\Application\Telegram\Services\AutoReplyRules;
 use App\Application\Telegram\Services\AutoReplyStore;
 use App\Application\Telegram\Services\ClientCheckRules;
+use App\Application\Telegram\Services\PersonalAnswers;
 use App\Models\Telegram\OperationUser;
 use App\Models\Telegram\TelegramClientCheck;
 use danog\MadelineProto\SimpleEventHandler;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Throwable;
+
+use function Amp\delay;
 
 /**
  * A new private message from an operator or a sales manager: "+", "ok",
@@ -40,6 +44,7 @@ final class ProcessAutoReply
         private readonly AutoReplyStore $store,
         private readonly AutoReplyMatcher $matcher,
         private readonly AutoReplyDelivery $delivery,
+        private readonly PersonalAnswers $personal,
     ) {
     }
 
@@ -86,7 +91,19 @@ final class ProcessAutoReply
          */
         $open = $check !== null && $check->reply_answered_at === null;
 
-        $kind = $this->matcher->match($rules, $text);
+        /*
+         * "Доброе утро. Готово": the greeting is answered on its own, the
+         * rest is read as any message. Once a day per person.
+         */
+        $greeting = $rules->greetings['enabled']
+            ? $this->matcher->greeting($rules->greetings['list'], $rules->greetings['fillers'], $text)
+            : null;
+
+        $kind = $this->matcher->match($rules, $greeting['rest'] ?? $text);
+
+        $greet = $greeting !== null
+            && ($kind !== null || $greeting['alone'])
+            && ! Cache::has($this->greetedKey($person));
 
         if ($open) {
             $check->update([
@@ -108,7 +125,7 @@ final class ProcessAutoReply
         /*
          * Muted on the card: nothing is written to them, an answer neither.
          */
-        if ($kind === null || ! $person->dm_enabled) {
+        if (($kind === null && ! $greet) || ! $person->dm_enabled) {
             return null;
         }
 
@@ -116,28 +133,79 @@ final class ProcessAutoReply
             return null;
         }
 
-        $choices = $rules->choices(
-            $kind,
-            $person->messageLanguage(),
-            $person->respectful ? ClientCheckRules::TONE_RESPECTFUL : ClientCheckRules::TONE_PLAIN,
-        );
+        $language = $person->messageLanguage();
+        $tone = $person->respectful ? ClientCheckRules::TONE_RESPECTFUL : ClientCheckRules::TONE_PLAIN;
 
-        if ($choices['items'] === []) {
+        /*
+         * With the person's own answers to this kind (PersonalAnswers).
+         */
+        $choices = $kind !== null
+            ? $this->personal->merge(
+                $rules->choices($kind, $language, $tone),
+                $person,
+                PersonalAnswers::replySlot($rules->replies[$kind]['id']),
+            )
+            : ['language' => $language, 'items' => []];
+
+        $hello = $greet ? $this->hello($rules, (int) $greeting['index'], $language, $tone, $person) : null;
+
+        if ($choices['items'] === [] && $hello === null) {
             return null;
         }
 
+        /*
+         * One answer on its way per person: a second "+" written during
+         * the wait gets none of its own.
+         */
+        if (! Cache::add($this->pendingKey($person), true, now()->addMinute())) {
+            return null;
+        }
+
+        /*
+         * Picked here rather than by the delivery: the wait shows what is
+         * coming - "typing…" for a text, "recording…" for a voice.
+         */
+        $item = $choices['items'] !== [] ? $choices['items'][array_rand($choices['items'])] : null;
+
         try {
-            /*
-             * Without a penalty, {request} reads "—".
-             */
-            $answer = $this->delivery->send(
-                $telegram,
-                $senderId,
-                $choices,
-                $check ?? new TelegramClientCheck(),
-                $person,
-                replyTo: $messageId,
-            );
+            $sent = [];
+
+            if ($hello !== null) {
+                $this->wait($telegram, $senderId, $hello['items'][0]['type']);
+
+                $sent[] = $this->delivery->send(
+                    $telegram,
+                    $senderId,
+                    $hello,
+                    $check ?? new TelegramClientCheck(),
+                    $person,
+                    replyTo: $messageId,
+                );
+
+                Cache::put($this->greetedKey($person), true, now()->endOfDay());
+            }
+
+            if ($item !== null) {
+                /*
+                 * After a greeting the thanks follows sooner, as its own
+                 * message rather than a second reply to theirs.
+                 */
+                $this->wait($telegram, $senderId, $item['type'], $hello !== null ? 'greeting_pause' : 'reply_delay');
+
+                /*
+                 * Without a penalty, {request} reads "—".
+                 */
+                $sent[] = $this->delivery->send(
+                    $telegram,
+                    $senderId,
+                    [...$choices, 'items' => [$item]],
+                    $check ?? new TelegramClientCheck(),
+                    $person,
+                    replyTo: $hello === null ? $messageId : null,
+                );
+            }
+
+            $answer = implode("\n", $sent);
         } catch (Throwable $e) {
             /*
              * Left unanswered: their next message gets another go.
@@ -151,6 +219,8 @@ final class ProcessAutoReply
             );
 
             return null;
+        } finally {
+            Cache::forget($this->pendingKey($person));
         }
 
         if ($rules->cooldownMinutes > 0) {
@@ -204,5 +274,75 @@ final class ProcessAutoReply
     private function cooldownKey(OperationUser $person): string
     {
         return 'auto-replies:cooldown:' . $person->id;
+    }
+
+    private function pendingKey(OperationUser $person): string
+    {
+        return 'auto-replies:pending:' . $person->id;
+    }
+
+    private function greetedKey(OperationUser $person): string
+    {
+        return 'auto-replies:greeted:' . $person->id;
+    }
+
+    /**
+     * The greeting's answer in the person's language and tone, as the
+     * delivery takes it - one of the shared texts or of the person's own
+     * answers to it (a voice saying "Доброе утро, Ali aka", say); null when
+     * there is none.
+     *
+     * @return array{language: string, items: list<array<string, mixed>>}|null
+     */
+    private function hello(AutoReplyRules $rules, int $index, string $language, string $tone, OperationUser $person): ?array
+    {
+        $texts = $rules->greetingAnswers($index, $language, $tone);
+
+        $choices = $this->personal->merge(
+            [
+                'language' => $texts['language'],
+                'items' => array_map(static fn (string $text): array => ['type' => 'text', 'text' => $text], $texts['answers']),
+            ],
+            $person,
+            PersonalAnswers::greetingSlot($rules->greetings['list'][$index]['id']),
+        );
+
+        if ($choices['items'] === []) {
+            return null;
+        }
+
+        return [...$choices, 'items' => [$choices['items'][array_rand($choices['items'])]]];
+    }
+
+    /**
+     * A few seconds (auto_replies.reply_delay, or $delay) with "typing…"
+     * on, as a person would take. The delay only suspends this message's
+     * fiber: the listener goes on with the others meanwhile.
+     */
+    private function wait(SimpleEventHandler $telegram, int $peer, string $type, string $delay = 'reply_delay'): void
+    {
+        $min = max(0.0, (float) config("auto_replies.{$delay}.min", 0));
+        $max = max($min, (float) config("auto_replies.{$delay}.max", $min));
+
+        if ($max <= 0) {
+            return;
+        }
+
+        try {
+            $telegram->messages->setTyping([
+                'peer' => $peer,
+                'action' => ['_' => match ($type) {
+                    AutoReplyRules::MEDIA_VOICE => 'sendMessageRecordAudioAction',
+                    AutoReplyRules::MEDIA_GIF => 'sendMessageChooseStickerAction',
+                    default => 'sendMessageTypingAction',
+                }],
+            ]);
+        } catch (Throwable) {
+            /*
+             * Only a nicety: the answer goes without it.
+             */
+        }
+
+        delay($min + (mt_rand() / mt_getrandmax()) * ($max - $min));
     }
 }

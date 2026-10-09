@@ -23,6 +23,7 @@ final class ClientCheckEscalation
 {
     public function __construct(
         private readonly ClientCheckRulesStore $store,
+        private readonly PersonalAnswers $personal,
     ) {
     }
 
@@ -113,6 +114,58 @@ final class ClientCheckEscalation
         ]);
 
         return $comment;
+    }
+
+    /**
+     * One of the person's own answers for the batch's level
+     * (PersonalAnswers), when it comes up: as often as any shared phrase -
+     * or always, when the person gets only their own. Null: the shared
+     * comment() goes.
+     *
+     * @param Collection<int, TelegramClientCheck> $batch oldest first
+     * @return array{check: TelegramClientCheck, level: int, language: string, item: array<string, mixed>}|null
+     */
+    public function personal(Collection $batch, OperationUser $person): ?array
+    {
+        if ($person->personal_answers === null || $person->personal_answers === []) {
+            return null;
+        }
+
+        $last = $this->strongest($batch, $person);
+
+        if ($last === null) {
+            return null;
+        }
+
+        $rules = $this->rules();
+        $role = $person->roleOrDefault();
+        $level = $rules->levelFor($role, max(1, (int) $last->repeat_number));
+
+        $own = $this->personal->slot($person, PersonalAnswers::penaltySlot($level));
+
+        if ($own['items'] === []) {
+            return null;
+        }
+
+        if (! $own['only']) {
+            $shared = count($rules->variant(
+                $role,
+                $level,
+                $person->messageLanguage(),
+                $person->respectful ? ClientCheckRules::TONE_RESPECTFUL : ClientCheckRules::TONE_PLAIN,
+            )['phrases']);
+
+            if (random_int(0, $shared + count($own['items']) - 1) < $shared) {
+                return null;
+            }
+        }
+
+        return [
+            'check' => $last,
+            'level' => $level,
+            'language' => $person->messageLanguage(),
+            'item' => $own['items'][array_rand($own['items'])],
+        ];
     }
 
     /**
