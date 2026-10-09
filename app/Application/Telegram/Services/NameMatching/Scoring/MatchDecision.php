@@ -17,5 +17,6 @@ final class MatchDecision
         public readonly float $score,
         public readonly string $decision,
         public readonly string $reason,
-    ) {}
+    ) {
+    }
 }

@@ -47,9 +47,9 @@ final class RerunTelegramDriverCheck
     }
 
     /**
-     * @param  string|null  $phoneNormalized  the new phone, when it changed
-     * @param  int|null  $newReportUnder  post a fresh report under this
-     *                                    message instead of editing the old one
+     * @param string|null $phoneNormalized the new phone, when it changed
+     * @param int|null $newReportUnder post a fresh report under this
+     *                                 message instead of editing the old one
      */
     public function execute(
         TelegramDriverCheck $check,

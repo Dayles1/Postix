@@ -167,8 +167,8 @@ final class TelegramDriverCheckStarter
             $telegram->messages->sendMessage([
                 'peer' => 'me',
 
-                'message' =>
-                    (
+                'message'
+                    => (
                         $restart === null
                             ? "✅ <b>Telegram Driver Check Listener запущен</b>\n\n"
                             : "♻️ <b>Telegram Driver Check Listener перезапущен</b>\n\n"

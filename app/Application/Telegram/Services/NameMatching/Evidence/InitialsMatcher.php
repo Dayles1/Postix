@@ -87,11 +87,12 @@ final class InitialsMatcher
     ];
 
     public function __construct(
-        private readonly NameNormalizer $normalizer = new NameNormalizer,
-    ) {}
+        private readonly NameNormalizer $normalizer = new NameNormalizer(),
+    ) {
+    }
 
     /**
-     * @param  list<Token>  $driverTokens
+     * @param list<Token> $driverTokens
      */
     public function match(array $driverTokens, string $telegramDisplayName): ?InitialsEvidence
     {
@@ -186,8 +187,8 @@ final class InitialsMatcher
      * a profile written in document order produces the assignment an
      * operator would expect to read.
      *
-     * @param  list<string>  $initials
-     * @param  list<Token>  $driverTokens
+     * @param list<string> $initials
+     * @param list<Token> $driverTokens
      * @return list<TokenAssignment>|null
      */
     private function assign(array $initials, array $driverTokens): ?array
@@ -282,9 +283,9 @@ final class InitialsMatcher
     }
 
     /**
-     * @param  list<string>  $initials
-     * @param  list<TokenAssignment>  $assignments
-     * @param  list<Token>  $driverTokens
+     * @param list<string> $initials
+     * @param list<TokenAssignment> $assignments
+     * @param list<Token> $driverTokens
      */
     private function score(array $initials, array $assignments, array $driverTokens): float
     {
@@ -310,7 +311,7 @@ final class InitialsMatcher
     }
 
     /**
-     * @param  list<TokenAssignment>  $assignments
+     * @param list<TokenAssignment> $assignments
      */
     private function coversSurnameAndGivenName(array $assignments): bool
     {
@@ -324,8 +325,8 @@ final class InitialsMatcher
     }
 
     /**
-     * @param  list<TokenAssignment>  $assignments
-     * @param  list<Token>  $driverTokens
+     * @param list<TokenAssignment> $assignments
+     * @param list<Token> $driverTokens
      */
     private function isInDocumentOrder(array $assignments, array $driverTokens): bool
     {

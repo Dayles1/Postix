@@ -71,8 +71,8 @@ final class TelegramAccountProcessService
                 $process,
                 $exceptAccountIds,
             ): ?TelegramAccount {
-                $primaryAccountId =
-                    $this->primaryAccountId();
+                $primaryAccountId
+                    = $this->primaryAccountId();
 
                 $accounts = TelegramAccount::query()
                     ->where(
@@ -130,8 +130,8 @@ final class TelegramAccountProcessService
                     /*
                      * Lock process row before checking it.
                      */
-                    $state =
-                        TelegramAccountProcess::query()
+                    $state
+                        = TelegramAccountProcess::query()
                             ->where(
                                 'telegram_account_id',
                                 $account->id,
@@ -147,13 +147,13 @@ final class TelegramAccountProcessService
                      * State doesn't exist yet.
                      */
                     if (!$state) {
-                        $state =
-                            TelegramAccountProcess::query()->create([
-                                'telegram_account_id' =>
-                                    $account->id,
+                        $state
+                            = TelegramAccountProcess::query()->create([
+                                'telegram_account_id'
+                                    => $account->id,
 
-                                'process' =>
-                                    $process->value,
+                                'process'
+                                    => $process->value,
 
                                 'successes' => 0,
                                 'failures' => 0,
@@ -183,8 +183,8 @@ final class TelegramAccountProcessService
                     }
 
                     if (
-                        $state->consecutive_failures >=
-                        self::MAX_CONSECUTIVE_FAILURES
+                        $state->consecutive_failures
+                        >= self::MAX_CONSECUTIVE_FAILURES
                     ) {
                         continue;
                     }
@@ -203,20 +203,20 @@ final class TelegramAccountProcessService
                     Log::info(
                         'Telegram resolver account claimed',
                         [
-                            'process' =>
-                                $process->value,
+                            'process'
+                                => $process->value,
 
-                            'account_id' =>
-                                $account->id,
+                            'account_id'
+                                => $account->id,
 
-                            'phone' =>
-                                $account->phone,
+                            'phone'
+                                => $account->phone,
 
-                            'excluded_account_ids' =>
-                                $exceptAccountIds,
+                            'excluded_account_ids'
+                                => $exceptAccountIds,
 
-                            'consecutive_failures' =>
-                                $state->consecutive_failures,
+                            'consecutive_failures'
+                                => $state->consecutive_failures,
                         ],
                     );
 
@@ -226,14 +226,14 @@ final class TelegramAccountProcessService
                 Log::warning(
                     'No Telegram resolver account available',
                     [
-                        'process' =>
-                            $process->value,
+                        'process'
+                            => $process->value,
 
-                        'excluded_account_ids' =>
-                            $exceptAccountIds,
+                        'excluded_account_ids'
+                            => $exceptAccountIds,
 
-                        'primary_account_id' =>
-                            $primaryAccountId,
+                        'primary_account_id'
+                            => $primaryAccountId,
                     ],
                 );
 
@@ -257,8 +257,8 @@ final class TelegramAccountProcessService
                 $account,
                 $process,
             ): TelegramAccountProcess {
-                $state =
-                    $this->lockOrCreateState(
+                $state
+                    = $this->lockOrCreateState(
                         $account,
                         $process,
                     );
@@ -297,8 +297,8 @@ final class TelegramAccountProcessService
                 $process,
                 $reason,
             ): TelegramAccountProcess {
-                $state =
-                    $this->lockOrCreateState(
+                $state
+                    = $this->lockOrCreateState(
                         $account,
                         $process,
                     );
@@ -335,8 +335,8 @@ final class TelegramAccountProcessService
                 $process,
                 $reason,
             ): TelegramAccountProcess {
-                $state =
-                    $this->lockOrCreateState(
+                $state
+                    = $this->lockOrCreateState(
                         $account,
                         $process,
                     );
@@ -374,14 +374,14 @@ final class TelegramAccountProcessService
         Log::info(
             'Telegram resolver account released',
             [
-                'process' =>
-                    $process->value,
+                'process'
+                    => $process->value,
 
-                'account_id' =>
-                    $account->id,
+                'account_id'
+                    => $account->id,
 
-                'phone' =>
-                    $account->phone,
+                'phone'
+                    => $account->phone,
             ],
         );
     }
@@ -395,8 +395,8 @@ final class TelegramAccountProcessService
         TelegramAccountProcessEnum $process,
         array $exceptAccountIds = [],
     ): Collection {
-        $primaryAccountId =
-            $this->primaryAccountId();
+        $primaryAccountId
+            = $this->primaryAccountId();
 
         return TelegramAccount::query()
             ->where(
@@ -477,8 +477,8 @@ final class TelegramAccountProcessService
         TelegramAccount $account,
         TelegramAccountProcessEnum $process,
     ): TelegramAccountProcess {
-        $state =
-            TelegramAccountProcess::query()
+        $state
+            = TelegramAccountProcess::query()
                 ->where(
                     'telegram_account_id',
                     $account->id,
@@ -495,11 +495,11 @@ final class TelegramAccountProcessService
         }
 
         return TelegramAccountProcess::query()->create([
-            'telegram_account_id' =>
-                $account->id,
+            'telegram_account_id'
+                => $account->id,
 
-            'process' =>
-                $process->value,
+            'process'
+                => $process->value,
 
             'successes' => 0,
             'failures' => 0,
@@ -524,8 +524,8 @@ final class TelegramAccountProcessService
         );
 
         if (
-            $accountId === null ||
-            $accountId === ''
+            $accountId === null
+            || $accountId === ''
         ) {
             return null;
         }

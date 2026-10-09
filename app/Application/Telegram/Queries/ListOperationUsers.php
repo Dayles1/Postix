@@ -376,10 +376,8 @@ final class ListOperationUsers
         $this->addCheckAggregates(
             query: $query,
             filters: $filters,
-            foreignColumn:
-                'telegram_driver_checks.operation_user_id',
-            parentQualifiedKey:
-                'operation_users.id',
+            foreignColumn: 'telegram_driver_checks.operation_user_id',
+            parentQualifiedKey: 'operation_users.id',
         );
 
         /*
@@ -500,26 +498,26 @@ final class ListOperationUsers
             : 'created_at';
 
         $map = [
-            'checks' =>
-                'checks_count',
+            'checks'
+                => 'checks_count',
 
-            'confirmed' =>
-                'driver_confirmed_count',
+            'confirmed'
+                => 'driver_confirmed_count',
 
-            'not_confirmed' =>
-                'driver_not_confirmed_count',
+            'not_confirmed'
+                => 'driver_not_confirmed_count',
 
-            'pending' =>
-                'driver_pending_count',
+            'pending'
+                => 'driver_pending_count',
 
-            'processing' =>
-                'driver_processing_count',
+            'processing'
+                => 'driver_processing_count',
 
             // 'avg_match_score' =>
             //     'avg_match_score',
 
-            'last_check_at' =>
-                'last_check_at',
+            'last_check_at'
+                => 'last_check_at',
         ];
 
         $query->orderBy(
@@ -539,8 +537,8 @@ final class ListOperationUsers
         $values = array_values(
             array_filter(
                 $values,
-                static fn ($value): bool =>
-                    $value !== null,
+                static fn ($value): bool
+                    => $value !== null,
             ),
         );
 
@@ -570,8 +568,8 @@ final class ListOperationUsers
         $values = array_values(
             array_filter(
                 $values,
-                static fn ($value): bool =>
-                    $value !== null,
+                static fn ($value): bool
+                    => $value !== null,
             ),
         );
 
@@ -653,10 +651,8 @@ final class ListOperationUsers
         $this->addCheckAggregates(
             query: $query,
             filters: TelegramListFilters::fromArray([]),
-            foreignColumn:
-                'telegram_driver_checks.operation_user_id',
-            parentQualifiedKey:
-                'operation_users.id',
+            foreignColumn: 'telegram_driver_checks.operation_user_id',
+            parentQualifiedKey: 'operation_users.id',
         );
 
         return $query->firstOrFail();

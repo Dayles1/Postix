@@ -55,6 +55,15 @@ final class ProcessClientCheckMessage
             return null;
         }
 
+        Log::info('Client check: recorded', [
+            'check_id' => $check->id,
+            'request_number' => $parsed['request_number'],
+            'repeat_number' => $parsed['repeat_number'],
+            'crm_status' => $parsed['crm_status'],
+            'responsible_role' => $parsed['responsible_role'],
+            'responsible_name' => $parsed['responsible_name'],
+        ]);
+
         $name = $parsed['responsible_name'];
 
         if ($name === null) {
@@ -92,7 +101,24 @@ final class ProcessClientCheckMessage
             ]);
         }
 
+        Log::info('Client check: goes to', [
+            'check_id' => $check->id,
+            'sales_turn' => $salesTurn !== null,
+            'name' => $name,
+            'role' => $role,
+        ]);
+
         $person = $this->resolveOperationUser->execute($name, $role);
+
+        Log::info('Client check: person resolved', [
+            'check_id' => $check->id,
+            'operation_user_id' => $person->id,
+            'name' => $person->name,
+            'role' => $person->role,
+            'created_now' => $person->wasRecentlyCreated,
+            'dm_enabled' => $person->dm_enabled,
+            'has_peer' => $person->hasTelegramPeer(),
+        ]);
 
         $check->update([
             'operation_user_id' => $person->id,
@@ -117,6 +143,12 @@ final class ProcessClientCheckMessage
                 'reason' => TelegramClientCheck::REASON_DISABLED,
             ]);
 
+            Log::info('Client check: skipped', [
+                'check_id' => $check->id,
+                'operation_user_id' => $person->id,
+                'reason' => TelegramClientCheck::REASON_DISABLED,
+            ]);
+
             return $check;
         }
 
@@ -128,6 +160,12 @@ final class ProcessClientCheckMessage
         if (! $this->escalation->rules()->withinWorkingHours($check->created_at ?? now())) {
             $check->update([
                 'status' => TelegramClientCheckStatus::Skipped,
+                'reason' => TelegramClientCheck::REASON_OUTSIDE_HOURS,
+            ]);
+
+            Log::info('Client check: skipped', [
+                'check_id' => $check->id,
+                'operation_user_id' => $person->id,
                 'reason' => TelegramClientCheck::REASON_OUTSIDE_HOURS,
             ]);
 
@@ -144,6 +182,12 @@ final class ProcessClientCheckMessage
                 'reason' => TelegramClientCheck::REASON_ROLE_DISABLED,
             ]);
 
+            Log::info('Client check: skipped', [
+                'check_id' => $check->id,
+                'operation_user_id' => $person->id,
+                'reason' => TelegramClientCheck::REASON_ROLE_DISABLED,
+            ]);
+
             return $check;
         }
 
@@ -153,6 +197,12 @@ final class ProcessClientCheckMessage
         if ($this->escalation->mode($check, $person) === ClientCheckRules::MODE_OFF) {
             $check->update([
                 'status' => TelegramClientCheckStatus::Skipped,
+                'reason' => TelegramClientCheck::REASON_LEVEL_OFF,
+            ]);
+
+            Log::info('Client check: skipped', [
+                'check_id' => $check->id,
+                'operation_user_id' => $person->id,
                 'reason' => TelegramClientCheck::REASON_LEVEL_OFF,
             ]);
 
@@ -178,7 +228,15 @@ final class ProcessClientCheckMessage
             return $check;
         }
 
-        $this->sender->forward($telegram, $check);
+        $forwarded = $this->sender->forward($telegram, $check);
+
+        Log::info('Client check: forward', [
+            'check_id' => $check->id,
+            'operation_user_id' => $person->id,
+            'forwarded' => $forwarded,
+            'peer' => $check->peer,
+            'error' => $check->error,
+        ]);
 
         return $check;
     }

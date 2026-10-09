@@ -46,7 +46,8 @@ final class TokenSetMatcher
 
     public function __construct(
         private readonly TokenComparatorPipeline $pipeline = new TokenComparatorPipeline([]),
-    ) {}
+    ) {
+    }
 
     public static function withDefaultComparators(): self
     {
@@ -54,8 +55,8 @@ final class TokenSetMatcher
     }
 
     /**
-     * @param  list<Token>  $driverTokens
-     * @param  list<EvidenceToken>  $evidenceTokens
+     * @param list<Token> $driverTokens
+     * @param list<EvidenceToken> $evidenceTokens
      * @return list<TokenAssignment>
      */
     public function match(array $driverTokens, array $evidenceTokens, string $usernameCompact): array

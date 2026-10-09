@@ -5,11 +5,8 @@ declare(strict_types=1);
 namespace App\Application\Telegram\Queries;
 
 use App\Application\Telegram\DTO\TelegramListFilters;
-use App\Models\Driver\TelegramDriverCheck;
-use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
-use Illuminate\Support\Facades\DB;
 
 trait TelegramQuerySupport
 {

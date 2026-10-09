@@ -16,7 +16,8 @@ final class TokenAssignment
         public readonly Token $driverToken,
         public readonly EvidenceToken $evidenceToken,
         public readonly ComparisonResult $comparison,
-    ) {}
+    ) {
+    }
 
     public function score(): float
     {

@@ -76,8 +76,8 @@ class TelegramMessageHistoryService
             $messageIds = array_filter(
                 array_map(
                     static fn (array $message): int => (int) ($message['id'] ?? 0),
-                    $messages
-                )
+                    $messages,
+                ),
             );
 
             if ($messageIds === []) {

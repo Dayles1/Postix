@@ -20,8 +20,8 @@ final class ApplyResolvedTelegramPhone
         TelegramDriverCheck $check,
         TelegramResolvedPhone $resolvedPhone,
     ): void {
-        $telegramRaw =
-            $resolvedPhone->telegram_raw ?? [];
+        $telegramRaw
+            = $resolvedPhone->telegram_raw ?? [];
 
         if (! is_array($telegramRaw)) {
             $telegramRaw = [];
@@ -29,8 +29,8 @@ final class ApplyResolvedTelegramPhone
 
         $telegramRaw['resolved_from_cache'] = true;
 
-        $telegramRaw['resolved_phone_id'] =
-            $resolvedPhone->id;
+        $telegramRaw['resolved_phone_id']
+            = $resolvedPhone->id;
 
         /*
          * Username included: it is often the only field spelling the
@@ -55,32 +55,32 @@ final class ApplyResolvedTelegramPhone
             : TelegramDriverCheckStatus::NotConfirmed;
 
         $check->update([
-            'telegram_resolved_phone_id' =>
-                $resolvedPhone->id,
+            'telegram_resolved_phone_id'
+                => $resolvedPhone->id,
 
-            'telegram_user_id' =>
-                $resolvedPhone->telegram_user_id,
+            'telegram_user_id'
+                => $resolvedPhone->telegram_user_id,
 
-            'telegram_username' =>
-                $resolvedPhone->telegram_username,
+            'telegram_username'
+                => $resolvedPhone->telegram_username,
 
-            'telegram_first_name' =>
-                $resolvedPhone->telegram_first_name,
+            'telegram_first_name'
+                => $resolvedPhone->telegram_first_name,
 
-            'telegram_last_name' =>
-                $resolvedPhone->telegram_last_name,
+            'telegram_last_name'
+                => $resolvedPhone->telegram_last_name,
 
-            'telegram_raw' =>
-                $telegramRaw,
+            'telegram_raw'
+                => $telegramRaw,
 
-            'status' =>
-                $status,
+            'status'
+                => $status,
 
-            'error_message' =>
-                null,
+            'error_message'
+                => null,
 
-            'checked_at' =>
-                now(),
+            'checked_at'
+                => now(),
         ]);
 
         /*

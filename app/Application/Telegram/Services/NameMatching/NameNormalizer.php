@@ -35,9 +35,10 @@ use Normalizer;
 final class NameNormalizer
 {
     public function __construct(
-        private readonly UnicodeStyledTextDecoder $styledTextDecoder = new UnicodeStyledTextDecoder,
-        private readonly CyrillicTransliterator $transliterator = new CyrillicTransliterator,
-    ) {}
+        private readonly UnicodeStyledTextDecoder $styledTextDecoder = new UnicodeStyledTextDecoder(),
+        private readonly CyrillicTransliterator $transliterator = new CyrillicTransliterator(),
+    ) {
+    }
 
     public function normalize(string $value): string
     {

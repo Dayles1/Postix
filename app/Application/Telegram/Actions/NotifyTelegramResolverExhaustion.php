@@ -65,8 +65,8 @@ final class NotifyTelegramResolverExhaustion
                 $telegram->messages->sendMessage([
                     'peer' => (int) $notificationChatId,
 
-                    'message' =>
-                        "⚠️ <b>TELEGRAM ACCOUNTLAR YETARLI EMAS</b>\n\n"
+                    'message'
+                        => "⚠️ <b>TELEGRAM ACCOUNTLAR YETARLI EMAS</b>\n\n"
                         . "Check ID: #"
                         . $check->id
                         . "\n"

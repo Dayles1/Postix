@@ -15,10 +15,11 @@ use App\Application\Telegram\Services\NameMatching\Scoring\MatchDecision;
 final class InitialsEvidence
 {
     /**
-     * @param  list<TokenAssignment>  $assignments
+     * @param list<TokenAssignment> $assignments
      */
     public function __construct(
         public readonly MatchDecision $decision,
         public readonly array $assignments,
-    ) {}
+    ) {
+    }
 }

@@ -74,7 +74,7 @@ final class MatchScoreAggregator
     ];
 
     /**
-     * @param  list<TokenAssignment>  $assignments
+     * @param list<TokenAssignment> $assignments
      */
     public function aggregate(array $assignments, int $driverTokenCount): MatchDecision
     {
@@ -110,7 +110,7 @@ final class MatchScoreAggregator
     }
 
     /**
-     * @param  list<TokenAssignment>  $assignments
+     * @param list<TokenAssignment> $assignments
      * @return list<TokenAssignment>
      */
     private function rankByWeightedScore(array $assignments): array
@@ -135,7 +135,7 @@ final class MatchScoreAggregator
      * nothing left for a role discount to express, so the full-name
      * path is decided on the raw scores and returns the ceiling.
      *
-     * @param  list<TokenAssignment>  $assignments
+     * @param list<TokenAssignment> $assignments
      */
     private function isFullNameReproduction(array $assignments, int $driverTokenCount): bool
     {

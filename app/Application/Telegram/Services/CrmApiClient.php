@@ -8,6 +8,7 @@ use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
@@ -56,13 +57,27 @@ final class CrmApiClient
      */
     private function get(string $path, array $query): Response
     {
+        Log::info('Sales turn: CRM request', [
+            'url' => $this->baseUrl() . '/' . $path,
+            'query' => $query,
+            'token_cached' => Cache::has(self::TOKEN_KEY),
+        ]);
+
         $response = $this->request()->get($path, $query);
 
         if ($response->status() === 401) {
+            Log::info('Sales turn: CRM answered 401, logging in again');
+
             Cache::forget(self::TOKEN_KEY);
 
             $response = $this->request()->get($path, $query);
         }
+
+        Log::info('Sales turn: CRM response', [
+            'url' => (string) $response->effectiveUri(),
+            'status' => $response->status(),
+            'body_start' => mb_substr($response->body(), 0, 500),
+        ]);
 
         if ($response->failed()) {
             throw new RuntimeException("CRM API {$path} failed with status {$response->status()}");
@@ -101,6 +116,8 @@ final class CrmApiClient
                 'email' => (string) config('services.crm.email'),
                 'password' => (string) config('services.crm.password'),
             ]);
+
+        Log::info('Sales turn: CRM login', ['status' => $response->status()]);
 
         if ($response->failed()) {
             throw new RuntimeException("CRM API login failed with status {$response->status()}");

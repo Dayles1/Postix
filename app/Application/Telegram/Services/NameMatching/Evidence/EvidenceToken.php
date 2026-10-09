@@ -14,5 +14,6 @@ final class EvidenceToken
     public function __construct(
         public readonly Token $token,
         public readonly EvidenceSource $source,
-    ) {}
+    ) {
+    }
 }

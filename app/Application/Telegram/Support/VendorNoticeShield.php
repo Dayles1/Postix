@@ -79,8 +79,8 @@ final class VendorNoticeShield
     /**
      * @template T
      *
-     * @param  callable(): T  $operation
-     * @param  array<string, mixed>  $context  what the caller was doing, for the log line
+     * @param callable(): T $operation
+     * @param array<string, mixed> $context what the caller was doing, for the log line
      * @return T
      */
     public static function guard(string $description, callable $operation, array $context = []): mixed
@@ -184,7 +184,7 @@ final class VendorNoticeShield
     }
 
     /**
-     * @param  array<string, mixed>  $context
+     * @param array<string, mixed> $context
      */
     private static function report(
         string $description,

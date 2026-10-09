@@ -52,6 +52,50 @@ final class AutoReplyMatcher
     }
 
     /**
+     * A greeting in the message - "Доброе утро. Готово" - read apart from
+     * the rest (config auto_replies.greetings): the first greeting found,
+     * the words left once every greeting is taken out, for match(), and
+     * whether only fillers ("aka", "всем", "🙂") are left - a greeting
+     * alone, not a conversation.
+     *
+     * @param list<array{keywords?: list<string>}> $greetings
+     * @param list<string> $fillers
+     * @return array{index: int, rest: string, alone: bool}|null
+     */
+    public function greeting(array $greetings, array $fillers, string $text): ?array
+    {
+        $words = self::words($text);
+        $found = null;
+
+        foreach ($greetings as $index => $greeting) {
+            foreach ((array) ($greeting['keywords'] ?? []) as $keyword) {
+                $prefix = str_ends_with(trim((string) $keyword), '*');
+                $needle = self::words(rtrim(trim((string) $keyword), '*'));
+
+                while ($needle !== [] && ($at = self::position($words, $needle, $prefix)) !== null) {
+                    array_splice($words, $at, count($needle));
+                    $found ??= $index;
+                }
+            }
+        }
+
+        if ($found === null) {
+            return null;
+        }
+
+        $fillers = array_merge([], ...array_map(
+            static fn (string $filler): array => self::words($filler),
+            $fillers,
+        ));
+
+        return [
+            'index' => $found,
+            'rest' => implode(' ', $words),
+            'alone' => array_diff($words, $fillers) === [],
+        ];
+    }
+
+    /**
      * Letters and digits make a word; any other symbol ("+", "👍") is a
      * word on its own; punctuation is dropped.
      *
@@ -106,6 +150,18 @@ final class AutoReplyMatcher
      */
     private static function contains(array $words, array $needle, bool $prefix): bool
     {
+        return self::position($words, $needle, $prefix) !== null;
+    }
+
+    /**
+     * Where $needle starts in $words, as contains() reads it; null when it
+     * is not there.
+     *
+     * @param list<string> $words
+     * @param list<string> $needle
+     */
+    private static function position(array $words, array $needle, bool $prefix): ?int
+    {
         $length = count($needle);
         $last = $length - 1;
 
@@ -122,9 +178,9 @@ final class AutoReplyMatcher
                 }
             }
 
-            return true;
+            return $i;
         }
 
-        return false;
+        return null;
     }
 }

@@ -34,8 +34,9 @@ final class PartialNameComparator implements TokenComparator
     private const SCORE_CAP = 88.0;
 
     public function __construct(
-        private readonly TokenCommonnessRater $commonnessRater = new LengthBasedCommonnessRater,
-    ) {}
+        private readonly TokenCommonnessRater $commonnessRater = new LengthBasedCommonnessRater(),
+    ) {
+    }
 
     public function compare(Token $driverToken, Token $telegramToken): ComparisonResult
     {

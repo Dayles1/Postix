@@ -119,7 +119,7 @@ final class ProcessUpdatedDriverMessage
      * in the same group are preferred - the same driver can be checked
      * in more than one.
      *
-     * @param  array<string, string|null>  $change
+     * @param array<string, string|null> $change
      */
     private function findTarget(
         TelegramDriverCheck $update,
@@ -170,7 +170,7 @@ final class ProcessUpdatedDriverMessage
      * The old report and its buttons describe a phone that is no longer
      * the driver's: say so on both, so nobody acts on them.
      *
-     * @param  array<string, string|null>  $change
+     * @param array<string, string|null> $change
      */
     private function retireOldMessages(
         SimpleEventHandler $telegram,
@@ -197,7 +197,7 @@ final class ProcessUpdatedDriverMessage
     }
 
     /**
-     * @param  array<string, string|null>  $change
+     * @param array<string, string|null> $change
      */
     private function checkFromScratch(
         TelegramDriverCheck $update,

@@ -34,7 +34,8 @@ final readonly class TelegramListFilters
         public string $sort = 'created_at',
         public string $direction = 'desc',
         public int $perPage = 25,
-    ) {}
+    ) {
+    }
 
     public static function fromArray(array $data): self
     {

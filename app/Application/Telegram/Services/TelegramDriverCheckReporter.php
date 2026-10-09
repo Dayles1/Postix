@@ -113,8 +113,8 @@ final class TelegramDriverCheckReporter
 
                 'reply_to' => [
                     '_' => 'inputReplyToMessage',
-                    'reply_to_msg_id' =>
-                        $check->report_reply_to_message_id
+                    'reply_to_msg_id'
+                        => $check->report_reply_to_message_id
                         ?? $check->telegram_message_id,
                 ],
 
@@ -255,20 +255,20 @@ final class TelegramDriverCheckReporter
             Log::error(
                 'Failed to send driver check reply',
                 [
-                    'check_id' =>
-                        $check->id,
+                    'check_id'
+                        => $check->id,
 
-                    'chat_id' =>
-                        $check->telegram_chat_id,
+                    'chat_id'
+                        => $check->telegram_chat_id,
 
-                    'message_id' =>
-                        $check->telegram_message_id,
+                    'message_id'
+                        => $check->telegram_message_id,
 
-                    'error' =>
-                        $e->getMessage(),
+                    'error'
+                        => $e->getMessage(),
 
-                    'exception' =>
-                        $e::class,
+                    'exception'
+                        => $e::class,
                 ],
             );
 
@@ -337,8 +337,8 @@ final class TelegramDriverCheckReporter
                 $check->telegram_username,
             ) !== ''
         ) {
-            $lines[] =
-                '<b>Имя пользователя:</b> @'
+            $lines[]
+                = '<b>Имя пользователя:</b> @'
                 . $this->escape(
                     ltrim(
                         $check->telegram_username,
@@ -355,8 +355,8 @@ final class TelegramDriverCheckReporter
         if (
             $check->telegram_user_id
         ) {
-            $lines[] =
-                '<b>ID пользователя:</b> '
+            $lines[]
+                = '<b>ID пользователя:</b> '
                 . $check->telegram_user_id;
         }
 
@@ -389,11 +389,11 @@ final class TelegramDriverCheckReporter
         ) {
             $lines[] = '';
 
-            $lines[] =
-                '<b>Ошибка:</b>';
+            $lines[]
+                = '<b>Ошибка:</b>';
 
-            $lines[] =
-                $this->escape(
+            $lines[]
+                = $this->escape(
                     mb_substr(
                         $check->error_message,
                         0,
@@ -419,13 +419,13 @@ final class TelegramDriverCheckReporter
          * SCORE
          * -------------------------------------------------------------
          */
-        $score =
-            $this->normalizeScore(
+        $score
+            = $this->normalizeScore(
                 $match['score'] ?? 0,
             );
 
-        $lines[] =
-            '<b>Оценка совпадения:</b> '
+        $lines[]
+            = '<b>Оценка совпадения:</b> '
             . $score;
 
         /*
@@ -433,14 +433,14 @@ final class TelegramDriverCheckReporter
          * LEVEL
          * -------------------------------------------------------------
          */
-        $level =
-            (string) (
+        $level
+            = (string) (
                 $match['level']
                 ?? '-'
             );
 
-        $lines[] =
-            '<b>Уровень:</b> '
+        $lines[]
+            = '<b>Уровень:</b> '
             . $this->levelLabel(
                 $level,
             );
@@ -450,16 +450,16 @@ final class TelegramDriverCheckReporter
          * CONFIDENCE
          * -------------------------------------------------------------
          */
-        $confidence =
-            $match['confidence']
+        $confidence
+            = $match['confidence']
             ?? null;
 
         if (
             is_string($confidence)
             && trim($confidence) !== ''
         ) {
-            $lines[] =
-                '<b>Уверенность:</b> '
+            $lines[]
+                = '<b>Уверенность:</b> '
                 . $this->confidenceLabel(
                     $confidence,
                 );
@@ -476,31 +476,30 @@ final class TelegramDriverCheckReporter
          * потому что там могут быть технические
          * кандидаты и дубликаты.
          */
-        $matchedParts =
-            $match['matched_parts']
+        $matchedParts
+            = $match['matched_parts']
             ?? [];
 
         if (
             is_array($matchedParts)
             && $matchedParts !== []
         ) {
-            $uniqueParts =
-                $this->uniqueMatchedParts(
+            $uniqueParts
+                = $this->uniqueMatchedParts(
                     $matchedParts,
                 );
 
             if ($uniqueParts !== []) {
                 $lines[] = '';
 
-                $lines[] =
-                    '<b>Совпавшие части:</b>';
+                $lines[]
+                    = '<b>Совпавшие части:</b>';
 
                 foreach (
-                    $uniqueParts
-                    as $part
+                    $uniqueParts as $part
                 ) {
-                    $from =
-                        trim(
+                    $from
+                        = trim(
                             (string) (
                                 $part['from']
                                 ?? $part['actual']
@@ -508,8 +507,8 @@ final class TelegramDriverCheckReporter
                             ),
                         );
 
-                    $to =
-                        trim(
+                    $to
+                        = trim(
                             (string) (
                                 $part['to']
                                 ?? $part['expected']
@@ -524,14 +523,14 @@ final class TelegramDriverCheckReporter
                         continue;
                     }
 
-                    $partScore =
-                        $this->normalizeScore(
+                    $partScore
+                        = $this->normalizeScore(
                             $part['score']
                             ?? 0,
                         );
 
-                    $lines[] =
-                        '• '
+                    $lines[]
+                        = '• '
                         . $this->escape(
                             $from,
                         )
@@ -551,8 +550,8 @@ final class TelegramDriverCheckReporter
          * REASONS
          * -------------------------------------------------------------
          */
-        $reasons =
-            $match['reasons']
+        $reasons
+            = $match['reasons']
             ?? [];
 
         if (
@@ -569,14 +568,14 @@ final class TelegramDriverCheckReporter
                     continue;
                 }
 
-                $labels[] =
-                    $this->reasonLabel(
+                $labels[]
+                    = $this->reasonLabel(
                         $reason,
                     );
             }
 
-            $labels =
-                array_values(
+            $labels
+                = array_values(
                     array_unique(
                         $labels,
                     ),
@@ -585,12 +584,12 @@ final class TelegramDriverCheckReporter
             if ($labels !== []) {
                 $lines[] = '';
 
-                $lines[] =
-                    '<b>Причина:</b>';
+                $lines[]
+                    = '<b>Причина:</b>';
 
                 foreach ($labels as $label) {
-                    $lines[] =
-                        '• '
+                    $lines[]
+                        = '• '
                         . $this->escape(
                             $label,
                         );
@@ -604,16 +603,16 @@ final class TelegramDriverCheckReporter
     ): string {
         $parts = [];
 
-        $firstName =
-            trim(
+        $firstName
+            = trim(
                 (string) (
                     $check->telegram_first_name
                     ?? ''
                 ),
             );
 
-        $lastName =
-            trim(
+        $lastName
+            = trim(
                 (string) (
                     $check->telegram_last_name
                     ?? ''
@@ -713,20 +712,20 @@ final class TelegramDriverCheckReporter
         string $status,
     ): string {
         return match ($status) {
-            'confirmed' =>
-                '✅ ПОДТВЕРЖДЕНО',
+            'confirmed'
+                => '✅ ПОДТВЕРЖДЕНО',
 
-            'not_confirmed' =>
-                '❌ НЕ ПОДТВЕРЖДЕНО',
+            'not_confirmed'
+                => '❌ НЕ ПОДТВЕРЖДЕНО',
 
-            'pending' =>
-                '⏳ ОЖИДАЕТ ПРОВЕРКИ',
+            'pending'
+                => '⏳ ОЖИДАЕТ ПРОВЕРКИ',
 
-            'processing' =>
-                '🔄 ПРОВЕРЯЕТСЯ',
+            'processing'
+                => '🔄 ПРОВЕРЯЕТСЯ',
 
-            default =>
-                '❓ НЕИЗВЕСТНЫЙ СТАТУС',
+            default
+            => '❓ НЕИЗВЕСТНЫЙ СТАТУС',
         };
     }
 
@@ -734,29 +733,29 @@ final class TelegramDriverCheckReporter
         string $level,
     ): string {
         return match ($level) {
-            'very_strong' =>
-                'очень сильное совпадение',
+            'very_strong'
+                => 'очень сильное совпадение',
 
-            'strong' =>
-                'сильное совпадение',
+            'strong'
+                => 'сильное совпадение',
 
-            'likely' =>
-                'вероятное совпадение',
+            'likely'
+                => 'вероятное совпадение',
 
-            'possible' =>
-                'возможное совпадение',
+            'possible'
+                => 'возможное совпадение',
 
-            'weak' =>
-                'слабое совпадение',
+            'weak'
+                => 'слабое совпадение',
 
-            'no_match' =>
-                'совпадений нет',
+            'no_match'
+                => 'совпадений нет',
 
-            'no_data' =>
-                'недостаточно данных',
+            'no_data'
+                => 'недостаточно данных',
 
-            default =>
-                $level,
+            default
+            => $level,
         };
     }
 
@@ -764,20 +763,20 @@ final class TelegramDriverCheckReporter
         string $confidence,
     ): string {
         return match ($confidence) {
-            'high' =>
-                'высокая',
+            'high'
+                => 'высокая',
 
-            'medium' =>
-                'средняя',
+            'medium'
+                => 'средняя',
 
-            'low' =>
-                'низкая',
+            'low'
+                => 'низкая',
 
-            'none' =>
-                'нет',
+            'none'
+                => 'нет',
 
-            default =>
-                $confidence,
+            default
+            => $confidence,
         };
     }
 
@@ -785,69 +784,69 @@ final class TelegramDriverCheckReporter
         string $reason,
     ): string {
         return match ($reason) {
-            'identity_match' =>
-                'Имя и данные Telegram достаточно хорошо совпадают.',
+            'identity_match'
+                => 'Имя и данные Telegram достаточно хорошо совпадают.',
 
-            'surname_and_first_name_match' =>
-                'Совпали фамилия и имя.',
+            'surname_and_first_name_match'
+                => 'Совпали фамилия и имя.',
 
-            'surname_and_username_match' =>
-                'Совпали фамилия и имя пользователя Telegram.',
+            'surname_and_username_match'
+                => 'Совпали фамилия и имя пользователя Telegram.',
 
-            'first_name_and_username_match' =>
-                'Совпали имя и имя пользователя Telegram.',
+            'first_name_and_username_match'
+                => 'Совпали имя и имя пользователя Telegram.',
 
-            'strong_first_name_near_surname' =>
-                'Имя совпадает уверенно, а фамилия имеет близкое написание.',
+            'strong_first_name_near_surname'
+                => 'Имя совпадает уверенно, а фамилия имеет близкое написание.',
 
-            'first_name_only' =>
-                'Совпало только имя.',
+            'first_name_only'
+                => 'Совпало только имя.',
 
-            'surname_only' =>
-                'Совпала только фамилия.',
+            'surname_only'
+                => 'Совпала только фамилия.',
 
-            'username_only' =>
-                'Совпало только имя пользователя Telegram.',
+            'username_only'
+                => 'Совпало только имя пользователя Telegram.',
 
-            'missing_name_data' =>
-                'Недостаточно данных для проверки имени.',
+            'missing_name_data'
+                => 'Недостаточно данных для проверки имени.',
 
-            'exact_full_name' =>
-                'Полное имя совпало.',
+            'exact_full_name'
+                => 'Полное имя совпало.',
 
-            'strong_name_match' =>
-                'Обнаружено сильное совпадение имени.',
+            'strong_name_match'
+                => 'Обнаружено сильное совпадение имени.',
 
-            'exact_core' =>
-                'Основная часть имени совпала полностью.',
+            'exact_core'
+                => 'Основная часть имени совпала полностью.',
 
-            'leet_normalized_exact' =>
-                'Имя совпало после нормализации символов.',
+            'leet_normalized_exact'
+                => 'Имя совпало после нормализации символов.',
 
-            'ordered_subsequence' =>
-                'Обнаружено частичное совпадение символов.',
+            'ordered_subsequence'
+                => 'Обнаружено частичное совпадение символов.',
 
-            'ordered_contains' =>
-                'Одно имя содержит основную часть другого.',
+            'ordered_contains'
+                => 'Одно имя содержит основную часть другого.',
 
-            'phonetic_equal' =>
-                'Имена совпадают по произношению.',
+            'phonetic_equal'
+                => 'Имена совпадают по произношению.',
 
-            'fuzzy' =>
-                'Обнаружено близкое написание имени.',
+            'fuzzy'
+                => 'Обнаружено близкое написание имени.',
 
-            default =>
-                $this->humanizeReason(
-                    $reason,
-                ),
+            default
+            => $this->humanizeReason(
+                $reason,
+            ),
         };
     }
 
     private function humanizeReason(
         string $reason,
     ): string {
-        $reason =
-            str_replace(
+        $reason
+            = str_replace(
                 [
                     '_',
                     '-',
@@ -856,8 +855,8 @@ final class TelegramDriverCheckReporter
                 $reason,
             );
 
-        $reason =
-            preg_replace(
+        $reason
+            = preg_replace(
                 '/\s+/u',
                 ' ',
                 $reason,
@@ -872,13 +871,13 @@ final class TelegramDriverCheckReporter
     private function normalizeScore(
         mixed $score,
     ): string {
-        $score =
-            is_numeric($score)
+        $score
+            = is_numeric($score)
                 ? (float) $score
                 : 0.0;
 
-        $score =
-            max(
+        $score
+            = max(
                 0.0,
                 min(
                     100.0,
@@ -920,16 +919,16 @@ final class TelegramDriverCheckReporter
                 continue;
             }
 
-            $field =
-                trim(
+            $field
+                = trim(
                     (string) (
                         $part['field']
                         ?? ''
                     ),
                 );
 
-            $from =
-                trim(
+            $from
+                = trim(
                     (string) (
                         $part['from']
                         ?? $part['actual']
@@ -937,8 +936,8 @@ final class TelegramDriverCheckReporter
                     ),
                 );
 
-            $to =
-                trim(
+            $to
+                = trim(
                     (string) (
                         $part['to']
                         ?? $part['expected']
@@ -946,8 +945,8 @@ final class TelegramDriverCheckReporter
                     ),
                 );
 
-            $key =
-                mb_strtolower(
+            $key
+                = mb_strtolower(
                     implode(
                         '|',
                         [

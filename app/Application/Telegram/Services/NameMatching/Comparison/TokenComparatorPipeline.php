@@ -16,20 +16,21 @@ use App\Application\Telegram\Services\NameMatching\Token;
 final class TokenComparatorPipeline
 {
     /**
-     * @param  list<TokenComparator>  $comparators
+     * @param list<TokenComparator> $comparators
      */
     public function __construct(
         private readonly array $comparators,
-    ) {}
+    ) {
+    }
 
     public static function default(): self
     {
         return new self([
-            new CanonicalEqualityComparator,
-            new EditDistanceComparator,
-            new PartialNameComparator,
-            new AffixTolerantComparator,
-            new PhoneticKeyComparator,
+            new CanonicalEqualityComparator(),
+            new EditDistanceComparator(),
+            new PartialNameComparator(),
+            new AffixTolerantComparator(),
+            new PhoneticKeyComparator(),
         ]);
     }
 

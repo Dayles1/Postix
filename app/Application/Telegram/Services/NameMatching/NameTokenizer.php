@@ -49,8 +49,9 @@ final class NameTokenizer
     private const MIN_SPACED_LETTERS = 3;
 
     public function __construct(
-        private readonly NameNormalizer $normalizer = new NameNormalizer,
-    ) {}
+        private readonly NameNormalizer $normalizer = new NameNormalizer(),
+    ) {
+    }
 
     /**
      * @return list<Token>
@@ -133,7 +134,7 @@ final class NameTokenizer
      * a pair of initials, and InitialsMatcher reads those from the
      * display name itself.
      *
-     * @param  list<string>  $words
+     * @param list<string> $words
      * @return list<string>
      */
     private function joinSpacedLetters(array $words): array

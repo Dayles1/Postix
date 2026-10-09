@@ -16,7 +16,8 @@ final class ComparisonResult
         public readonly float $score,
         public readonly string $kind,
         public readonly string $reason,
-    ) {}
+    ) {
+    }
 
     public static function make(float $score, string $kind, string $reason): self
     {

@@ -31,7 +31,7 @@ class TelegramContactResolver
             $result = VendorNoticeShield::guard(
                 'contacts.resolvePhone',
                 static fn (): array => $api->contacts->resolvePhone(
-                    phone: $phone
+                    phone: $phone,
                 ),
                 $context,
             );
@@ -42,8 +42,8 @@ class TelegramContactResolver
                 return [
                     'success' => false,
 
-                    'reason' =>
-                        'telegram_not_registered',
+                    'reason'
+                        => 'telegram_not_registered',
 
                     'user' => null,
 
@@ -68,15 +68,15 @@ class TelegramContactResolver
             return [
                 'success' => false,
 
-                'reason' =>
-                    $this->mapError($e),
+                'reason'
+                    => $this->mapError($e),
 
                 'user' => null,
 
                 'raw' => null,
 
-                'error_message' =>
-                    $e->getMessage(),
+                'error_message'
+                    => $e->getMessage(),
             ];
         } catch (Throwable $e) {
             /*
@@ -117,8 +117,8 @@ class TelegramContactResolver
 
                 'raw' => null,
 
-                'error_message' =>
-                    $e->getMessage(),
+                'error_message'
+                    => $e->getMessage(),
             ] + $diagnostics;
         }
     }
@@ -161,7 +161,7 @@ class TelegramContactResolver
      * Returned to the caller as extra result keys, so the command can log the
      * same data next to its own check/attempt context.
      *
-     * @param  array<string, mixed> $context
+     * @param array<string, mixed> $context
      * @return array<string, mixed>
      */
     private function cancellationDiagnostics(
@@ -171,69 +171,69 @@ class TelegramContactResolver
         $previous = $e->getPrevious();
 
         return [
-            'check_id' =>
-                $context['check_id'] ?? null,
+            'check_id'
+                => $context['check_id'] ?? null,
 
-            'attempt' =>
-                $context['attempt'] ?? null,
+            'attempt'
+                => $context['attempt'] ?? null,
 
-            'account_id' =>
-                $context['account_id'] ?? null,
+            'account_id'
+                => $context['account_id'] ?? null,
 
-            'account_phone' =>
-                $context['account_phone'] ?? null,
+            'account_phone'
+                => $context['account_phone'] ?? null,
 
-            'pid' =>
-                getmypid(),
+            'pid'
+                => getmypid(),
 
-            'diagnosed_at' =>
-                date('c'),
+            'diagnosed_at'
+                => date('c'),
 
-            'exception' =>
-                $e::class,
+            'exception'
+                => $e::class,
 
-            'exception_class' =>
-                $e::class,
+            'exception_class'
+                => $e::class,
 
-            'exception_message' =>
-                $e->getMessage(),
+            'exception_message'
+                => $e->getMessage(),
 
-            'exception_code' =>
-                $e->getCode(),
+            'exception_code'
+                => $e->getCode(),
 
-            'exception_file' =>
-                $e->getFile(),
+            'exception_file'
+                => $e->getFile(),
 
-            'exception_line' =>
-                $e->getLine(),
+            'exception_line'
+                => $e->getLine(),
 
-            'exception_trace' =>
-                $this->redact($e->getTraceAsString()),
+            'exception_trace'
+                => $this->redact($e->getTraceAsString()),
 
             /*
              * The real cause: CancelledException("The operation was
              * cancelled") wraps TimeoutException("Timeout while waiting for
              * contacts.resolvePhone").
              */
-            'previous_exception' =>
-                $previous !== null
+            'previous_exception'
+                => $previous !== null
                     ? $previous::class
                     : null,
 
-            'previous_message' =>
-                $previous?->getMessage(),
+            'previous_message'
+                => $previous?->getMessage(),
 
-            'previous_code' =>
-                $previous?->getCode(),
+            'previous_code'
+                => $previous?->getCode(),
 
-            'previous_file' =>
-                $previous?->getFile(),
+            'previous_file'
+                => $previous?->getFile(),
 
-            'previous_line' =>
-                $previous?->getLine(),
+            'previous_line'
+                => $previous?->getLine(),
 
-            'previous_trace' =>
-                $previous !== null
+            'previous_trace'
+                => $previous !== null
                     ? $this->redact($previous->getTraceAsString())
                     : null,
         ];
@@ -267,10 +267,10 @@ class TelegramContactResolver
     }
 
     private function mapError(
-        Throwable $exception
+        Throwable $exception,
     ): string {
         $message = strtoupper(
-            $exception->getMessage()
+            $exception->getMessage(),
         );
 
         if (
@@ -283,11 +283,11 @@ class TelegramContactResolver
         if (
             str_contains(
                 $message,
-                'PHONE_NOT_OCCUPIED'
+                'PHONE_NOT_OCCUPIED',
             )
             || str_contains(
                 $message,
-                'PHONE_NUMBER_UNOCCUPIED'
+                'PHONE_NUMBER_UNOCCUPIED',
             )
         ) {
             return 'telegram_not_registered';

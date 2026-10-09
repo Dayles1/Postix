@@ -59,9 +59,9 @@ final class Token
         ?NameAffixStripper $affixStripper = null,
         ?PhoneticKeyBuilder $phoneticKeyBuilder = null,
     ) {
-        $folder ??= new OrthographicVariantFolder;
-        $affixStripper ??= new NameAffixStripper;
-        $phoneticKeyBuilder ??= new PhoneticKeyBuilder;
+        $folder ??= new OrthographicVariantFolder();
+        $affixStripper ??= new NameAffixStripper();
+        $phoneticKeyBuilder ??= new PhoneticKeyBuilder();
 
         $this->canonical = $folder->foldCore($display);
         $this->core = $affixStripper->core($this->canonical);

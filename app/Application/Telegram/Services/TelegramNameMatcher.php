@@ -60,14 +60,14 @@ final class TelegramNameMatcher
     private readonly TokenSetMatcher $tokenSetMatcher;
 
     public function __construct(
-        private readonly NameNormalizer $normalizer = new NameNormalizer,
-        private readonly NameTokenizer $tokenizer = new NameTokenizer,
+        private readonly NameNormalizer $normalizer = new NameNormalizer(),
+        private readonly NameTokenizer $tokenizer = new NameTokenizer(),
         ?TokenSetMatcher $tokenSetMatcher = null,
-        private readonly MatchScoreAggregator $aggregator = new MatchScoreAggregator,
-        private readonly MatchLevelClassifier $classifier = new MatchLevelClassifier,
-        private readonly MatchExplainer $explainer = new MatchExplainer,
-        private readonly NameRoleClassifier $roleClassifier = new NameRoleClassifier,
-        private readonly InitialsMatcher $initialsMatcher = new InitialsMatcher,
+        private readonly MatchScoreAggregator $aggregator = new MatchScoreAggregator(),
+        private readonly MatchLevelClassifier $classifier = new MatchLevelClassifier(),
+        private readonly MatchExplainer $explainer = new MatchExplainer(),
+        private readonly NameRoleClassifier $roleClassifier = new NameRoleClassifier(),
+        private readonly InitialsMatcher $initialsMatcher = new InitialsMatcher(),
     ) {
         $this->tokenSetMatcher = $tokenSetMatcher ?? TokenSetMatcher::withDefaultComparators();
     }

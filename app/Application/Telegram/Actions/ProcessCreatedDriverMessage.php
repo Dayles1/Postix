@@ -40,8 +40,8 @@ final class ProcessCreatedDriverMessage
 
                 'reason' => null,
 
-                'error_message' =>
-                    'Operation user is missing.',
+                'error_message'
+                    => 'Operation user is missing.',
 
                 'checked_at' => now(),
             ]);
@@ -84,17 +84,17 @@ final class ProcessCreatedDriverMessage
          * Save parsed data into check.
          */
         $check->update([
-            'phone_raw' =>
-                $driverData['phone_raw'] ?? null,
+            'phone_raw'
+                => $driverData['phone_raw'] ?? null,
 
-            'phone_normalized' =>
-                $driverData['phone_normalized'] ?? null,
+            'phone_normalized'
+                => $driverData['phone_normalized'] ?? null,
 
-            'driver_name' =>
-                $driverData['driver_name'] ?? null,
+            'driver_name'
+                => $driverData['driver_name'] ?? null,
 
-            'operation_user_id' =>
-                $operationUser->id,
+            'operation_user_id'
+                => $operationUser->id,
         ]);
 
         /*
@@ -102,19 +102,19 @@ final class ProcessCreatedDriverMessage
          * 4. Driver name is required
          * ---------------------------------------------------------
          */
-        $driverName =
-            $driverData['driver_name'] ?? null;
+        $driverName
+            = $driverData['driver_name'] ?? null;
 
         if (
             ! is_string($driverName)
             || trim($driverName) === ''
         ) {
             $check->update([
-                'status' =>
-                    TelegramDriverCheckStatus::NotConfirmed,
+                'status'
+                    => TelegramDriverCheckStatus::NotConfirmed,
 
-                'error_message' =>
-                    'Driver name is missing.',
+                'error_message'
+                    => 'Driver name is missing.',
 
                 'checked_at' => now(),
             ]);
@@ -141,19 +141,19 @@ final class ProcessCreatedDriverMessage
          * 6. Phone is required
          * ---------------------------------------------------------
          */
-        $phoneNormalized =
-            $driverData['phone_normalized'] ?? null;
+        $phoneNormalized
+            = $driverData['phone_normalized'] ?? null;
 
         if (
             ! is_string($phoneNormalized)
             || trim($phoneNormalized) === ''
         ) {
             $check->update([
-                'status' =>
-                    TelegramDriverCheckStatus::NotConfirmed,
+                'status'
+                    => TelegramDriverCheckStatus::NotConfirmed,
 
-                'error_message' =>
-                    'Phone number is missing.',
+                'error_message'
+                    => 'Phone number is missing.',
 
                 'checked_at' => now(),
             ]);

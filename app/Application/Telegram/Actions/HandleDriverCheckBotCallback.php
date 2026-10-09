@@ -32,7 +32,7 @@ final class HandleDriverCheckBotCallback
     }
 
     /**
-     * @param  array<string, mixed>  $callback  the Bot API CallbackQuery
+     * @param array<string, mixed> $callback the Bot API CallbackQuery
      */
     public function execute(array $callback): void
     {
@@ -151,7 +151,7 @@ final class HandleDriverCheckBotCallback
     /**
      * "Иван Петров (@ivan)", or whatever part of that the user has.
      *
-     * @param  array<string, mixed>  $from
+     * @param array<string, mixed> $from
      */
     private function presserName(array $from): string
     {

@@ -55,8 +55,8 @@ final class NameRoleClassifier
     ];
 
     /**
-     * @param  list<Token>  $tokens  driver tokens, in document order
-     * @return list<Token>  the same tokens, each carrying its role
+     * @param list<Token> $tokens driver tokens, in document order
+     * @return list<Token> the same tokens, each carrying its role
      */
     public function classify(array $tokens, string $normalizedName): array
     {

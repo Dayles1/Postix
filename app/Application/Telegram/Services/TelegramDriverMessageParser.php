@@ -9,26 +9,26 @@ class TelegramDriverMessageParser
         $phoneRaw = $this->extractPhone($messageText);
 
         $parts = $this->extractDriverNameParts(
-            $messageText
+            $messageText,
         );
 
         return [
             'phone_raw' => $phoneRaw,
 
-            'phone_normalized' =>
-                $this->normalizePhone($phoneRaw),
+            'phone_normalized'
+                => $this->normalizePhone($phoneRaw),
 
-            'first_name' =>
-                $parts['first_name'],
+            'first_name'
+                => $parts['first_name'],
 
-            'last_name' =>
-                $parts['last_name'],
+            'last_name'
+                => $parts['last_name'],
 
-            'patronymic' =>
-                $parts['patronymic'],
+            'patronymic'
+                => $parts['patronymic'],
 
-            'driver_name' =>
-                $this->buildFullName($parts),
+            'driver_name'
+                => $this->buildFullName($parts),
         ];
     }
 
@@ -36,7 +36,7 @@ class TelegramDriverMessageParser
      * Extract driver phone.
      */
     private function extractPhone(
-        string $text
+        string $text,
     ): ?string {
         /*
          * Prefer:
@@ -54,11 +54,11 @@ class TelegramDriverMessageParser
                 preg_match(
                     $pattern,
                     $text,
-                    $matches
+                    $matches,
                 )
             ) {
                 $phone = trim(
-                    $matches[1]
+                    $matches[1],
                 );
 
                 if (
@@ -74,18 +74,18 @@ class TelegramDriverMessageParser
          *
          * Generic international phone.
          */
-        $genericPattern =
-            '/(?<!\d)\+?\d[\d\s\-\(\)]{8,}\d(?!\d)/u';
+        $genericPattern
+            = '/(?<!\d)\+?\d[\d\s\-\(\)]{8,}\d(?!\d)/u';
 
         if (
             preg_match(
                 $genericPattern,
                 $text,
-                $matches
+                $matches,
             )
         ) {
             $phone = trim(
-                $matches[0]
+                $matches[0],
             );
 
             if (
@@ -102,7 +102,7 @@ class TelegramDriverMessageParser
      * Normalize phone.
      */
     public function normalizePhone(
-        ?string $phone
+        ?string $phone,
     ): ?string {
         if (! $phone) {
             return null;
@@ -111,7 +111,7 @@ class TelegramDriverMessageParser
         $digits = preg_replace(
             '/\D+/',
             '',
-            $phone
+            $phone,
         );
 
         if (! $digits) {
@@ -122,7 +122,7 @@ class TelegramDriverMessageParser
          * Uzbekistan local number.
          */
         if (strlen($digits) === 9) {
-            return '+998'.$digits;
+            return '+998' . $digits;
         }
 
         /*
@@ -131,10 +131,10 @@ class TelegramDriverMessageParser
         if (
             str_starts_with(
                 $digits,
-                '998'
+                '998',
             )
         ) {
-            return '+'.$digits;
+            return '+' . $digits;
         }
 
         /*
@@ -143,10 +143,10 @@ class TelegramDriverMessageParser
         if (
             str_starts_with(
                 $digits,
-                '375'
+                '375',
             )
         ) {
-            return '+'.$digits;
+            return '+' . $digits;
         }
 
         /*
@@ -155,23 +155,23 @@ class TelegramDriverMessageParser
         if (
             str_starts_with(
                 $digits,
-                '7'
+                '7',
             )
         ) {
-            return '+'.$digits;
+            return '+' . $digits;
         }
 
         /*
          * Generic international.
          */
-        return '+'.$digits;
+        return '+' . $digits;
     }
 
     /**
      * Extract all possible driver name information.
      */
     private function extractDriverNameParts(
-        string $text
+        string $text,
     ): array {
         /*
          * -------------------------------------------------
@@ -182,14 +182,14 @@ class TelegramDriverMessageParser
             $text,
             [
                 'имя водителя',
-            ]
+            ],
         );
 
         $lastName = $this->extractField(
             $text,
             [
                 'фамилия водителя',
-            ]
+            ],
         );
 
         $patronymic = $this->extractField(
@@ -197,7 +197,7 @@ class TelegramDriverMessageParser
             [
                 'отчество водителя',
                 'отечество водителя',
-            ]
+            ],
         );
 
         /*
@@ -235,7 +235,7 @@ class TelegramDriverMessageParser
          * -Номер телефона 1: ...
          */
         $driverFio = $this->extractDriverFio(
-            $text
+            $text,
         );
 
         /*
@@ -244,7 +244,7 @@ class TelegramDriverMessageParser
          */
         if ($driverFio) {
             $fioParts = $this->splitFio(
-                $driverFio
+                $driverFio,
             );
 
             $lastName ??=
@@ -268,22 +268,22 @@ class TelegramDriverMessageParser
             && ! $patronymic
         ) {
             $fio = $this->extractFio(
-                $text
+                $text,
             );
 
             if ($fio) {
                 $fioParts = $this->splitFio(
-                    $fio
+                    $fio,
                 );
 
-                $lastName =
-                    $fioParts['last_name'];
+                $lastName
+                    = $fioParts['last_name'];
 
-                $firstName =
-                    $fioParts['first_name'];
+                $firstName
+                    = $fioParts['first_name'];
 
-                $patronymic =
-                    $fioParts['patronymic'];
+                $patronymic
+                    = $fioParts['patronymic'];
             }
         }
 
@@ -298,7 +298,7 @@ class TelegramDriverMessageParser
      * Extract FIO from "Водитель" section.
      */
     private function extractDriverFio(
-        string $text
+        string $text,
     ): ?string {
         /*
          * We search for:
@@ -309,24 +309,24 @@ class TelegramDriverMessageParser
          *
          * but only inside the nearby block.
          */
-        $pattern =
-            '/водитель\s*:\s*(?:\R\s*)?'
-            .'(?:[-•]\s*)?фио\s*[:\-]\s*'
-            .'([^\r\n]+)/iu';
+        $pattern
+            = '/водитель\s*:\s*(?:\R\s*)?'
+            . '(?:[-•]\s*)?фио\s*[:\-]\s*'
+            . '([^\r\n]+)/iu';
 
         if (
             preg_match(
                 $pattern,
                 $text,
-                $matches
+                $matches,
             )
         ) {
             $fio = trim(
-                $matches[1]
+                $matches[1],
             );
 
             return $this->cleanNameValue(
-                $fio
+                $fio,
             );
         }
 
@@ -336,21 +336,21 @@ class TelegramDriverMessageParser
          * This handles cases where there are
          * extra lines between "Водитель" and "ФИО".
          */
-        $pattern =
-            '/водитель\s*:\s*'
-            .'(.{0,500}?)'
-            .'(?:^|\R)\s*[-•]?\s*фио\s*[:\-]\s*'
-            .'([^\r\n]+)/isu';
+        $pattern
+            = '/водитель\s*:\s*'
+            . '(.{0,500}?)'
+            . '(?:^|\R)\s*[-•]?\s*фио\s*[:\-]\s*'
+            . '([^\r\n]+)/isu';
 
         if (
             preg_match(
                 $pattern,
                 $text,
-                $matches
+                $matches,
             )
         ) {
             return $this->cleanNameValue(
-                $matches[2]
+                $matches[2],
             );
         }
 
@@ -361,22 +361,22 @@ class TelegramDriverMessageParser
      * Extract generic FIO.
      */
     private function extractFio(
-        string $text
+        string $text,
     ): ?string {
-        $pattern =
-            '/(?:^|\R)\s*'
-            .'[-•]?\s*фио\s*[:\-]\s*'
-            .'(.+?)(?=\R|$)/imu';
+        $pattern
+            = '/(?:^|\R)\s*'
+            . '[-•]?\s*фио\s*[:\-]\s*'
+            . '(.+?)(?=\R|$)/imu';
 
         if (
             preg_match(
                 $pattern,
                 $text,
-                $matches
+                $matches,
             )
         ) {
             return $this->cleanNameValue(
-                $matches[1]
+                $matches[1],
             );
         }
 
@@ -388,33 +388,33 @@ class TelegramDriverMessageParser
      */
     private function extractField(
         string $text,
-        array $labels
+        array $labels,
     ): ?string {
         foreach ($labels as $label) {
-            $quotedLabel =
-                preg_quote(
+            $quotedLabel
+                = preg_quote(
                     $label,
-                    '/'
+                    '/',
                 );
 
-            $pattern =
-                "/{$quotedLabel}"
-                ."\s*[:\-]\s*"
-                ."(.+?)(?=\R|$)/iu";
+            $pattern
+                = "/{$quotedLabel}"
+                . "\s*[:\-]\s*"
+                . "(.+?)(?=\R|$)/iu";
 
             if (
                 preg_match(
                     $pattern,
                     $text,
-                    $matches
+                    $matches,
                 )
             ) {
                 $value = trim(
-                    $matches[1]
+                    $matches[1],
                 );
 
                 $value = $this->cleanNameValue(
-                    $value
+                    $value,
                 );
 
                 if (
@@ -434,10 +434,10 @@ class TelegramDriverMessageParser
      * SURNAME FIRSTNAME PATRONYMIC
      */
     private function splitFio(
-        string $fio
+        string $fio,
     ): array {
         $fio = $this->cleanNameValue(
-            $fio
+            $fio,
         );
 
         if (! $fio) {
@@ -450,17 +450,17 @@ class TelegramDriverMessageParser
 
         $parts = preg_split(
             '/\s+/u',
-            $fio
+            $fio,
         );
 
         $parts = array_values(
             array_filter(
                 $parts,
-                fn ($value) =>
-                    ! $this->isEmptyValue(
-                        $value
-                    )
-            )
+                fn ($value)
+                    => ! $this->isEmptyValue(
+                        $value,
+                    ),
+            ),
         );
 
         /*
@@ -501,8 +501,8 @@ class TelegramDriverMessageParser
                 ' ',
                 array_slice(
                     $parts,
-                    2
-                )
+                    2,
+                ),
             ),
         ];
     }
@@ -511,7 +511,7 @@ class TelegramDriverMessageParser
      * Build full driver name.
      */
     private function buildFullName(
-        array $parts
+        array $parts,
     ): ?string {
         $name = implode(
             ' ',
@@ -519,7 +519,7 @@ class TelegramDriverMessageParser
                 $parts['last_name'] ?? null,
                 $parts['first_name'] ?? null,
                 $parts['patronymic'] ?? null,
-            ])
+            ]),
         );
 
         return $name !== ''
@@ -531,14 +531,14 @@ class TelegramDriverMessageParser
      * Clean extracted value.
      */
     private function cleanNameValue(
-        ?string $value
+        ?string $value,
     ): ?string {
         if ($value === null) {
             return null;
         }
 
         $value = trim(
-            $value
+            $value,
         );
 
         /*
@@ -547,7 +547,7 @@ class TelegramDriverMessageParser
         $value = preg_replace(
             '/^[\s\-•]+/u',
             '',
-            $value
+            $value,
         );
 
         /*
@@ -556,11 +556,11 @@ class TelegramDriverMessageParser
         $value = preg_replace(
             '/\s+/u',
             ' ',
-            $value
+            $value,
         );
 
         $value = trim(
-            $value
+            $value,
         );
 
         if (
@@ -576,14 +576,14 @@ class TelegramDriverMessageParser
      * "-" / "—" / empty = no value.
      */
     private function isEmptyValue(
-        ?string $value
+        ?string $value,
     ): bool {
         if ($value === null) {
             return true;
         }
 
         $value = trim(
-            $value
+            $value,
         );
 
         return $value === ''

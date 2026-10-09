@@ -17,7 +17,7 @@ final class MatchExplainer
     private const MAX_MATCHED_PARTS = 8;
 
     /**
-     * @param  list<TokenAssignment>  $assignments
+     * @param list<TokenAssignment> $assignments
      * @return list<array{field: string, source: string, from: string, to: string, score: float, kind: string, reason: string}>
      */
     public function matchedParts(array $assignments): array
@@ -37,7 +37,7 @@ final class MatchExplainer
     }
 
     /**
-     * @param  list<array{reason: string}>  $matchedParts
+     * @param list<array{reason: string}> $matchedParts
      * @return list<string>
      */
     public function reasons(MatchDecision $decision, array $matchedParts): array

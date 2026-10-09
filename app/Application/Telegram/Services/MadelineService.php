@@ -58,7 +58,7 @@ class MadelineService
                 function () use ($account): API {
                     $api = new API(
                         $account->session_path,
-                        $this->settings()
+                        $this->settings(),
                     );
 
                     Log::debug('MadelineProto API created', [
@@ -102,11 +102,11 @@ class MadelineService
         $appInfo = new AppInfo();
 
         $appInfo->setApiId(
-            (int) config('services.telegram.api_id')
+            (int) config('services.telegram.api_id'),
         );
 
         $appInfo->setApiHash(
-            (string) config('services.telegram.api_hash')
+            (string) config('services.telegram.api_hash'),
         );
 
         $settings->setAppInfo($appInfo);
