@@ -168,7 +168,17 @@ class OperationUser extends Model
     public static function normalizeName(
         string $name,
     ): string {
-        $name = trim($name);
+        /*
+         * Uzbek names are typed with every apostrophe variant there is
+         * ("O`GLI", "O'G'LI", "OʻGʻLI", "OGLI"), so the same person used to
+         * end up as two operators - one holding the checks, the other the
+         * Telegram contact.
+         */
+        $name = str_replace(
+            ["'", '’', '‘', '′', '`', 'ʻ', 'ʼ', 'ʹ', 'ʺ'],
+            '',
+            trim($name),
+        );
 
         $name = preg_replace(
             '/\s+/u',

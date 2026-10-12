@@ -352,4 +352,24 @@ class OperatorNotificationTest extends TestCase
         $this->assertSame($manual->id, $resolved->id);
         $this->assertSame(1, OperationUser::query()->count());
     }
+
+    /**
+     * "O`GLI" in a message and "OGLI" typed by hand are the same person.
+     */
+    public function test_apostrophes_do_not_split_an_operator_in_two(): void
+    {
+        $manual = $this->operator([
+            'name' => 'NASRIDDINOV USMON DONIYOR OGLI',
+            'name_normalized' => OperationUser::normalizeName(
+                'NASRIDDINOV USMON DONIYOR OGLI',
+            ),
+        ]);
+
+        $resolved = (new ResolveOperationUser())->execute(
+            'NASRIDDINOV USMON DONIYOR O`GLI',
+        );
+
+        $this->assertSame($manual->id, $resolved->id);
+        $this->assertSame(1, OperationUser::query()->count());
+    }
 }
