@@ -667,7 +667,7 @@ return [
             'add' => 'Add a greeting',
             'remove' => 'Remove the greeting',
             'none' => 'No greetings: nobody is greeted back.',
-            'order_hint' => 'Tried top to bottom: the first greeting found in the message picks the answer. Texts only, no GIFs or voices.',
+            'order_hint' => 'Tried top to bottom: the first greeting found in the message picks the answer. A text, a GIF or a voice message - one at random.',
             'fillers' => 'Words that do not count after a greeting',
             'fillers_hint' => '"Assalomu alaykum aka 🙂" is a greeting alone: it is greeted back. Commas or new lines between them.',
         ],
@@ -745,7 +745,7 @@ return [
             'media_gif_sound' => 'This .mp4 has a sound track: Telegram would show it as a video, not a GIF. Upload one without sound',
             'media_voice' => 'A voice message is an .ogg (Opus) file, as Telegram records it',
             'greeting_keywords' => 'A greeting needs at least one keyword',
-            'greeting_answers' => 'A greeting needs at least one text',
+            'greeting_answers' => 'A greeting needs at least one answer: a text, a GIF or a voice message',
         ],
     ],
 

@@ -1,6 +1,7 @@
 {{--
-    GIFs and voice messages of a kind - or of the nudge. $owner is the JS
-    expression for it: "k" inside the kinds loop, "'silence'" for the nudge.
+    GIFs and voice messages of a kind - or of the nudge, or a greeting.
+    $owner is the JS expression for it: "k" inside the kinds loop,
+    "'silence'" for the nudge, "'g' + g" inside the greetings loop.
     GIFs serve every language; voices belong to the language being edited.
     A GIF comes from Telegram (the dialog in auto-replies.blade.php) or is
     uploaded.

@@ -622,6 +622,21 @@ class PeoplePanelTest extends TestCase
 
             $this->assertSame('Tong', json_decode((string) file_get_contents($path), true)['greetings']['list'][0]['name']);
 
+            /* A GIF is an answer too. */
+            $gif = bin2hex(random_bytes(12)) . '.mp4';
+
+            $this->putJson('/api/telegram/auto-replies', $this->autoReplies([
+                'greetings' => [
+                    'enabled' => true,
+                    'fillers' => [],
+                    'list' => [
+                        ['keywords' => ['salom'], 'answers' => [], 'media' => ['gifs' => [['file' => $gif, 'name' => 'hi']]]],
+                    ],
+                ],
+            ]))
+                ->assertOk()
+                ->assertJsonPath('data.greetings.list.0.media.gifs.0.file', $gif);
+
             /* A half-made greeting is refused. */
             $this->putJson('/api/telegram/auto-replies', $this->autoReplies([
                 'greetings' => [

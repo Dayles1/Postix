@@ -68,7 +68,7 @@ final class AutoReplyRequest extends FormRequest
          * GIFs for every language, voices per language: names
          * AutoReplyMedia::store() gave, checked again by AutoReplyRules.
          */
-        foreach (['replies.*.media', 'silence.media'] as $media) {
+        foreach (['replies.*.media', 'silence.media', 'greetings.list.*.media'] as $media) {
             $rules["{$media}"] = ['nullable', 'array'];
             $rules["{$media}.gifs"] = ['nullable', 'array', 'max:' . AutoReplyRules::MAX_MEDIA];
             $rules["{$media}.gifs.*.file"] = ['required', 'string', 'regex:/^[a-f0-9]{24}\.(gif|mp4)$/'];
@@ -127,7 +127,7 @@ final class AutoReplyRequest extends FormRequest
                 }
 
                 /*
-                 * A greeting answers with a text only: no GIF, no voice.
+                 * A greeting answers like a kind: a text, a GIF or a voice.
                  */
                 foreach (array_values((array) $this->input('greetings.list', [])) as $index => $greeting) {
                     $greeting = (array) $greeting;
@@ -139,7 +139,7 @@ final class AutoReplyRequest extends FormRequest
                         );
                     }
 
-                    if (! $this->hasAnswer($greeting['answers'] ?? [])) {
+                    if (! $this->hasAnswer($greeting['answers'] ?? []) && ! $this->hasMedia($greeting['media'] ?? [])) {
                         $validator->errors()->add(
                             "greetings.list.{$index}.answers",
                             __('telegram.auto_replies.validation.greeting_answers'),

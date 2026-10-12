@@ -1730,6 +1730,28 @@ class ClientCheckTest extends TestCase
         );
     }
 
+    public function test_a_greeting_may_be_answered_with_a_gif(): void
+    {
+        $this->person();
+        $gif = $this->telegramGif();
+
+        $this->saveAutoReplies(['greetings' => [
+            'enabled' => true,
+            'fillers' => [],
+            'list' => [
+                ['keywords' => ['salom'], 'answers' => [], 'media' => ['gifs' => [$gif], 'voices' => []]],
+            ],
+        ]]);
+
+        $this->messages->savedGifs = [
+            ['_' => 'document', 'id' => 9007199254740993, 'access_hash' => -42, 'file_reference' => 'fresh'],
+        ];
+
+        $this->assertSame('GIF · ok', $this->reply('Salom'));
+        $this->assertSame(['media'], $this->messages->kinds());
+        $this->assertSame($this->messageId, $this->messages->calls[0][1]['reply_to']['reply_to_msg_id']);
+    }
+
     public function test_a_telegram_gif_no_longer_saved_is_saved_again(): void
     {
         $this->person();

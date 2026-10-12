@@ -215,7 +215,6 @@ function kindToPayload(kind) {
     };
 }
 
-/** Greetings answer with texts only. */
 function greetingToForm(greeting) {
     return {
         key: nextKey(),
@@ -223,6 +222,7 @@ function greetingToForm(greeting) {
         name: greeting.name ?? '',
         keywords: (greeting.keywords || []).join(', '),
         answers: setsToForm(greeting.answers),
+        media: mediaToForm(greeting.media),
     };
 }
 
@@ -232,6 +232,7 @@ function greetingToPayload(greeting) {
         name: String(greeting.name || '').trim() || null,
         keywords: splitKeywords(greeting.keywords),
         answers: setsToPayload(greeting.answers),
+        media: mediaToPayload(greeting.media),
     };
 }
 
@@ -548,7 +549,7 @@ export function autoRepliesPage(config) {
 
         /*
         |----------------------------------------------------------------
-        | Greetings: answered before the kind, texts only
+        | Greetings: answered before the kind
         |----------------------------------------------------------------
         */
 
@@ -561,7 +562,9 @@ export function autoRepliesPage(config) {
 
             answers[this.language].plain.push({ key: nextKey(), text: '' });
 
-            this.form.greetings.list.push({ key: nextKey(), id: newId(), name: '', keywords: '', answers });
+            this.form.greetings.list.push({
+                key: nextKey(), id: newId(), name: '', keywords: '', answers, media: mediaToForm({}),
+            });
         },
 
         removeGreeting(g) {
@@ -679,7 +682,7 @@ export function autoRepliesPage(config) {
         |----------------------------------------------------------------
         */
 
-        /** GIFs of kind k (or 'silence'), or its voices in the language being edited. */
+        /** GIFs of kind k (or 'silence', or greeting 'g' + g), or its voices in the language being edited. */
         mediaList(k, type) {
             const owner = this.owner(k);
 
@@ -810,6 +813,8 @@ export function autoRepliesPage(config) {
                 hello = {
                     greeting: String(greeting.name || '').trim() || this.greetingTitle(found.index),
                     greetingAnswers: set.map((answer) => this.preview(answer.text, lang)),
+                    greetingGifs: greeting.media.gifs.length,
+                    greetingVoices: (greeting.media.voices[this.test.language] || []).length,
                 };
             }
 

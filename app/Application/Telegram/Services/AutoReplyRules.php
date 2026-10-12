@@ -57,7 +57,7 @@ final readonly class AutoReplyRules
      * @param array{
      *     enabled: bool,
      *     fillers: list<string>,
-     *     list: list<array{id: string, name: string|null, keywords: list<string>, answers: array<string, array<string, list<string>>>}>,
+     *     list: list<array{id: string, name: string|null, keywords: list<string>, answers: array<string, array<string, list<string>>>, media: array{gifs: list<array{file: string, name: string, telegram?: array{id: string, access_hash: string, file_reference: string}}>, voices: array<string, list<array{file: string, name: string}>>}}>,
      * } $greetings  "Доброе утро" answered on its own, before the kind's
      *               answer; the first of the list found picks the answer
      */
@@ -196,16 +196,6 @@ final readonly class AutoReplyRules
     }
 
     /**
-     * The answers of greeting $index, the same way.
-     *
-     * @return array{answers: list<string>, language: string, tone: string}
-     */
-    public function greetingAnswers(int $index, string $language, string $tone): array
-    {
-        return self::pick($this->greetings['list'][$index]['answers'] ?? [], $language, $tone);
-    }
-
-    /**
      * Everything a kind (or the nudge, $kind = 'silence') may answer this
      * person with, one to be picked at random: the texts as answers()
      * finds them, the GIFs, and the voice messages in the person's own
@@ -219,8 +209,28 @@ final readonly class AutoReplyRules
      */
     public function choices(int|string $kind, string $language, string $tone): array
     {
-        $owner = $kind === 'silence' ? $this->silence : ($this->replies[$kind] ?? null);
+        return self::items($kind === 'silence' ? $this->silence : ($this->replies[$kind] ?? null), $language, $tone);
+    }
 
+    /**
+     * Everything greeting $index may answer with, the same way.
+     *
+     * @return array{
+     *     language: string,
+     *     items: list<array{type: 'text', text: string}|array{type: 'gif'|'voice', file: string, name: string, telegram?: array{id: string, access_hash: string, file_reference: string}}>,
+     * }
+     */
+    public function greetingChoices(int $index, string $language, string $tone): array
+    {
+        return self::items($this->greetings['list'][$index] ?? null, $language, $tone);
+    }
+
+    /**
+     * @param array<string, mixed>|null $owner
+     * @return array{language: string, items: list<array<string, mixed>>}
+     */
+    private static function items(?array $owner, string $language, string $tone): array
+    {
         if ($owner === null) {
             return ['language' => $language, 'items' => []];
         }
@@ -249,7 +259,7 @@ final readonly class AutoReplyRules
     {
         $files = [];
 
-        foreach ([...$this->replies, $this->silence] as $owner) {
+        foreach ([...$this->replies, $this->silence, ...$this->greetings['list']] as $owner) {
             foreach ($owner['media']['gifs'] ?? [] as $gif) {
                 $files[] = $gif['file'];
             }
@@ -288,7 +298,7 @@ final readonly class AutoReplyRules
      * @return array{
      *     enabled: bool,
      *     fillers: list<string>,
-     *     list: list<array{name: string|null, keywords: list<string>, answers: array<string, array<string, list<string>>>}>,
+     *     list: list<array{name: string|null, keywords: list<string>, answers: array<string, array<string, list<string>>>, media: array<string, mixed>}>,
      * }
      */
     private static function greetings(array $greetings): array
@@ -314,6 +324,7 @@ final readonly class AutoReplyRules
                 'name' => $name !== '' ? mb_substr($name, 0, 60) : null,
                 'keywords' => array_slice($keywords, 0, self::MAX_KEYWORDS),
                 'answers' => self::sets($greeting['answers'] ?? []),
+                'media' => self::media($greeting['media'] ?? []),
             ];
         }
 

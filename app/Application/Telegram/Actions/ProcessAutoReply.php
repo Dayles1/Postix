@@ -288,21 +288,16 @@ final class ProcessAutoReply
 
     /**
      * The greeting's answer in the person's language and tone, as the
-     * delivery takes it - one of the shared texts or of the person's own
-     * answers to it (a voice saying "Доброе утро, Ali aka", say); null when
-     * there is none.
+     * delivery takes it - one of the shared texts, GIFs and voices or of
+     * the person's own answers to it (a voice saying "Доброе утро, Ali
+     * aka", say); null when there is none.
      *
      * @return array{language: string, items: list<array<string, mixed>>}|null
      */
     private function hello(AutoReplyRules $rules, int $index, string $language, string $tone, OperationUser $person): ?array
     {
-        $texts = $rules->greetingAnswers($index, $language, $tone);
-
         $choices = $this->personal->merge(
-            [
-                'language' => $texts['language'],
-                'items' => array_map(static fn (string $text): array => ['type' => 'text', 'text' => $text], $texts['answers']),
-            ],
+            $rules->greetingChoices($index, $language, $tone),
             $person,
             PersonalAnswers::greetingSlot($rules->greetings['list'][$index]['id']),
         );

@@ -123,6 +123,12 @@
                             ></p>
                         </template>
 
+                        <p
+                            x-show="tried().greetingGifs || tried().greetingVoices"
+                            class="text-[11px] text-gray-500 dark:text-gray-400"
+                            x-text="translations.test.media.replace(':gifs', tried().greetingGifs || 0).replace(':voices', tried().greetingVoices || 0)"
+                        ></p>
+
                         <p class="text-[11px] text-gray-500 dark:text-gray-400" x-text="translations.test.greeted_once"></p>
                     </div>
                 </template>
@@ -635,6 +641,12 @@
                                                 </button>
                                             </div>
                                         </template>
+                                    </div>
+
+                                    {{-- GIFs and voice messages: picked at random among the texts --}}
+                                    <div class="flex flex-col gap-2">
+                                        <span class="text-[13px] font-medium text-gray-700 dark:text-gray-300" x-text="translations.media.title"></span>
+                                        @include('pages.driver-check.partials.auto-reply-media', ['owner' => "'g' + g"])
                                     </div>
 
                                     <template x-for="message in greetingErrors(g)" :key="message">

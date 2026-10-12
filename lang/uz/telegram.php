@@ -655,7 +655,7 @@ return [
             'add' => 'Salom qo\'shish',
             'remove' => 'Salomni o\'chirish',
             'none' => 'Salomlar yo\'q: hech kimga alik olinmaydi.',
-            'order_hint' => 'Yuqoridan pastga tekshiriladi: xabarda birinchi topilgan salom javobni tanlaydi. Faqat matn, GIF va ovozli xabarsiz.',
+            'order_hint' => 'Yuqoridan pastga tekshiriladi: xabarda birinchi topilgan salom javobni tanlaydi. Matn, GIF yoki ovozli xabar - tasodifiy bittasi.',
             'fillers' => 'Salomdan keyin hisobga olinmaydigan so\'zlar',
             'fillers_hint' => '«Assalomu alaykum aka 🙂» - shunchaki salom: unga alik olinadi. Vergul yoki yangi qator bilan.',
         ],
@@ -733,7 +733,7 @@ return [
             'media_gif_sound' => 'Bu .mp4 da ovoz bor: Telegram uni GIF emas, video qilib ko\'rsatadi. Ovozsizini yuklang',
             'media_voice' => 'Ovozli xabar - .ogg (Opus) fayl, Telegram yozgandek',
             'greeting_keywords' => 'Salomda kamida bitta kalit so\'z bo\'lishi kerak',
-            'greeting_answers' => 'Salomda kamida bitta matn bo\'lishi kerak',
+            'greeting_answers' => 'Salomda kamida bitta javob bo\'lishi kerak: matn, GIF yoki ovozli xabar',
         ],
     ],
 
