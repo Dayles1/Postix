@@ -8,6 +8,7 @@ use App\Models\Driver\TelegramDriverCheck;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 
 /**
  * A group the driver-check listener watches.
@@ -75,6 +76,47 @@ class TelegramDriverCheckChat extends Model
             'telegram_chat_id',
             'chat_id',
         );
+    }
+
+    /**
+     * CRM penalties posted in this chat, joined the same way as checks.
+     */
+    public function penalties(): HasMany
+    {
+        return $this->hasMany(
+            TelegramClientCheck::class,
+            'telegram_chat_id',
+            'chat_id',
+        );
+    }
+
+    /**
+     * Files of the notifications bot routed from this chat.
+     */
+    public function fileForwards(): HasMany
+    {
+        return $this->hasMany(
+            TelegramFileForward::class,
+            'source_chat_id',
+            'chat_id',
+        );
+    }
+
+    /**
+     * What the chats page counts per row: checks, penalties, and files
+     * (one file sent to two groups is still one file).
+     *
+     * @return array<int|string, mixed>
+     */
+    public static function counters(): array
+    {
+        return [
+            'checks',
+            'penalties',
+            'fileForwards as files_count' => fn (Builder $query) => $query->select(
+                DB::raw('count(distinct message_id)'),
+            ),
+        ];
     }
 
     public function scopeActive(Builder $query): Builder

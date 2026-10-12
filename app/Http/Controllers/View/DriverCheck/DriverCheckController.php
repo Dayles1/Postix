@@ -83,6 +83,13 @@ final class DriverCheckController extends Controller
         );
     }
 
+    public function fileRoutes()
+    {
+        return view(
+            'pages.driver-check.file-routes'
+        );
+    }
+
     public function sessions()
     {
         return view(

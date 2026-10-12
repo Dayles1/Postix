@@ -29,6 +29,8 @@ class DriverCheckChatIndexRequest extends FormRequest
                     'title',
                     'last_message_at',
                     'checks',
+                    'penalties',
+                    'files',
                 ]),
             ],
             'direction' => ['nullable', 'in:asc,desc'],

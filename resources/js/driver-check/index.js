@@ -14,6 +14,7 @@ import { penaltiesPage } from './penalties';
 import { autoRepliesPage } from './auto-replies';
 import { personalAnswersPage } from './personal-answers';
 import { penaltySettingsPage } from './penalty-settings';
+import { fileRoutesPage } from './file-routes';
 import { queuePage, watchdogPage } from './monitoring';
 import { statusType } from './status';
 
@@ -1189,6 +1190,7 @@ export function registerDriverCheck(Alpine) {
     Alpine.data('dcDrivers', driversPage);
     Alpine.data('dcResolvedPhones', resolvedPhonesPage);
     Alpine.data('dcChats', chatsPage);
+    Alpine.data('dcFileRoutes', fileRoutesPage);
     Alpine.data('dcSessions', sessionsPage);
     Alpine.data('dcPenalties', penaltiesPage);
     Alpine.data('dcPenaltySettings', penaltySettingsPage);

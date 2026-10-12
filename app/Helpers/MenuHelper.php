@@ -147,6 +147,11 @@ class MenuHelper
                         'path' => '/driver-check/chats',
                     ],
                     [
+                        'icon' => 'send',
+                        'name' => __('telegram.menu.items.file_routes'),
+                        'path' => '/driver-check/file-routes',
+                    ],
+                    [
                         'icon' => 'authentication',
                         'name' => __('telegram.menu.items.sessions'),
                         'path' => '/driver-check/sessions',

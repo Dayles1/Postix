@@ -11,6 +11,7 @@ use App\Application\Telegram\Actions\ProcessClientCheckMessage;
 use App\Application\Telegram\Actions\ProcessCreatedDriverMessage;
 use App\Application\Telegram\Actions\ProcessTelegramDriverCheckResults;
 use App\Application\Telegram\Actions\ProcessUpdatedDriverMessage;
+use App\Application\Telegram\Actions\RouteTelegramFile;
 use App\Application\Telegram\Actions\TelegramDriverCheckStarter;
 use App\Application\Telegram\Services\AutoReplyTelegramGifs;
 use App\Application\Telegram\Services\ClientCheckSender;
@@ -20,6 +21,7 @@ use App\Application\Telegram\Services\TelegramMessageTypeDetector;
 use App\Enums\Drivers\TelegramDriverMessageType;
 use danog\MadelineProto\EventHandler\Attributes\Cron;
 use danog\MadelineProto\EventHandler\Attributes\Handler;
+use danog\MadelineProto\EventHandler\Media\Document;
 use danog\MadelineProto\EventHandler\Message as TelegramIncomingMessage;
 use danog\MadelineProto\EventHandler\SimpleFilter\Incoming;
 use danog\MadelineProto\Loop\Update\UpdateLoop;
@@ -149,6 +151,25 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
             app(
                 TelegramDriverCheckChats::class,
             )->touch((int) $chatId);
+
+            /*
+             * The bots' morning files: forwarded to the groups their kind
+             * is set to. Only documents - a photo is never one of them.
+             */
+            if (
+                $message->media instanceof Document
+                && app(
+                    RouteTelegramFile::class,
+                )->execute(
+                    telegram: $this,
+                    chatId: (int) $chatId,
+                    messageId: (int) ($message->id ?? 0),
+                    fileName: (string) ($message->media->fileName ?? ''),
+                    caption: (string) ($message->message ?? ''),
+                )
+            ) {
+                return;
+            }
 
             Log::info(
                 'TelegramDriverCheckHandler: incoming message',
@@ -411,6 +432,32 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
         } catch (Throwable $e) {
             Log::error(
                 'TelegramDriverCheckHandler: client check nudge failed',
+                [
+                    'error' => $e->getMessage(),
+                    'exception' => $e::class,
+                ],
+            );
+        }
+    }
+
+    /**
+     * The file forwards Telegram refused (a group the account was not in
+     * yet, a flood wait), tried again a minute later.
+     */
+    #[Cron(period: 60.0)]
+    public function retryFileForwards(): void
+    {
+        if ($this->targetChatIds === null || $this->restartRequested) {
+            return;
+        }
+
+        try {
+            app(
+                RouteTelegramFile::class,
+            )->retry($this);
+        } catch (Throwable $e) {
+            Log::error(
+                'TelegramDriverCheckHandler: file forward retry failed',
                 [
                     'error' => $e->getMessage(),
                     'exception' => $e::class,

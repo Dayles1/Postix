@@ -79,6 +79,7 @@ return [
             'auto_replies' => 'Avto-javoblar',
             'personal_answers' => 'Shaxsiy javoblar',
             'chats' => 'Chatlar',
+            'file_routes' => 'Fayllar',
             'sessions' => 'Telegram sessiyalari',
             'watchdog' => 'Watchdog',
             'queue' => 'Navbat',
@@ -782,6 +783,9 @@ return [
             'peer' => 'Chat ID',
             'status' => 'Holat',
             'checks' => 'Tekshiruvlar',
+            'counts' => 'Statistika',
+            'penalties' => 'Jarimalar',
+            'files' => 'Fayllar',
             'last_message' => 'Oxirgi xabar',
             'actions' => 'Amallar',
             'no_link' => 'ID orqali qo\'shilgan',
@@ -845,6 +849,101 @@ return [
         'empty' => [
             'title' => 'Hozircha chat yo\'q',
             'description' => 'Xabarlari tekshiriladigan guruhni qo\'shing. Usiz listener ishlaydi, lekin jim turadi.',
+        ],
+    ],
+
+    'file_routes' => [
+
+        'title' => 'Fayllar',
+
+        'description' => 'Bildirishnoma boti har kuni ertalab yuboradigan fayllar: qaysi turi qaysi guruhlarga forward qilinadi.',
+
+        'notice' => 'Fayl turi izoh yoki fayl nomidagi kalit so\'z orqali aniqlanadi, ro\'yxatda yuqoridagi tur birinchi tekshiriladi. Listener akkaunti tanlangan guruhlarda a\'zo bo\'lishi kerak, aks holda Telegram forwardni rad etadi.',
+
+        'source' => 'Manba chat',
+
+        'create' => 'Tur qo\'shish',
+
+        'table' => [
+            'name' => 'Tur',
+            'keywords' => 'Kalit so\'zlar',
+            'targets' => 'Guruhlar',
+            'sent' => 'Yuborildi',
+            'last_sent' => 'Oxirgi',
+            'status' => 'Holat',
+            'actions' => 'Amallar',
+            'edit' => 'Tahrirlash',
+            'no_targets' => 'Guruh tanlanmagan',
+            'never' => 'Hali yo\'q',
+        ],
+
+        'status' => [
+            'active' => 'Yoqilgan',
+            'paused' => 'To\'xtatilgan',
+        ],
+
+        'recent' => [
+            'title' => 'Oxirgi fayllar',
+            'description' => 'Oxirgi 50 ta yuborish. Rad etilgani daqiqada bir qayta uriniladi (3 martagacha).',
+            'time' => 'Vaqt',
+            'file' => 'Fayl',
+            'route' => 'Tur',
+            'target' => 'Guruh',
+            'status' => 'Holat',
+            'empty' => 'Hali fayl kelmagan',
+            'no_route' => 'Aniqlanmadi',
+        ],
+
+        'forward_status' => [
+            'sent' => 'Yuborildi',
+            'failed' => 'Xato',
+            'unmatched' => 'Tur topilmadi',
+        ],
+
+        'form' => [
+            'create_title' => 'Yangi fayl turi',
+            'edit_title' => 'Fayl turini tahrirlash',
+            'name' => 'Nomi',
+            'name_hint' => 'Faqat panel uchun',
+            'keywords' => 'Kalit so\'zlar',
+            'keywords_hint' => 'Vergul bilan. Izoh yoki fayl nomida shulardan biri bo\'lsa, fayl shu turga tegishli. Katta-kichik harf, chiziqcha va qavslar ahamiyatsiz',
+            'targets' => 'Guruhlar ID si',
+            'targets_hint' => 'Har qatorda bitta, masalan -5524265426 yoki -1004431008937',
+            'is_active' => 'Forward qilish',
+            'is_active_hint' => 'O\'chirilsa, bu turdagi fayllar hech qayerga yuborilmaydi',
+            'save' => 'Saqlash',
+            'cancel' => 'Bekor qilish',
+            'saving' => 'Saqlanmoqda...',
+            'delete' => 'O\'chirish',
+        ],
+
+        'confirm' => [
+            'delete_title' => 'Bu fayl turi o\'chirilsinmi?',
+            'delete_text' => 'Bunday fayllar endi forward qilinmaydi. Yuborilganlar jurnalda qoladi.',
+            'delete' => 'O\'chirish',
+            'cancel' => 'Bekor qilish',
+        ],
+
+        'messages' => [
+            'created' => 'Fayl turi qo\'shildi',
+            'updated' => 'O\'zgarishlar saqlandi',
+            'deleted' => 'Fayl turi o\'chirildi',
+        ],
+
+        'validation' => [
+            'chat_id' => 'Guruh ID si raqam bo\'lishi kerak, masalan -1004431008937',
+        ],
+
+        'errors' => [
+            'title' => 'Xato',
+            'load' => 'Fayl turlarini yuklab bo\'lmadi',
+            'save' => 'Saqlab bo\'lmadi',
+            'delete' => 'O\'chirib bo\'lmadi',
+        ],
+
+        'empty' => [
+            'title' => 'Fayl turlari yo\'q',
+            'description' => 'php artisan db:seed --class=TelegramFileRouteSeeder yoki "Tur qo\'shish" tugmasi bilan qo\'shing.',
         ],
     ],
 

@@ -71,7 +71,7 @@ final class ListDriverCheckChats
     ): Builder {
         $query = TelegramDriverCheckChat::query()
             ->select('telegram_driver_check_chats.*')
-            ->withCount('checks');
+            ->withCount(TelegramDriverCheckChat::counters());
 
         $search = trim(
             (string) ($filters['search'] ?? ''),
@@ -129,6 +129,8 @@ final class ListDriverCheckChats
             'title',
             'last_message_at',
             'checks',
+            'penalties',
+            'files',
         ];
 
         $sort = (string) ($filters['sort'] ?? 'created_at');
@@ -143,8 +145,8 @@ final class ListDriverCheckChats
             ? 'asc'
             : 'desc';
 
-        $column = $sort === 'checks'
-            ? 'checks_count'
+        $column = in_array($sort, ['checks', 'penalties', 'files'], true)
+            ? $sort . '_count'
             : $sort;
 
         $query->orderBy($column, $direction);

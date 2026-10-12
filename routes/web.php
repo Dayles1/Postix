@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\Telegram\DriverCheckChatController;
 use App\Http\Controllers\Api\Telegram\DriverCheckExportController;
 use App\Http\Controllers\Api\Telegram\DriverCheckQueueController;
 use App\Http\Controllers\Api\Telegram\DriverCheckWatchdogController;
+use App\Http\Controllers\Api\Telegram\FileRouteController;
 use App\Http\Controllers\Api\Telegram\OperationUserController;
 use App\Http\Controllers\Api\Telegram\PersonalAnswerController;
 use App\Http\Controllers\Api\Telegram\OperatorController;
@@ -240,6 +241,15 @@ Route::middleware(['auth', 'role:driverCheck,superadmin'])
             '/chats',
             [DriverCheckController::class, 'chats']
         )->name('driver-check.chats');
+
+        /*
+         * File routes: the notifications bot's morning files, forwarded
+         * to the groups their kind is set to.
+         */
+        Route::get(
+            '/file-routes',
+            [DriverCheckController::class, 'fileRoutes']
+        )->name('driver-check.file-routes');
 
         /*
          * Monitoring: the listener under its watchdog, and the queue
@@ -488,6 +498,29 @@ Route::middleware(['auth', 'role:driverCheck,superadmin'])
             '/chats/{chat}',
             [DriverCheckChatController::class, 'destroy']
         )->name('api.telegram.chats.destroy');
+
+        /*
+         * File routes (management CRUD)
+         */
+        Route::get(
+            '/file-routes',
+            [FileRouteController::class, 'index']
+        )->name('api.telegram.file-routes.index');
+
+        Route::post(
+            '/file-routes',
+            [FileRouteController::class, 'store']
+        )->name('api.telegram.file-routes.store');
+
+        Route::put(
+            '/file-routes/{fileRoute}',
+            [FileRouteController::class, 'update']
+        )->name('api.telegram.file-routes.update');
+
+        Route::delete(
+            '/file-routes/{fileRoute}',
+            [FileRouteController::class, 'destroy']
+        )->name('api.telegram.file-routes.destroy');
 
         /*
          * Watchdog

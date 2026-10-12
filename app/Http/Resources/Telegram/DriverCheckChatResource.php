@@ -53,6 +53,10 @@ final class DriverCheckChatResource extends JsonResource
 
             'checks_count' => (int) ($this->checks_count ?? 0),
 
+            'penalties_count' => (int) ($this->penalties_count ?? 0),
+
+            'files_count' => (int) ($this->files_count ?? 0),
+
             'created_at' => $this->created_at,
 
             'updated_at' => $this->updated_at,

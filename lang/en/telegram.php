@@ -79,6 +79,7 @@ return [
             'auto_replies' => 'Auto replies',
             'personal_answers' => 'Personal answers',
             'chats' => 'Chats',
+            'file_routes' => 'Files',
             'sessions' => 'Telegram sessions',
             'watchdog' => 'Watchdog',
             'queue' => 'Queue',
@@ -794,6 +795,9 @@ return [
             'peer' => 'Chat ID',
             'status' => 'Status',
             'checks' => 'Checks',
+            'counts' => 'Counts',
+            'penalties' => 'Penalties',
+            'files' => 'Files',
             'last_message' => 'Last message',
             'actions' => 'Actions',
             'no_link' => 'Added as an ID',
@@ -857,6 +861,101 @@ return [
         'empty' => [
             'title' => 'No chats yet',
             'description' => 'Add the group whose driver messages should be checked. Without one the listener runs but stays silent.',
+        ],
+    ],
+
+    'file_routes' => [
+
+        'title' => 'Files',
+
+        'description' => 'The files the notifications bot sends every morning: which kind is forwarded to which groups.',
+
+        'notice' => 'A file\'s kind is found by a keyword in its caption or file name, kinds are tried top to bottom. The listener account must be a member of the chosen groups, otherwise Telegram refuses the forward.',
+
+        'source' => 'Source chat',
+
+        'create' => 'Add kind',
+
+        'table' => [
+            'name' => 'Kind',
+            'keywords' => 'Keywords',
+            'targets' => 'Groups',
+            'sent' => 'Sent',
+            'last_sent' => 'Last',
+            'status' => 'Status',
+            'actions' => 'Actions',
+            'edit' => 'Edit',
+            'no_targets' => 'No group chosen',
+            'never' => 'Not yet',
+        ],
+
+        'status' => [
+            'active' => 'On',
+            'paused' => 'Off',
+        ],
+
+        'recent' => [
+            'title' => 'Recent files',
+            'description' => 'The last 50 forwards. A refused one is retried every minute (up to 3 times).',
+            'time' => 'Time',
+            'file' => 'File',
+            'route' => 'Kind',
+            'target' => 'Group',
+            'status' => 'Status',
+            'empty' => 'No files yet',
+            'no_route' => 'Unknown',
+        ],
+
+        'forward_status' => [
+            'sent' => 'Sent',
+            'failed' => 'Failed',
+            'unmatched' => 'No kind',
+        ],
+
+        'form' => [
+            'create_title' => 'New file kind',
+            'edit_title' => 'Edit file kind',
+            'name' => 'Name',
+            'name_hint' => 'For the panel only',
+            'keywords' => 'Keywords',
+            'keywords_hint' => 'Comma separated. A file whose caption or name contains one of them is of this kind. Case, dashes and brackets do not matter',
+            'targets' => 'Group ids',
+            'targets_hint' => 'One per line, e.g. -5524265426 or -1004431008937',
+            'is_active' => 'Forward',
+            'is_active_hint' => 'When off, files of this kind are not sent anywhere',
+            'save' => 'Save',
+            'cancel' => 'Cancel',
+            'saving' => 'Saving...',
+            'delete' => 'Delete',
+        ],
+
+        'confirm' => [
+            'delete_title' => 'Delete this file kind?',
+            'delete_text' => 'Such files will no longer be forwarded. The ones sent stay in the journal.',
+            'delete' => 'Delete',
+            'cancel' => 'Cancel',
+        ],
+
+        'messages' => [
+            'created' => 'File kind added',
+            'updated' => 'Changes saved',
+            'deleted' => 'File kind deleted',
+        ],
+
+        'validation' => [
+            'chat_id' => 'A group id is a number, e.g. -1004431008937',
+        ],
+
+        'errors' => [
+            'title' => 'Error',
+            'load' => 'Could not load the file kinds',
+            'save' => 'Could not save',
+            'delete' => 'Could not delete',
+        ],
+
+        'empty' => [
+            'title' => 'No file kinds',
+            'description' => 'Add them with php artisan db:seed --class=TelegramFileRouteSeeder or the "Add kind" button.',
         ],
     ],
 

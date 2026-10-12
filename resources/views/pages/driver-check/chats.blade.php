@@ -114,6 +114,8 @@
                         'title' => __('telegram.chats.table.chat'),
                         'last_message_at' => __('telegram.chats.table.last_message'),
                         'checks' => __('telegram.chats.table.checks'),
+                        'penalties' => __('telegram.chats.table.penalties'),
+                        'files' => __('telegram.chats.table.files'),
                     ]"
             >
                 <x-driver-check.field :label="__('telegram.chats.filters.status')">
@@ -138,10 +140,10 @@
                 <div class="overflow-x-auto">
                     <table class="w-full min-w-[960px] table-fixed text-left">
                         <colgroup>
-                            <col class="w-[28%]">
+                            <col class="w-[24%]">
                             <col class="w-[16%]">
                             <col class="w-[14%]">
-                            <col class="w-[10%]">
+                            <col class="w-[14%]">
                             <col class="w-[18%]">
                             <col class="w-[14%]">
                         </colgroup>
@@ -151,7 +153,7 @@
                                 <th scope="col" class="px-4 py-2.5 font-semibold">{{ __('telegram.chats.table.chat') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.chats.table.peer') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.chats.table.status') }}</th>
-                                <th scope="col" class="px-3 py-2.5 text-right font-semibold">{{ __('telegram.chats.table.checks') }}</th>
+                                <th scope="col" class="px-3 py-2.5 text-right font-semibold">{{ __('telegram.chats.table.counts') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.chats.table.last_message') }}</th>
                                 <th scope="col" class="px-4 py-2.5 text-right font-semibold">{{ __('telegram.chats.table.actions') }}</th>
                             </tr>
@@ -242,10 +244,21 @@
                                         </x-driver-check.badge>
                                     </td>
 
-                                    <td
-                                        class="px-3 py-3 text-right text-sm tabular-nums text-gray-700 dark:text-gray-300"
-                                        x-text="number(row.checks_count)"
-                                    ></td>
+                                    {{-- Counts: checks, CRM penalties, routed files --}}
+                                    <td class="px-3 py-3">
+                                        <dl class="ml-auto grid w-fit grid-cols-[auto_auto] gap-x-2.5 gap-y-0.5 text-[12px]">
+                                            @foreach (['checks', 'penalties', 'files'] as $counter)
+                                                <dt class="text-gray-500 dark:text-gray-400">{{ __('telegram.chats.table.' . $counter) }}</dt>
+                                                <dd
+                                                    class="text-right tabular-nums"
+                                                    :class="row.{{ $counter }}_count > 0
+                                                        ? 'font-medium text-gray-900 dark:text-white'
+                                                        : 'text-gray-400 dark:text-gray-500'"
+                                                    x-text="number(row.{{ $counter }}_count)"
+                                                ></dd>
+                                            @endforeach
+                                        </dl>
+                                    </td>
 
                                     {{-- Last message --}}
                                     <td class="px-3 py-3">
@@ -320,6 +333,14 @@
 
                             <x-driver-check.kv :label="__('telegram.chats.table.checks')">
                                 <span class="tabular-nums" x-text="number(row.checks_count)"></span>
+                            </x-driver-check.kv>
+
+                            <x-driver-check.kv :label="__('telegram.chats.table.penalties')">
+                                <span class="tabular-nums" x-text="number(row.penalties_count)"></span>
+                            </x-driver-check.kv>
+
+                            <x-driver-check.kv :label="__('telegram.chats.table.files')">
+                                <span class="tabular-nums" x-text="number(row.files_count)"></span>
                             </x-driver-check.kv>
 
                             <x-driver-check.kv :label="__('telegram.chats.table.last_message')">

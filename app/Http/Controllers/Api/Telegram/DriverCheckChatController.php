@@ -67,7 +67,7 @@ final class DriverCheckChatController extends Controller
         ]);
 
         return (new DriverCheckChatResource(
-            $chat->loadCount('checks'),
+            $chat->loadCount(TelegramDriverCheckChat::counters()),
         ))
             ->response()
             ->setStatusCode(201);
@@ -109,7 +109,7 @@ final class DriverCheckChatController extends Controller
         $chat->update($attributes);
 
         return new DriverCheckChatResource(
-            $chat->loadCount('checks'),
+            $chat->loadCount(TelegramDriverCheckChat::counters()),
         );
     }
 
