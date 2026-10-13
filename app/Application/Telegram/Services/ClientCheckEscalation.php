@@ -186,7 +186,7 @@ final class ClientCheckEscalation
      *
      * @param Collection<int, TelegramClientCheck> $batch oldest first
      */
-    private function strongest(Collection $batch, OperationUser $person): ?TelegramClientCheck
+    public function strongest(Collection $batch, OperationUser $person): ?TelegramClientCheck
     {
         return $batch
             ->filter(fn (TelegramClientCheck $check): bool => $this->mode($check, $person) === ClientCheckRules::MODE_ALL)

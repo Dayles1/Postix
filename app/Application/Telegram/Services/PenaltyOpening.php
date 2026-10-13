@@ -57,7 +57,11 @@ final class PenaltyOpening
     ): void {
         $rules = $this->store->current();
 
-        if (! $rules->opening['enabled'] || Cache::has(self::greetedKey($person))) {
+        if (
+            ! $rules->opening['enabled']
+            || ! $person->allows('greet_first_enabled')
+            || Cache::has(self::greetedKey($person))
+        ) {
             return;
         }
 

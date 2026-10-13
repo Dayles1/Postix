@@ -69,6 +69,15 @@ final class AutoReplyRequest extends FormRequest
             'opening' => ['sometimes', 'array'],
             'opening.enabled' => ['required_with:opening', 'boolean'],
             'opening.answers' => ['present_with:opening', 'array'],
+
+            /*
+             * Left out: the file keeps the config's follow-up.
+             */
+            'follow_up' => ['sometimes', 'array'],
+            'follow_up.enabled' => ['required_with:follow_up', 'boolean'],
+            'follow_up.window_minutes' => ['required_with:follow_up', 'integer', 'min:1', 'max:1440'],
+            'follow_up.answers' => ['present_with:follow_up', 'array'],
+            'follow_up.answers_many' => ['nullable', 'array'],
         ];
 
         /*
@@ -97,7 +106,7 @@ final class AutoReplyRequest extends FormRequest
 
         foreach (OperationUser::LANGUAGES as $language) {
             foreach (ClientCheckRules::TONES as $tone) {
-                foreach (['replies.*.answers', 'silence.answers', 'opening.answers', 'greetings.list.*.answers'] as $answers) {
+                foreach (['replies.*.answers', 'silence.answers', 'opening.answers', 'follow_up.answers', 'follow_up.answers_many', 'greetings.list.*.answers'] as $answers) {
                     $rules["{$answers}.{$language}.{$tone}"] = ['nullable', 'array', 'max:' . AutoReplyRules::MAX_ANSWERS];
                     $rules["{$answers}.{$language}.{$tone}.*"] = ['nullable', 'string', 'max:1000'];
                 }
@@ -179,6 +188,17 @@ final class AutoReplyRequest extends FormRequest
                     $validator->errors()->add(
                         'opening.answers',
                         __('telegram.auto_replies.validation.opening'),
+                    );
+                }
+
+                /*
+                 * The follow-up is texts only: one for a single penalty at
+                 * least - a burst borrows those.
+                 */
+                if ($this->boolean('follow_up.enabled') && ! $this->hasAnswer($this->input('follow_up.answers', []))) {
+                    $validator->errors()->add(
+                        'follow_up.answers',
+                        __('telegram.auto_replies.validation.follow_up'),
                     );
                 }
             },

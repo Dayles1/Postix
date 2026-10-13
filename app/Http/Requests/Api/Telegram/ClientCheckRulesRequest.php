@@ -47,7 +47,7 @@ final class ClientCheckRulesRequest extends FormRequest
                 "roles.{$role}.levels.*.mode" => ['required', 'string', Rule::in(ClientCheckRules::MODES)],
                 "roles.{$role}.levels.*.phrases" => ['present', 'array'],
                 "roles.{$role}.levels.*.phrases.*" => ['array'],
-                "roles.{$role}.levels.*.phrases.*.*" => ['array', 'max:30'],
+                "roles.{$role}.levels.*.phrases.*.*" => ['array', 'max:' . ClientCheckRules::MAX_PHRASES],
                 "roles.{$role}.levels.*.phrases.*.*.*" => ['nullable', 'string', 'max:1000'],
             ];
         }

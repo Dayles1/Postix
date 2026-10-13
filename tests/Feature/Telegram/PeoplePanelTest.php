@@ -82,6 +82,11 @@ class PeoplePanelTest extends TestCase
             $table->unsignedBigInteger('telegram_id')->nullable()->unique();
             $table->boolean('is_active')->default(true);
             $table->boolean('dm_enabled')->default(true);
+            $table->boolean('penalties_enabled')->default(true);
+            $table->boolean('penalty_comments_enabled')->default(true);
+            $table->boolean('greet_first_enabled')->default(true);
+            $table->boolean('nudge_enabled')->default(true);
+            $table->boolean('auto_replies_enabled')->default(true);
             $table->timestamp('dm_last_sent_at')->nullable();
             $table->text('dm_last_error')->nullable();
             $table->timestamp('last_private_message_at')->nullable();
@@ -391,6 +396,36 @@ class PeoplePanelTest extends TestCase
         $this->putJson("/api/telegram/operators/{$operator->id}", ['name' => 'ALPHA OPERATOR', 'language' => 'en'])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('language');
+    }
+
+    public function test_what_goes_to_the_private_chat_is_switched_one_by_one(): void
+    {
+        $person = $this->person('ALPHA OPERATOR');
+
+        $this->getJson('/api/telegram/operators')
+            ->assertJsonPath('data.0.switches.auto_replies_enabled', true)
+            ->assertJsonPath('data.0.switches.penalties_enabled', true);
+
+        $this->putJson("/api/telegram/operators/{$person->id}", [
+            'name' => 'ALPHA OPERATOR',
+            'auto_replies_enabled' => false,
+            'nudge_enabled' => false,
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.switches.auto_replies_enabled', false)
+            ->assertJsonPath('data.switches.nudge_enabled', false)
+            ->assertJsonPath('data.switches.penalties_enabled', true);
+
+        /* Left out of an edit, they stay as they are. */
+        $this->putJson("/api/telegram/operators/{$person->id}", ['name' => 'ALPHA OPERATOR'])
+            ->assertJsonPath('data.switches.auto_replies_enabled', false);
+
+        $this->assertFalse($person->refresh()->allows('auto_replies_enabled'));
+        $this->assertTrue($person->allows('penalties_enabled'));
+
+        /* The private chat off turns every one of them off. */
+        $person->update(['dm_enabled' => false]);
+        $this->assertFalse($person->allows('penalties_enabled'));
     }
 
     public function test_how_to_call_a_person_is_saved_per_language(): void

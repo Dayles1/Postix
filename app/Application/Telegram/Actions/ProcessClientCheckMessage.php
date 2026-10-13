@@ -228,6 +228,24 @@ final class ProcessClientCheckMessage
             return $check;
         }
 
+        /*
+         * Reachable, but not for penalties: switched off on their card.
+         */
+        if (! $person->allows('penalties_enabled')) {
+            $check->update([
+                'status' => TelegramClientCheckStatus::Skipped,
+                'reason' => TelegramClientCheck::REASON_PERSON_PENALTIES_OFF,
+            ]);
+
+            Log::info('Client check: skipped', [
+                'check_id' => $check->id,
+                'operation_user_id' => $person->id,
+                'reason' => TelegramClientCheck::REASON_PERSON_PENALTIES_OFF,
+            ]);
+
+            return $check;
+        }
+
         $forwarded = $this->sender->forward($telegram, $check);
 
         Log::info('Client check: forward', [

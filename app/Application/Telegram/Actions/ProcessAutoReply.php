@@ -124,9 +124,10 @@ final class ProcessAutoReply
         );
 
         /*
-         * Muted on the card: nothing is written to them, an answer neither.
+         * Muted on the card - the private chat or the auto replies alone:
+         * nothing is written to them, an answer neither.
          */
-        if (($kind === null && ! $greet) || ! $person->dm_enabled) {
+        if (($kind === null && ! $greet) || ! $person->allows('auto_replies_enabled')) {
             return null;
         }
 

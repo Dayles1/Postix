@@ -301,6 +301,14 @@
                                                        dark:bg-brand-500/10 dark:text-brand-300"
                                                 x-text="translations.table.respectful"
                                             ></span>
+                    <span
+                        x-show="switchesOff(row).length"
+                        x-cloak
+                        class="rounded bg-warning-50 px-1.5 py-px text-[10px] font-medium text-warning-700
+                               dark:bg-warning-500/10 dark:text-warning-400"
+                        :title="switchesOff(row).join(', ')"
+                        x-text="translations.form.switches_off.replace(':n', switchesOff(row).length)"
+                    ></span>
                                             <span
                                                 x-show="addressOf(row)"
                                                 x-cloak
@@ -418,6 +426,14 @@
                                                dark:bg-brand-500/10 dark:text-brand-300"
                                         x-text="translations.table.respectful"
                                     ></span>
+                                            <span
+                                                x-show="switchesOff(row).length"
+                                                x-cloak
+                                                class="rounded bg-warning-50 px-1.5 py-px text-[10px] font-medium text-warning-700
+                                                       dark:bg-warning-500/10 dark:text-warning-400"
+                                                :title="switchesOff(row).join(', ')"
+                                                x-text="translations.form.switches_off.replace(':n', switchesOff(row).length)"
+                                            ></span>
                                     <span
                                         x-show="addressOf(row)"
                                         x-cloak
@@ -743,6 +759,38 @@
                     </span>
                 </span>
             </label>
+
+            {{-- What goes to the private chat, one by one (OperationUser::MESSAGE_SWITCHES) --}}
+            <div x-show="form.dm_enabled" x-collapse class="rounded-2xl border border-gray-200 p-3.5 dark:border-gray-800">
+                <p class="text-sm font-medium text-gray-900 dark:text-white">
+                    {{ __('telegram.operators.form.switches') }}
+                </p>
+                <p class="mt-0.5 text-[11px] leading-snug text-gray-500 dark:text-gray-400">
+                    {{ __('telegram.operators.form.switches_hint') }}
+                </p>
+
+                <div class="mt-2.5 flex flex-col gap-1">
+                    @foreach (\App\Models\Telegram\OperationUser::MESSAGE_SWITCHES as $switch)
+                        <label class="dc-tap flex cursor-pointer items-start gap-3 rounded-xl px-2 py-1.5 transition hover:bg-gray-50 dark:hover:bg-white/[0.03]">
+                            <input
+                                type="checkbox"
+                                x-model="form.switches.{{ $switch }}"
+                                class="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-brand-500
+                                       focus:ring-brand-500/30 dark:border-gray-600 dark:bg-gray-900"
+                            >
+
+                            <span class="min-w-0">
+                                <span class="block text-[13px] font-medium text-gray-800 dark:text-gray-200">
+                                    {{ __('telegram.operators.form.switch.' . $switch . '.label') }}
+                                </span>
+                                <span class="block text-[11px] leading-snug text-gray-500 dark:text-gray-400">
+                                    {{ __('telegram.operators.form.switch.' . $switch . '.hint') }}
+                                </span>
+                            </span>
+                        </label>
+                    @endforeach
+                </div>
+            </div>
 
             <p
                 x-show="formError"

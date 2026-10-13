@@ -28,6 +28,11 @@ final readonly class ClientCheckRules
 {
     public const MAX_LEVELS = 10;
 
+    /**
+     * Phrases per language and tone of a level: what the panel takes.
+     */
+    public const MAX_PHRASES = 30;
+
     public const TONE_PLAIN = 'plain';
 
     public const TONE_RESPECTFUL = 'respectful';

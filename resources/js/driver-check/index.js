@@ -34,6 +34,11 @@ function operatorsPage(config) {
      */
     const role = config.role === 'sales' ? 'sales' : 'operation';
 
+    /* OperationUser::MESSAGE_SWITCHES: what goes to their private chat, all on by default. */
+    const switchKeys = Object.keys(t.form.switch || {});
+
+    const allOn = () => Object.fromEntries(switchKeys.map((key) => [key, true]));
+
     const emptyForm = () => ({
         id: null,
         name: '',
@@ -46,6 +51,7 @@ function operatorsPage(config) {
         respectful: false,
         /* How to call them, per language: "Ali aka", "jigar". */
         address: { uz: '', ru: '' },
+        switches: allOn(),
         deletable: false,
     });
 
@@ -131,6 +137,13 @@ function operatorsPage(config) {
             const address = row.address || {};
 
             return address[row.message_language] || Object.values(address)[0] || '';
+        },
+
+        /** The private-chat switches turned off on the card, by name. */
+        switchesOff(row) {
+            return switchKeys
+                .filter((key) => row.switches?.[key] === false)
+                .map((key) => t.form.switch[key].label);
         },
 
         /**
@@ -222,6 +235,7 @@ function operatorsPage(config) {
                 language: row.language || '',
                 respectful: !!row.respectful,
                 address: { uz: row.address?.uz || '', ru: row.address?.ru || '' },
+                switches: { ...allOn(), ...(row.switches || {}) },
                 deletable: !!row.deletable,
             };
 
@@ -310,6 +324,7 @@ function operatorsPage(config) {
                             uz: this.form.address.uz.trim() || null,
                             ru: this.form.address.ru.trim() || null,
                         },
+                        ...this.form.switches,
                     }),
                 });
 

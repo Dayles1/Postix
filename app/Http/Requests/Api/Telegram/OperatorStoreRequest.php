@@ -49,6 +49,12 @@ class OperatorStoreRequest extends FormRequest
 
             'dm_enabled' => ['nullable', 'boolean'],
 
+            /*
+             * OperationUser::MESSAGE_SWITCHES; left out keeps what the
+             * person has (on, for a new one).
+             */
+            ...array_fill_keys(OperationUser::MESSAGE_SWITCHES, ['sometimes', 'boolean']),
+
             'role' => [
                 'nullable',
                 'string',

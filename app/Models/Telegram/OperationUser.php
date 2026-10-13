@@ -39,6 +39,20 @@ class OperationUser extends Model
         self::LANGUAGE_RU,
     ];
 
+    /**
+     * What goes into their private chat, one switch each, all under
+     * dm_enabled: the CRM penalties, the comment after them, our greeting
+     * before the day's first one (PenaltyOpening), the nudge when they
+     * stay silent, and the answers to their own messages (ProcessAutoReply).
+     */
+    public const MESSAGE_SWITCHES = [
+        'penalties_enabled',
+        'penalty_comments_enabled',
+        'greet_first_enabled',
+        'nudge_enabled',
+        'auto_replies_enabled',
+    ];
+
     protected $fillable = [
         'name',
         'name_normalized',
@@ -51,6 +65,11 @@ class OperationUser extends Model
         'telegram_id',
         'is_active',
         'dm_enabled',
+        'penalties_enabled',
+        'penalty_comments_enabled',
+        'greet_first_enabled',
+        'nudge_enabled',
+        'auto_replies_enabled',
         'dm_last_sent_at',
         'dm_last_error',
         'last_private_message_at',
@@ -62,6 +81,11 @@ class OperationUser extends Model
             'telegram_id' => 'integer',
             'is_active' => 'boolean',
             'dm_enabled' => 'boolean',
+            'penalties_enabled' => 'boolean',
+            'penalty_comments_enabled' => 'boolean',
+            'greet_first_enabled' => 'boolean',
+            'nudge_enabled' => 'boolean',
+            'auto_replies_enabled' => 'boolean',
             'respectful' => 'boolean',
             'address' => 'array',
             'personal_answers' => 'array',
@@ -216,6 +240,17 @@ class OperationUser extends Model
     {
         return $this->dm_enabled
             && $this->hasTelegramPeer();
+    }
+
+    /**
+     * Whether $switch (MESSAGE_SWITCHES) lets this go to them: the private
+     * chat on and that switch too. A row read without the column - an
+     * older select - counts as on, the column's default.
+     */
+    public function allows(string $switch): bool
+    {
+        return (bool) $this->dm_enabled
+            && ($this->getAttribute($switch) ?? true) !== false;
     }
 
     public function hasTelegramPeer(): bool

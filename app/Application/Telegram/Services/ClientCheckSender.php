@@ -32,6 +32,7 @@ final class ClientCheckSender
         private readonly ClientCheckEscalation $escalation,
         private readonly AutoReplyDelivery $delivery,
         private readonly PenaltyOpening $opening,
+        private readonly PenaltyFollowUp $followUp,
     ) {
     }
 
@@ -251,16 +252,36 @@ final class ClientCheckSender
             return;
         }
 
+        /*
+         * The same, for this person only: their card says no comments.
+         */
+        if (! $person->allows('penalty_comments_enabled')) {
+            TelegramClientCheck::query()->whereIn('id', $ids)->update([
+                'status' => TelegramClientCheckStatus::Sent,
+                'reason' => TelegramClientCheck::REASON_PERSON_COMMENTS_OFF,
+                'error' => null,
+                'sent_at' => now(),
+            ]);
+
+            return;
+        }
+
         TelegramClientCheck::query()->whereIn('id', $ids)->increment('attempts');
 
         try {
             /*
+             * The same level's comment went to them a moment ago: "это
+             * тоже" rather than the same phrase again (PenaltyFollowUp).
+             */
+            $followUp = $this->followUp->comment($batch, $person);
+
+            /*
              * The person's own answer for this level, when it comes up -
              * a voice with their name, say - otherwise the shared phrase.
              */
-            $personal = $this->escalation->personal($batch, $person);
+            $personal = $followUp === null ? $this->escalation->personal($batch, $person) : null;
 
-            $comment = $personal === null ? $this->escalation->comment($batch, $person) : null;
+            $comment = $followUp ?? ($personal === null ? $this->escalation->comment($batch, $person) : null);
 
             /*
              * No comment at this level for this role: the forward was the
@@ -316,6 +337,7 @@ final class ClientCheckSender
                     'check_ids' => $ids,
                     'level' => $last->refresh()->comment_level,
                     'personal' => $personal !== null,
+                    'follow_up' => $followUp !== null,
                 ],
             );
         } catch (Throwable $e) {

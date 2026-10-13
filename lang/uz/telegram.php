@@ -164,6 +164,31 @@ return [
             'telegram_id_hint' => 'Zaxira variant: akkaunt bu foydalanuvchini allaqachon ko\'rgan bo\'lsagina ishlaydi',
             'dm_enabled' => 'Hisobotlarni lichkaga yuborish',
             'dm_enabled_hint' => 'Guruhga ketgan hisobot nusxasi operatorga shaxsiy xabar bilan yuboriladi',
+            'switches' => 'Lichkaga nima yuboriladi',
+            'switches_hint' => 'Yuqoridagi lichkaga yuborish yoqilgan bo\'lsa ishlaydi.',
+            'switches_off' => 'O\'chirilgan: :n',
+            'switch' => [
+                'penalties_enabled' => [
+                    'label' => 'CRM jarimalari',
+                    'hint' => 'Jarimani forward qilish. O\'chirilsa - jarimalar umuman yuborilmaydi.',
+                ],
+                'penalty_comments_enabled' => [
+                    'label' => 'Jarimaga izoh',
+                    'hint' => 'Forwarddan keyingi matn: «Moshina chiqmadimi?».',
+                ],
+                'greet_first_enabled' => [
+                    'label' => 'Birinchi bo\'lib salom',
+                    'hint' => 'Kunning birinchi jarimasidan oldin «Assalomu alaykum».',
+                ],
+                'nudge_enabled' => [
+                    'label' => 'Eslatma',
+                    'hint' => 'Jarimalarga ketma-ket javob bermasa.',
+                ],
+                'auto_replies_enabled' => [
+                    'label' => 'Avto-javoblar',
+                    'hint' => 'Uning xabarlariga javob: «+», «ok», salom.',
+                ],
+            ],
             'role' => 'Rol',
             'role_hint' => 'Rol odam qaysi sahifada ko\'rinishini belgilaydi. Ism bo\'yicha moslashtirish umumiy: bitta odam ikkalasida bo\'la olmaydi.',
             'save' => 'Saqlash',
@@ -328,6 +353,8 @@ return [
             'outside_hours' => 'Ish vaqtidan tashqari keldi - yuborilmadi',
             'responsible_missing' => 'Jarimada mas\'ul ko\'rsatilmagan',
             'responsible_unreachable' => 'Mas\'ulning Telegrami yo\'q yoki lichkaga yuborish o\'chirilgan',
+            'person_penalties_off' => 'Odam kartasida jarimalar o\'chirilgan',
+            'person_comments_off' => 'Izohsiz forward qilindi: odam kartasida o\'chirilgan',
             'forward_failed' => 'Telegram forwardni qabul qilmadi',
             'comment_failed' => 'Izoh yuborilmadi',
             'disabled' => 'Jarimalarni yuborish o\'chirilgan edi',
@@ -605,6 +632,7 @@ return [
             'file' => 'Fayl',
             'silence' => 'Javob bermasa',
             'opening' => 'Jarimadan oldin salom',
+            'follow_up' => '«Bu ham»',
             'greetings' => 'Salomlashish',
         ],
         'tones' => [
@@ -656,6 +684,14 @@ return [
             'enabled' => 'Birinchi bo\'lib salomlashish',
             'enabled_hint' => 'Kunning birinchi jarimasidan oldin - avval alohida xabar bilan «Assalomu alaykum, Ali aka», bir-ikki soniyadan keyin jarima. Bugun o\'zi birinchi salom bergan bo\'lsa - kerak emas; uning «Va alaykum assalom»iga javob berilmaydi.',
             'answers' => 'Salom',
+        ],
+        'follow_up' => [
+            'enabled' => 'Bir xil gapni takrorlamaslik',
+            'enabled_hint' => 'Odamga yaqinda shu darajadagi izoh («statusni yangilang») ketgan bo\'lsa, keyingi jarima qisqa «Bu ham» / «Bunisi ham» bilan, bir nechtasi - «Bularni ham unutmang» bilan boradi. Tirik odamga o\'xshaydi.',
+            'window_minutes' => 'Yaqinda - bu necha daqiqa',
+            'window_minutes_hint' => 'Shu odamga ketgan oxirgi izohdan hisoblanadi.',
+            'one' => 'Bitta jarima',
+            'many' => 'Bir nechta jarima birdan',
         ],
         'greetings' => [
             'enabled' => 'Salomga alik olish',
@@ -739,6 +775,7 @@ return [
             'fix' => 'Belgilangan maydonlarni tuzating',
             'silence' => 'Yoqilgan eslatmada kamida bitta matn, GIF yoki ovozli xabar bo\'lishi kerak',
             'opening' => 'Yoqilgan salomda kamida bitta matn, GIF yoki ovozli xabar bo\'lishi kerak',
+            'follow_up' => 'Yoqilgan «Bu ham»da bitta jarima uchun kamida bitta matn bo\'lishi kerak',
             'media_gif' => 'GIF - .gif yoki .mp4 fayl',
             'media_gif_sound' => 'Bu .mp4 da ovoz bor: Telegram uni GIF emas, video qilib ko\'rsatadi. Ovozsizini yuklang',
             'media_voice' => 'Ovozli xabar - .ogg (Opus) fayl, Telegram yozgandek',

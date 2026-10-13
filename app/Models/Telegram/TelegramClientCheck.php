@@ -40,6 +40,17 @@ class TelegramClientCheck extends Model
 
     public const REASON_RESPONSIBLE_UNREACHABLE = 'responsible_unreachable';
 
+    /**
+     * Penalties switched off on the person's card (penalties_enabled).
+     */
+    public const REASON_PERSON_PENALTIES_OFF = 'person_penalties_off';
+
+    /**
+     * Forwarded without the comment: switched off on the person's card
+     * (penalty_comments_enabled).
+     */
+    public const REASON_PERSON_COMMENTS_OFF = 'person_comments_off';
+
     public const REASON_FORWARD_FAILED = 'forward_failed';
 
     public const REASON_COMMENT_FAILED = 'comment_failed';

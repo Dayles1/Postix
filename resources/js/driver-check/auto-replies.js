@@ -260,6 +260,12 @@ function toForm(data) {
             answers: setsToForm(data.opening?.answers),
             media: mediaToForm(data.opening?.media),
         },
+        follow_up: {
+            enabled: !!data.follow_up?.enabled,
+            window_minutes: data.follow_up?.window_minutes ?? 60,
+            answers: setsToForm(data.follow_up?.answers),
+            answers_many: setsToForm(data.follow_up?.answers_many),
+        },
     };
 }
 
@@ -286,6 +292,12 @@ function toPayload(form) {
             enabled: !!form.opening.enabled,
             answers: setsToPayload(form.opening.answers),
             media: mediaToPayload(form.opening.media),
+        },
+        follow_up: {
+            enabled: !!form.follow_up.enabled,
+            window_minutes: toNumber(form.follow_up.window_minutes),
+            answers: setsToPayload(form.follow_up.answers),
+            answers_many: setsToPayload(form.follow_up.answers_many),
         },
     };
 }
@@ -622,6 +634,15 @@ export function autoRepliesPage(config) {
 
             if (k === 'opening') {
                 return this.form.opening;
+            }
+
+            /* "Это тоже": texts only, for one penalty and for a burst. */
+            if (k === 'follow_up') {
+                return { answers: this.form.follow_up.answers };
+            }
+
+            if (k === 'follow_up_many') {
+                return { answers: this.form.follow_up.answers_many };
             }
 
             if (typeof k === 'string' && k.startsWith('g')) {

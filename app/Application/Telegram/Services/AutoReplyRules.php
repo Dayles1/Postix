@@ -65,6 +65,12 @@ final readonly class AutoReplyRules
      *     answers: array<string, array<string, list<string>>>,
      *     media: array{gifs: list<array{file: string, name: string}>, voices: array<string, list<array{file: string, name: string}>>},
      * } $opening  our own greeting before the day's first penalty
+     * @param array{
+     *     enabled: bool,
+     *     window_minutes: int,
+     *     answers: array<string, array<string, list<string>>>,
+     *     answers_many: array<string, array<string, list<string>>>,
+     * } $followUp  "Это тоже" instead of the same level's comment again
      */
     public function __construct(
         public bool $enabled,
@@ -76,6 +82,7 @@ final readonly class AutoReplyRules
         public array $silence = ['enabled' => false, 'after_penalties' => 5, 'answers' => [], 'media' => ['gifs' => [], 'voices' => []]],
         public array $greetings = ['enabled' => false, 'fillers' => [], 'list' => []],
         public array $opening = ['enabled' => false, 'answers' => [], 'media' => ['gifs' => [], 'voices' => []]],
+        public array $followUp = ['enabled' => false, 'window_minutes' => 60, 'answers' => [], 'answers_many' => []],
     ) {
     }
 
@@ -139,6 +146,10 @@ final readonly class AutoReplyRules
             ? (array) $data['opening']
             : (array) config('auto_replies.defaults.opening', []);
 
+        $followUp = array_key_exists('follow_up', $data)
+            ? (array) $data['follow_up']
+            : (array) config('auto_replies.defaults.follow_up', []);
+
         return new self(
             enabled: (bool) ($data['enabled'] ?? true),
             onlyAfterPenalty: (bool) ($data['only_after_penalty'] ?? false),
@@ -162,6 +173,12 @@ final readonly class AutoReplyRules
                 'answers' => self::sets($opening['answers'] ?? []),
                 'media' => self::media($opening['media'] ?? []),
             ],
+            followUp: [
+                'enabled' => (bool) ($followUp['enabled'] ?? false),
+                'window_minutes' => self::clamp($followUp['window_minutes'] ?? 60, 1, 1440),
+                'answers' => self::sets($followUp['answers'] ?? []),
+                'answers_many' => self::sets($followUp['answers_many'] ?? []),
+            ],
         );
     }
 
@@ -180,6 +197,7 @@ final readonly class AutoReplyRules
             'silence' => $this->silence,
             'greetings' => $this->greetings,
             'opening' => $this->opening,
+            'follow_up' => $this->followUp,
         ];
     }
 
@@ -212,6 +230,22 @@ final readonly class AutoReplyRules
     public function silenceAnswers(string $language, string $tone): array
     {
         return self::pick($this->silence['answers'], $language, $tone);
+    }
+
+    /**
+     * The follow-up's texts for one penalty, or for a burst ($many) - the
+     * one-penalty ones when a burst has none ("И это" reads for several
+     * too) - the same way as answers().
+     *
+     * @return array{answers: list<string>, language: string, tone: string}
+     */
+    public function followUpAnswers(bool $many, string $language, string $tone): array
+    {
+        $found = $many ? self::pick($this->followUp['answers_many'], $language, $tone) : null;
+
+        return $found !== null && $found['answers'] !== []
+            ? $found
+            : self::pick($this->followUp['answers'], $language, $tone);
     }
 
     /**

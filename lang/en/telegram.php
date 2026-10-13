@@ -175,6 +175,31 @@ return [
             'is_active_hint' => 'An inactive operator receives nothing',
             'dm_enabled' => 'Send reports to the private chat',
             'dm_enabled_hint' => 'A copy of the group report is sent to the operator directly',
+            'switches' => 'What goes to their private chat',
+            'switches_hint' => 'Applies while sending to the private chat is on above.',
+            'switches_off' => 'Off: :n',
+            'switch' => [
+                'penalties_enabled' => [
+                    'label' => 'CRM penalties',
+                    'hint' => 'The penalty forward. Off - no penalties reach them at all.',
+                ],
+                'penalty_comments_enabled' => [
+                    'label' => 'Penalty comment',
+                    'hint' => 'The text after the forward: "Moshina chiqmadimi?".',
+                ],
+                'greet_first_enabled' => [
+                    'label' => 'Greet first',
+                    'hint' => '"Assalomu alaykum" before the day\'s first penalty.',
+                ],
+                'nudge_enabled' => [
+                    'label' => 'Nudge',
+                    'hint' => 'When they ignore several penalties in a row.',
+                ],
+                'auto_replies_enabled' => [
+                    'label' => 'Auto replies',
+                    'hint' => 'Answers to their messages: "+", "ok", greetings.',
+                ],
+            ],
             'role' => 'Role',
             'role_hint' => 'The role decides which page the person is on. Matching by name is shared: one person cannot be on both.',
             'save' => 'Save',
@@ -340,6 +365,8 @@ return [
             'outside_hours' => 'Came in outside working hours - not sent',
             'responsible_missing' => 'The penalty names nobody responsible',
             'responsible_unreachable' => 'The person has no Telegram contact or private messages are off',
+            'person_penalties_off' => 'Penalties are switched off on the person\'s card',
+            'person_comments_off' => 'Forwarded without a comment: switched off on the person\'s card',
             'forward_failed' => 'Telegram refused the forward',
             'comment_failed' => 'The comment was not sent',
             'disabled' => 'Penalty delivery was switched off',
@@ -617,6 +644,7 @@ return [
             'file' => 'File',
             'silence' => 'When they stay silent',
             'opening' => 'Greeting before a penalty',
+            'follow_up' => '"This one too"',
             'greetings' => 'Greetings',
         ],
         'tones' => [
@@ -668,6 +696,14 @@ return [
             'enabled' => 'Greet first',
             'enabled_hint' => 'Before the day\'s first penalty to a person - "Assalomu alaykum, Ali aka" as its own message first, the penalty a couple of seconds later. Not when they greeted us first today; their "Va alaykum assalom" is not answered.',
             'answers' => 'The greeting',
+        ],
+        'follow_up' => [
+            'enabled' => 'Do not repeat the same thing',
+            'enabled_hint' => 'When the person got a comment of the same level a moment ago ("update the status"), the next penalty goes with a short "This one too" / "And this", a burst with "Don\'t forget these too". Reads like a person.',
+            'window_minutes' => 'A moment ago is minutes',
+            'window_minutes_hint' => 'Counted from the last comment to this person.',
+            'one' => 'One penalty',
+            'many' => 'Several at once',
         ],
         'greetings' => [
             'enabled' => 'Greet back',
@@ -751,6 +787,7 @@ return [
             'fix' => 'Fix the highlighted fields',
             'silence' => 'A nudge that is on needs at least one text, GIF or voice message',
             'opening' => 'A greeting that is on needs at least one text, GIF or voice message',
+            'follow_up' => 'A "This one too" that is on needs at least one text for a single penalty',
             'media_gif' => 'A GIF is a .gif or .mp4 file',
             'media_gif_sound' => 'This .mp4 has a sound track: Telegram would show it as a video, not a GIF. Upload one without sound',
             'media_voice' => 'A voice message is an .ogg (Opus) file, as Telegram records it',

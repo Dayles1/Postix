@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Telegram;
 
+use App\Models\Telegram\OperationUser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -41,6 +42,14 @@ final class OperatorResource extends JsonResource
             'telegram_id' => $this->telegram_id,
 
             'dm_enabled' => (bool) $this->dm_enabled,
+
+            /*
+             * {"penalties_enabled": true, ...}: OperationUser::MESSAGE_SWITCHES.
+             */
+            'switches' => (object) array_map(
+                fn (string $switch): bool => ($this->getAttribute($switch) ?? true) !== false,
+                array_combine(OperationUser::MESSAGE_SWITCHES, OperationUser::MESSAGE_SWITCHES),
+            ),
 
             /*
              * What the page actually needs to answer "will this operator get

@@ -144,7 +144,7 @@ final class NudgeSilentClientChecks
          */
         $check->update(['nudged_at' => now()]);
 
-        if (! $person->dm_enabled) {
+        if (! $person->allows('nudge_enabled')) {
             return;
         }
 

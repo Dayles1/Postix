@@ -309,6 +309,11 @@ class ClientCheckTest extends TestCase
             $table->unsignedBigInteger('telegram_id')->nullable();
             $table->boolean('is_active')->default(true);
             $table->boolean('dm_enabled')->default(true);
+            $table->boolean('penalties_enabled')->default(true);
+            $table->boolean('penalty_comments_enabled')->default(true);
+            $table->boolean('greet_first_enabled')->default(true);
+            $table->boolean('nudge_enabled')->default(true);
+            $table->boolean('auto_replies_enabled')->default(true);
             $table->timestamp('dm_last_sent_at')->nullable();
             $table->text('dm_last_error')->nullable();
             $table->timestamp('last_private_message_at')->nullable();
@@ -1368,6 +1373,181 @@ class ClientCheckTest extends TestCase
         $this->assertSame(['send', 'forward'], $this->messages->kinds());
     }
 
+    /*
+     * ------------------------------------------------------------------
+     * The person's own switches for their private chat
+     * ------------------------------------------------------------------
+     */
+
+    public function test_penalties_switched_off_on_the_card_are_not_sent(): void
+    {
+        $this->person(attributes: ['penalties_enabled' => false]);
+
+        $check = $this->penalty(repeat: 1);
+        $this->flushAfterQuiet();
+
+        $this->assertSame([], $this->messages->kinds());
+        $this->assertSame(TelegramClientCheckStatus::Skipped, $check->refresh()->status);
+        $this->assertSame(TelegramClientCheck::REASON_PERSON_PENALTIES_OFF, $check->reason);
+    }
+
+    public function test_comments_switched_off_on_the_card_leave_the_forward_alone(): void
+    {
+        $this->person(attributes: ['penalty_comments_enabled' => false]);
+
+        $check = $this->penalty(repeat: 1);
+        $this->flushAfterQuiet();
+
+        $this->assertSame(['forward'], $this->messages->kinds());
+        $this->assertSame(TelegramClientCheckStatus::Sent, $check->refresh()->status);
+        $this->assertSame(TelegramClientCheck::REASON_PERSON_COMMENTS_OFF, $check->reason);
+    }
+
+    public function test_greeting_first_switched_off_on_the_card(): void
+    {
+        $this->openingOn();
+        $this->person(attributes: ['greet_first_enabled' => false]);
+
+        $this->penalty(repeat: 1);
+
+        $this->assertSame(['forward'], $this->messages->kinds());
+    }
+
+    public function test_auto_replies_switched_off_on_the_card(): void
+    {
+        $this->person(attributes: ['auto_replies_enabled' => false]);
+        $check = $this->penaltySent();
+
+        $this->assertNull($this->reply('+'));
+        $this->assertSame([], $this->messages->kinds());
+
+        /* Still kept on the penalty for the journal. */
+        $this->assertSame('+', $check->refresh()->reply_text);
+    }
+
+    public function test_the_nudge_switched_off_on_the_card(): void
+    {
+        $this->person(attributes: ['nudge_enabled' => false]);
+
+        $this->ignoredPenalties(2);
+        $this->penaltySent(repeat: 3);
+        Carbon::setTestNow(now()->addMinutes(3));
+        $this->nudge();
+
+        $this->assertSame([], $this->messages->kinds());
+    }
+
+    /*
+     * ------------------------------------------------------------------
+     * "Это тоже": the same level again soon
+     * ------------------------------------------------------------------
+     */
+
+    private function followUpOn(): void
+    {
+        $this->saveAutoReplies(['follow_up' => [
+            'enabled' => true,
+            'window_minutes' => 60,
+            'answers' => ['uz' => ['plain' => ['Bu ham', 'Bunisi ham']], 'ru' => ['plain' => ['Это тоже']]],
+            'answers_many' => ['uz' => ['plain' => ['Bular ham']]],
+        ]]);
+    }
+
+    /** @return list<string> the comments sent, oldest first */
+    private function comments(): array
+    {
+        return array_column($this->messages->sent(), 'message');
+    }
+
+    public function test_the_same_level_again_soon_is_this_one_too(): void
+    {
+        $this->followUpOn();
+        $this->person();
+
+        $this->penalty(repeat: 1);
+        $this->flushAfterQuiet();
+
+        Carbon::setTestNow(now()->addMinutes(10));
+        $second = $this->penalty(repeat: 1, request: 'TLS00001');
+        $this->flushAfterQuiet();
+
+        Carbon::setTestNow(now()->addMinutes(10));
+        $this->penalty(repeat: 1, request: 'TLS00002');
+        $this->flushAfterQuiet();
+
+        $comments = $this->comments();
+        $this->assertCount(3, $comments);
+        $this->assertStringStartsWith('U1 ', $comments[0]);
+        $this->assertContains($comments[1], ['Bu ham', 'Bunisi ham']);
+        /* Not the same follow-up twice in a row. */
+        $this->assertContains($comments[2], ['Bu ham', 'Bunisi ham']);
+        $this->assertNotSame($comments[1], $comments[2]);
+
+        $second->refresh();
+        $this->assertSame($comments[1], $second->comment);
+        $this->assertTrue($second->metrics['follow_up']);
+        $this->assertSame(TelegramClientCheckStatus::Sent, $second->status);
+    }
+
+    public function test_a_burst_after_it_is_these_too(): void
+    {
+        $this->followUpOn();
+        $this->person();
+
+        $this->penalty(repeat: 1);
+        $this->flushAfterQuiet();
+
+        Carbon::setTestNow(now()->addMinutes(10));
+        $this->penalty(repeat: 1, request: 'TLS00001');
+        $this->penalty(repeat: 1, request: 'TLS00002');
+        $this->flushAfterQuiet();
+
+        $this->assertSame('Bular ham', $this->comments()[1]);
+    }
+
+    public function test_another_level_or_a_while_later_gets_the_full_phrase(): void
+    {
+        $this->followUpOn();
+        $this->person();
+
+        $this->penalty(repeat: 1);
+        $this->flushAfterQuiet();
+
+        /* Level 2 says something else. */
+        Carbon::setTestNow(now()->addMinutes(10));
+        $this->penalty(repeat: 2, request: 'TLS00001');
+        $this->flushAfterQuiet();
+
+        /* Level 1 again: the last thing said was level 2's. */
+        Carbon::setTestNow(now()->addMinutes(10));
+        $this->penalty(repeat: 1, request: 'TLS00002');
+        $this->flushAfterQuiet();
+
+        /* Level 1 once more, but over the window later. */
+        Carbon::setTestNow(now()->addMinutes(61));
+        $this->penalty(repeat: 1, request: 'TLS00003');
+        $this->flushAfterQuiet();
+
+        $comments = $this->comments();
+        $this->assertStringStartsWith('U1 ', $comments[0]);
+        $this->assertSame('U2 №2', $comments[1]);
+        $this->assertStringStartsWith('U1 ', $comments[2]);
+        $this->assertStringStartsWith('U1 ', $comments[3]);
+    }
+
+    public function test_without_the_follow_up_the_phrase_goes_again(): void
+    {
+        $this->person();
+
+        $this->penalty(repeat: 1);
+        $this->flushAfterQuiet();
+        Carbon::setTestNow(now()->addMinutes(10));
+        $this->penalty(repeat: 1, request: 'TLS00001');
+        $this->flushAfterQuiet();
+
+        $this->assertStringStartsWith('U1 ', $this->comments()[1]);
+    }
+
     public function test_a_greeting_before_a_question_is_not_answered(): void
     {
         $this->person();
@@ -1548,6 +1728,7 @@ class ClientCheckTest extends TestCase
             'Ассалому алайкум Ёпаман акажон узим' => 'Благодарность',
             "Assalomu aleykum xo'p bo'ladi" => 'Благодарность',
             '+' => 'Благодарность',
+            'обрабатываю' => 'Благодарность',
             /* For a person to read: no answer. */
             'хали клент билан гаплашолмадим телефонни кутармади .' => null,
             'Ещё ждем ответ от клиента' => null,
@@ -1563,6 +1744,55 @@ class ClientCheckTest extends TestCase
 
             $this->assertSame($kind, $index !== null ? $rules->name($index) : null, $text);
         }
+    }
+
+    /**
+     * Greetings as they are really typed (2026-10-13).
+     */
+    public function test_the_shipped_greetings_read_real_ones(): void
+    {
+        $rules = AutoReplyRules::fromArray((require config_path('auto_replies.php'))['defaults']);
+        $matcher = new AutoReplyMatcher();
+        $list = $rules->greetings['list'];
+
+        foreach (['Ассалому алекейкум', 'Ассалому алейкум', 'Assalomu aleykum aka', 'Ассалом', 'Салом алейкум'] as $text) {
+            $found = $matcher->greeting($list, $rules->greetings['fillers'], $text);
+
+            $this->assertNotNull($found, $text);
+            $this->assertSame('Ассалому алайкум', $list[$found['index']]['name'], $text);
+            $this->assertTrue($found['alone'], $text);
+        }
+    }
+
+    public function test_the_shipped_texts_are_added_to_the_ones_saved_in_the_panel(): void
+    {
+        config()->set('auto_replies.defaults', (require config_path('auto_replies.php'))['defaults']);
+        config()->set('client_checks', require config_path('client_checks.php'));
+
+        $store = app(AutoReplyStore::class);
+        $saved = $store->defaults()->toArray();
+        $saved['replies'][0]['answers'] = ['ru' => ['plain' => ['Моё спасибо']]];
+        $saved['replies'][0]['keywords'] = ['+'];
+        $store->save(AutoReplyRules::fromArray($saved));
+
+        $penalties = app(ClientCheckRulesStore::class);
+        $rules = $penalties->defaults()->toArray();
+        $rules['roles']['sales']['levels'][0]['phrases']['ru']['plain'] = ['Моя фраза'];
+        $penalties->save(ClientCheckRules::fromArray($rules));
+
+        $this->artisan('telegram:merge-defaults')->assertSuccessful();
+
+        $reply = $store->current()->replies[0];
+        $this->assertSame(['Моё спасибо', 'Отлично, спасибо!'], array_slice($reply['answers']['ru']['plain'], 0, 2));
+        $this->assertContains('Сэнк ю!', $reply['answers']['ru']['plain']);
+        $this->assertContains('обрабатываю', $reply['keywords']);
+
+        $sales = $penalties->current()->ladders['sales'][0]['phrases']['ru']['plain'];
+        $this->assertSame('Моя фраза', $sales[0]);
+        $this->assertContains('обновите статус', $sales);
+
+        /* Run again: nothing twice. */
+        $this->artisan('telegram:merge-defaults')->expectsOutput('Added: 0')->assertSuccessful();
     }
 
     public function test_a_star_takes_any_ending_and_a_kind_may_allow_longer_messages(): void

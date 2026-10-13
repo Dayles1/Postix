@@ -143,6 +143,15 @@ final class OperatorController extends Controller
             'dm_enabled' => (bool) ($validated['dm_enabled'] ?? true),
 
             /*
+             * What goes into the private chat, one by one: only the
+             * switches sent are touched.
+             */
+            ...array_map(
+                static fn (mixed $on): bool => (bool) $on,
+                array_intersect_key($validated, array_flip(OperationUser::MESSAGE_SWITCHES)),
+            ),
+
+            /*
              * Left out when not submitted, so an edit that does not touch it
              * never turns a sales manager back into an operator.
              */
