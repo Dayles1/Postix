@@ -60,6 +60,11 @@ final readonly class AutoReplyRules
      *     list: list<array{id: string, name: string|null, keywords: list<string>, answers: array<string, array<string, list<string>>>, media: array{gifs: list<array{file: string, name: string, telegram?: array{id: string, access_hash: string, file_reference: string}}>, voices: array<string, list<array{file: string, name: string}>>}}>,
      * } $greetings  "Доброе утро" answered on its own, before the kind's
      *               answer; the first of the list found picks the answer
+     * @param array{
+     *     enabled: bool,
+     *     answers: array<string, array<string, list<string>>>,
+     *     media: array{gifs: list<array{file: string, name: string}>, voices: array<string, list<array{file: string, name: string}>>},
+     * } $opening  our own greeting before the day's first penalty
      */
     public function __construct(
         public bool $enabled,
@@ -70,6 +75,7 @@ final readonly class AutoReplyRules
         public array $replies,
         public array $silence = ['enabled' => false, 'after_penalties' => 5, 'answers' => [], 'media' => ['gifs' => [], 'voices' => []]],
         public array $greetings = ['enabled' => false, 'fillers' => [], 'list' => []],
+        public array $opening = ['enabled' => false, 'answers' => [], 'media' => ['gifs' => [], 'voices' => []]],
     ) {
     }
 
@@ -126,6 +132,13 @@ final readonly class AutoReplyRules
             ? (array) $data['greetings']
             : (array) config('auto_replies.defaults.greetings', []);
 
+        /*
+         * And before there was an opening, the config's too.
+         */
+        $opening = array_key_exists('opening', $data)
+            ? (array) $data['opening']
+            : (array) config('auto_replies.defaults.opening', []);
+
         return new self(
             enabled: (bool) ($data['enabled'] ?? true),
             onlyAfterPenalty: (bool) ($data['only_after_penalty'] ?? false),
@@ -144,6 +157,11 @@ final readonly class AutoReplyRules
                 'media' => self::media($silence['media'] ?? []),
             ],
             greetings: self::greetings($greetings),
+            opening: [
+                'enabled' => (bool) ($opening['enabled'] ?? false),
+                'answers' => self::sets($opening['answers'] ?? []),
+                'media' => self::media($opening['media'] ?? []),
+            ],
         );
     }
 
@@ -161,6 +179,7 @@ final readonly class AutoReplyRules
             'replies' => $this->replies,
             'silence' => $this->silence,
             'greetings' => $this->greetings,
+            'opening' => $this->opening,
         ];
     }
 
@@ -196,7 +215,8 @@ final readonly class AutoReplyRules
     }
 
     /**
-     * Everything a kind (or the nudge, $kind = 'silence') may answer this
+     * Everything a kind (or the nudge, $kind = 'silence', or the opening,
+     * $kind = 'opening') may answer this
      * person with, one to be picked at random: the texts as answers()
      * finds them, the GIFs, and the voice messages in the person's own
      * language - a voice in the other language is not understood, so
@@ -209,7 +229,13 @@ final readonly class AutoReplyRules
      */
     public function choices(int|string $kind, string $language, string $tone): array
     {
-        return self::items($kind === 'silence' ? $this->silence : ($this->replies[$kind] ?? null), $language, $tone);
+        $owner = match ($kind) {
+            'silence' => $this->silence,
+            'opening' => $this->opening,
+            default => $this->replies[$kind] ?? null,
+        };
+
+        return self::items($owner, $language, $tone);
     }
 
     /**
@@ -259,7 +285,7 @@ final readonly class AutoReplyRules
     {
         $files = [];
 
-        foreach ([...$this->replies, $this->silence, ...$this->greetings['list']] as $owner) {
+        foreach ([...$this->replies, $this->silence, $this->opening, ...$this->greetings['list']] as $owner) {
             foreach ($owner['media']['gifs'] ?? [] as $gif) {
                 $files[] = $gif['file'];
             }

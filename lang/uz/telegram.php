@@ -537,6 +537,7 @@ return [
             'greeting' => 'Salomlashish',
             'reply' => 'Avto-javob',
             'silence' => 'Eslatma',
+            'opening' => 'Jarimadan oldin salom',
         ],
         'situations' => [
             'penalty' => ':name (:from-chidan)',
@@ -544,6 +545,7 @@ return [
             'greeting' => 'Salomlashish :n',
             'reply' => 'Tur :n',
             'silence' => 'Jarimalarga javob bermaganda',
+            'opening' => 'Kunning birinchi jarimasidan oldin',
             'gone' => 'Bu vaziyat endi yo\'q',
             'gone_hint' => 'Tur, salomlashish yoki daraja sozlamalarda o\'chirilgan: bu javoblar yuborilmaydi. Olib tashlang yoki qaytguncha qoldiring.',
         ],
@@ -602,6 +604,7 @@ return [
             'test' => 'Xabarni sinash',
             'file' => 'Fayl',
             'silence' => 'Javob bermasa',
+            'opening' => 'Jarimadan oldin salom',
             'greetings' => 'Salomlashish',
         ],
         'tones' => [
@@ -648,6 +651,11 @@ return [
             'after_penalties' => 'Javobsiz jarimalardan keyin',
             'after_penalties_hint' => 'Uning shaxsiyga yozgan har qanday xabari hisobni nolga tushiradi.',
             'answers' => 'Eslatma',
+        ],
+        'opening' => [
+            'enabled' => 'Birinchi bo\'lib salomlashish',
+            'enabled_hint' => 'Kunning birinchi jarimasidan oldin - avval alohida xabar bilan «Assalomu alaykum, Ali aka», bir-ikki soniyadan keyin jarima. Bugun o\'zi birinchi salom bergan bo\'lsa - kerak emas; uning «Va alaykum assalom»iga javob berilmaydi.',
+            'answers' => 'Salom',
         ],
         'greetings' => [
             'enabled' => 'Salomga alik olish',
@@ -730,6 +738,7 @@ return [
             'answers' => 'Turda kamida bitta javob bo\'lishi kerak: matn, GIF yoki ovozli xabar',
             'fix' => 'Belgilangan maydonlarni tuzating',
             'silence' => 'Yoqilgan eslatmada kamida bitta matn, GIF yoki ovozli xabar bo\'lishi kerak',
+            'opening' => 'Yoqilgan salomda kamida bitta matn, GIF yoki ovozli xabar bo\'lishi kerak',
             'media_gif' => 'GIF - .gif yoki .mp4 fayl',
             'media_gif_sound' => 'Bu .mp4 da ovoz bor: Telegram uni GIF emas, video qilib ko\'rsatadi. Ovozsizini yuklang',
             'media_voice' => 'Ovozli xabar - .ogg (Opus) fayl, Telegram yozgandek',

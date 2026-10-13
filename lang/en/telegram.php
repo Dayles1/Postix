@@ -549,6 +549,7 @@ return [
             'greeting' => 'Greeting',
             'reply' => 'Auto reply',
             'silence' => 'Nudge',
+            'opening' => 'Greeting before a penalty',
         ],
         'situations' => [
             'penalty' => ':name (from the :from.)',
@@ -556,6 +557,7 @@ return [
             'greeting' => 'Greeting :n',
             'reply' => 'Kind :n',
             'silence' => 'After ignored penalties',
+            'opening' => 'Before the day\'s first penalty',
             'gone' => 'This situation is gone',
             'gone_hint' => 'The kind, greeting or level was removed in the settings: these answers are not sent. Remove them or keep them for its return.',
         ],
@@ -614,6 +616,7 @@ return [
             'test' => 'Try a message',
             'file' => 'File',
             'silence' => 'When they stay silent',
+            'opening' => 'Greeting before a penalty',
             'greetings' => 'Greetings',
         ],
         'tones' => [
@@ -660,6 +663,11 @@ return [
             'after_penalties' => 'After unanswered penalties',
             'after_penalties_hint' => 'Any private message of theirs resets the count.',
             'answers' => 'The nudge',
+        ],
+        'opening' => [
+            'enabled' => 'Greet first',
+            'enabled_hint' => 'Before the day\'s first penalty to a person - "Assalomu alaykum, Ali aka" as its own message first, the penalty a couple of seconds later. Not when they greeted us first today; their "Va alaykum assalom" is not answered.',
+            'answers' => 'The greeting',
         ],
         'greetings' => [
             'enabled' => 'Greet back',
@@ -742,6 +750,7 @@ return [
             'answers' => 'A kind needs at least one answer: a text, a GIF or a voice message',
             'fix' => 'Fix the highlighted fields',
             'silence' => 'A nudge that is on needs at least one text, GIF or voice message',
+            'opening' => 'A greeting that is on needs at least one text, GIF or voice message',
             'media_gif' => 'A GIF is a .gif or .mp4 file',
             'media_gif_sound' => 'This .mp4 has a sound track: Telegram would show it as a video, not a GIF. Upload one without sound',
             'media_voice' => 'A voice message is an .ogg (Opus) file, as Telegram records it',

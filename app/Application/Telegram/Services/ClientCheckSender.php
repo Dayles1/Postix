@@ -31,6 +31,7 @@ final class ClientCheckSender
     public function __construct(
         private readonly ClientCheckEscalation $escalation,
         private readonly AutoReplyDelivery $delivery,
+        private readonly PenaltyOpening $opening,
     ) {
     }
 
@@ -51,6 +52,11 @@ final class ClientCheckSender
 
         foreach ($person->telegramPeerCandidates() as $peer) {
             try {
+                /*
+                 * The day's first penalty to them: we greet first.
+                 */
+                $this->opening->before($telegram, $peer, $check, $person);
+
                 $telegram->messages->forwardMessages([
                     'from_peer' => $check->telegram_chat_id,
                     'id' => [$check->telegram_message_id],

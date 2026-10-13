@@ -255,6 +255,11 @@ function toForm(data) {
             fillers: (data.greetings?.fillers || []).join(', '),
             list: (data.greetings?.list || []).map(greetingToForm),
         },
+        opening: {
+            enabled: !!data.opening?.enabled,
+            answers: setsToForm(data.opening?.answers),
+            media: mediaToForm(data.opening?.media),
+        },
     };
 }
 
@@ -276,6 +281,11 @@ function toPayload(form) {
             enabled: !!form.greetings.enabled,
             fillers: splitKeywords(form.greetings.fillers),
             list: form.greetings.list.map(greetingToPayload),
+        },
+        opening: {
+            enabled: !!form.opening.enabled,
+            answers: setsToPayload(form.opening.answers),
+            media: mediaToPayload(form.opening.media),
         },
     };
 }
@@ -602,12 +612,16 @@ export function autoRepliesPage(config) {
         },
 
         /**
-         * Kind k, the nudge (k = 'silence') or greeting g (k = 'g' + g):
-         * whatever has answers.
+         * Kind k, the nudge (k = 'silence'), our greeting before a penalty
+         * (k = 'opening') or greeting g (k = 'g' + g): whatever has answers.
          */
         owner(k) {
             if (k === 'silence') {
                 return this.form.silence;
+            }
+
+            if (k === 'opening') {
+                return this.form.opening;
             }
 
             if (typeof k === 'string' && k.startsWith('g')) {
@@ -682,7 +696,7 @@ export function autoRepliesPage(config) {
         |----------------------------------------------------------------
         */
 
-        /** GIFs of kind k (or 'silence', or greeting 'g' + g), or its voices in the language being edited. */
+        /** GIFs of kind k (or 'silence', 'opening', or greeting 'g' + g), or its voices in the language being edited. */
         mediaList(k, type) {
             const owner = this.owner(k);
 

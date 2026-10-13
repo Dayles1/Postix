@@ -66,6 +66,10 @@
 |       words that do not count after a greeting ("aka", "всем", "🙂"): a
 |       greeting with only these is greeted back alone. A greeting before
 |       a question is not answered, as any question. Once a day per person.
+|   opening                 - we greet first: before the day's first
+|       penalty to a person, "Assalomu alaykum, Ali aka", then the penalty
+|       `greeting_pause` later. enabled, answers and media (as above). Not
+|       when they greeted us first that day (greetings above).
 |
 */
 
@@ -281,6 +285,26 @@ return [
                     ],
                 ],
             ],
+        ],
+
+        /*
+         * The penalty used to come first and the person greeted us - the
+         * older one greeting first, which the account's owner had to put
+         * right by hand (2026-10-13). Now the day starts with ours.
+         */
+        'opening' => [
+            'enabled' => true,
+            'answers' => [
+                'uz' => [
+                    'plain' => ['Assalomu alaykum, {address}!'],
+                    'respectful' => ['Assalomu alaykum, {address}!'],
+                ],
+                'ru' => [
+                    'plain' => ['Здравствуйте, {address}!'],
+                    'respectful' => ['Здравствуйте, {address}!'],
+                ],
+            ],
+            'media' => ['gifs' => [], 'voices' => ['uz' => [], 'ru' => []]],
         ],
     ],
 

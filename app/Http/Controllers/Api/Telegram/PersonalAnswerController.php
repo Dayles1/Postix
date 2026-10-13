@@ -150,6 +150,7 @@ final class PersonalAnswerController extends Controller
                 array_keys($autoReplies->greetings['list']),
             ),
             'silence' => PersonalAnswers::SILENCE,
+            'opening' => PersonalAnswers::OPENING,
         ];
     }
 }

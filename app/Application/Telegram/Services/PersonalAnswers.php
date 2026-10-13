@@ -18,6 +18,7 @@ use App\Models\Telegram\OperationUser;
  *   reply:<kind id>   - an auto reply kind (AutoReplyRules ids)
  *   greeting:<id>     - an auto reply greeting
  *   silence           - the nudge after ignored penalties
+ *   opening           - our greeting before the day's first penalty
  *
  * Each holds texts (placeholders as in the shared ones), voice messages and
  * GIFs - files of the auto replies media folder - and `only`: false adds
@@ -33,6 +34,8 @@ final class PersonalAnswers
     public const TYPE_TEXT = 'text';
 
     public const SILENCE = 'silence';
+
+    public const OPENING = 'opening';
 
     public static function penaltySlot(int $level): string
     {
@@ -51,7 +54,7 @@ final class PersonalAnswers
 
     public static function validSlot(string $slot): bool
     {
-        return $slot === self::SILENCE
+        return in_array($slot, [self::SILENCE, self::OPENING], true)
             || preg_match('/^(penalty:\d{1,2}|reply:[a-z0-9]{1,24}|greeting:[a-z0-9]{1,24})$/', $slot) === 1;
     }
 

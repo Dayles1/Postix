@@ -62,13 +62,20 @@ final class AutoReplyRequest extends FormRequest
             'greetings.list.*.keywords' => ['present', 'array', 'max:' . AutoReplyRules::MAX_KEYWORDS],
             'greetings.list.*.keywords.*' => ['nullable', 'string', 'max:60'],
             'greetings.list.*.answers' => ['present', 'array'],
+
+            /*
+             * Left out: the file keeps the config's opening.
+             */
+            'opening' => ['sometimes', 'array'],
+            'opening.enabled' => ['required_with:opening', 'boolean'],
+            'opening.answers' => ['present_with:opening', 'array'],
         ];
 
         /*
          * GIFs for every language, voices per language: names
          * AutoReplyMedia::store() gave, checked again by AutoReplyRules.
          */
-        foreach (['replies.*.media', 'silence.media', 'greetings.list.*.media'] as $media) {
+        foreach (['replies.*.media', 'silence.media', 'opening.media', 'greetings.list.*.media'] as $media) {
             $rules["{$media}"] = ['nullable', 'array'];
             $rules["{$media}.gifs"] = ['nullable', 'array', 'max:' . AutoReplyRules::MAX_MEDIA];
             $rules["{$media}.gifs.*.file"] = ['required', 'string', 'regex:/^[a-f0-9]{24}\.(gif|mp4)$/'];
@@ -90,7 +97,7 @@ final class AutoReplyRequest extends FormRequest
 
         foreach (OperationUser::LANGUAGES as $language) {
             foreach (ClientCheckRules::TONES as $tone) {
-                foreach (['replies.*.answers', 'silence.answers', 'greetings.list.*.answers'] as $answers) {
+                foreach (['replies.*.answers', 'silence.answers', 'opening.answers', 'greetings.list.*.answers'] as $answers) {
                     $rules["{$answers}.{$language}.{$tone}"] = ['nullable', 'array', 'max:' . AutoReplyRules::MAX_ANSWERS];
                     $rules["{$answers}.{$language}.{$tone}.*"] = ['nullable', 'string', 'max:1000'];
                 }
@@ -158,6 +165,20 @@ final class AutoReplyRequest extends FormRequest
                     $validator->errors()->add(
                         'silence.answers',
                         __('telegram.auto_replies.validation.silence'),
+                    );
+                }
+
+                /*
+                 * The same for the opening.
+                 */
+                if (
+                    $this->boolean('opening.enabled')
+                    && ! $this->hasAnswer($this->input('opening.answers', []))
+                    && ! $this->hasMedia($this->input('opening.media', []))
+                ) {
+                    $validator->errors()->add(
+                        'opening.answers',
+                        __('telegram.auto_replies.validation.opening'),
                     );
                 }
             },

@@ -65,7 +65,7 @@ export function personalAnswersPage(config) {
 
         people: [],
 
-        situations: { penalties: { operation: [], sales: [] }, replies: [], greetings: [], silence: 'silence' },
+        situations: { penalties: { operation: [], sales: [] }, replies: [], greetings: [], silence: 'silence', opening: 'opening' },
 
         filters: { search: '', role: '', withoutVoice: false },
 
@@ -291,6 +291,7 @@ export function personalAnswersPage(config) {
                     label: reply.name || t.situations.reply.replace(':n', reply.index + 1),
                 })),
                 { slot: s.silence, group: t.groups.silence, label: t.situations.silence },
+                { slot: s.opening, group: t.groups.opening, label: t.situations.opening },
             ];
         },
 

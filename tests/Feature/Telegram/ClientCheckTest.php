@@ -1280,6 +1280,94 @@ class ClientCheckTest extends TestCase
         $this->assertSame('Xayrli tong, Afzal aka!', $this->reply('Xayrli tong'));
     }
 
+    private function openingOn(): void
+    {
+        $this->saveAutoReplies(['opening' => [
+            'enabled' => true,
+            'answers' => [
+                'uz' => ['plain' => ['Assalomu alaykum, {address}!']],
+                'ru' => ['plain' => ['Здравствуйте, {address}!']],
+            ],
+        ]]);
+    }
+
+    public function test_the_day_first_penalty_is_greeted_first(): void
+    {
+        $this->openingOn();
+        $this->person(attributes: ['address' => ['uz' => 'Afzal aka']]);
+
+        $check = $this->penalty(repeat: 1);
+
+        $this->assertSame(['send', 'forward'], $this->messages->kinds());
+        $this->assertSame('Assalomu alaykum, Afzal aka!', $this->messages->sent()[0]['message']);
+        $this->assertSame('@afzal', $this->messages->sent()[0]['peer']);
+        $this->assertSame(TelegramClientCheckStatus::Forwarded, $check->refresh()->status);
+
+        /* Not before the next one the same day. */
+        $this->messages->calls = [];
+        Carbon::setTestNow(now()->addHour());
+        $this->penalty(repeat: 1, request: 'TLS00001');
+        $this->assertSame(['forward'], $this->messages->kinds());
+
+        /* The next day, again. */
+        $this->messages->calls = [];
+        Carbon::setTestNow(now()->addDay());
+        $this->penalty(repeat: 1, request: 'TLS00002');
+        $this->assertSame(['send', 'forward'], $this->messages->kinds());
+    }
+
+    public function test_their_answer_to_our_greeting_is_not_greeted_back(): void
+    {
+        $this->openingOn();
+        $this->person(attributes: ['address' => ['uz' => 'Afzal aka']]);
+
+        $this->penalty(repeat: 1);
+        $this->messages->calls = [];
+
+        $this->assertNull($this->reply('Va alaykum assalom aka'));
+        $this->assertNull($this->reply('Assalomu alaykum'));
+        $this->assertSame([], $this->messages->sent());
+    }
+
+    public function test_someone_who_greeted_us_first_today_is_not_greeted(): void
+    {
+        $this->openingOn();
+        $this->person(attributes: ['address' => ['uz' => 'Afzal aka']]);
+
+        $this->reply('Assalomu alaykum');
+        $this->messages->calls = [];
+
+        $this->penalty(repeat: 1);
+        $this->assertSame(['forward'], $this->messages->kinds());
+    }
+
+    public function test_without_the_opening_the_penalty_goes_alone(): void
+    {
+        $this->person();
+
+        $this->penalty(repeat: 1);
+
+        $this->assertSame(['forward'], $this->messages->kinds());
+    }
+
+    public function test_a_refused_greeting_does_not_hold_the_penalty_up(): void
+    {
+        $this->openingOn();
+        $this->person();
+        $this->messages->commentFails = true;
+
+        $check = $this->penalty(repeat: 1);
+
+        $this->assertSame(['forward'], $this->messages->kinds());
+        $this->assertSame(TelegramClientCheckStatus::Forwarded, $check->refresh()->status);
+
+        /* Not marked as greeted: the next penalty tries again. */
+        $this->messages->commentFails = false;
+        $this->messages->calls = [];
+        $this->penalty(repeat: 1, request: 'TLS00001');
+        $this->assertSame(['send', 'forward'], $this->messages->kinds());
+    }
+
     public function test_a_greeting_before_a_question_is_not_answered(): void
     {
         $this->person();

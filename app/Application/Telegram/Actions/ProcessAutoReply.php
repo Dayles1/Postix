@@ -9,6 +9,7 @@ use App\Application\Telegram\Services\AutoReplyMatcher;
 use App\Application\Telegram\Services\AutoReplyRules;
 use App\Application\Telegram\Services\AutoReplyStore;
 use App\Application\Telegram\Services\ClientCheckRules;
+use App\Application\Telegram\Services\PenaltyOpening;
 use App\Application\Telegram\Services\PersonalAnswers;
 use App\Models\Telegram\OperationUser;
 use App\Models\Telegram\TelegramClientCheck;
@@ -281,9 +282,12 @@ final class ProcessAutoReply
         return 'auto-replies:pending:' . $person->id;
     }
 
+    /**
+     * Shared with PenaltyOpening: greeted by us or by them, once a day.
+     */
     private function greetedKey(OperationUser $person): string
     {
-        return 'auto-replies:greeted:' . $person->id;
+        return PenaltyOpening::greetedKey($person);
     }
 
     /**

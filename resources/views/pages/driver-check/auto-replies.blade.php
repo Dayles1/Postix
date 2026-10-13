@@ -854,6 +854,143 @@
                         </div>
                     </div>
                 </article>
+
+                {{-- ====================================================
+                     Before the day's first penalty: we greet first
+                ===================================================== --}}
+                <article
+                    x-show="!loading"
+                    x-cloak
+                    class="relative mt-2 overflow-hidden rounded-2xl border bg-white shadow-sm transition dark:bg-white/[0.03]"
+                    :class="fieldError('opening.answers')
+                        ? 'border-error-300 dark:border-error-500/40'
+                        : 'border-gray-200 dark:border-gray-800'"
+                >
+                    <span class="absolute inset-y-0 left-0 w-1 bg-success-400"></span>
+
+                    <div class="flex flex-col gap-4 p-4 pl-5 sm:p-5 sm:pl-6">
+                        <div class="flex items-start justify-between gap-4">
+                            <div class="min-w-0">
+                                <h2 class="text-base font-semibold text-gray-900 dark:text-white">
+                                    {{ __('telegram.auto_replies.sections.opening') }}
+                                </h2>
+                                <p class="mt-0.5 text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">
+                                    {{ __('telegram.auto_replies.opening.enabled_hint') }}
+                                </p>
+                            </div>
+
+                            <button
+                                type="button"
+                                role="switch"
+                                :aria-checked="form.opening.enabled"
+                                aria-label="{{ __('telegram.auto_replies.opening.enabled') }}"
+                                x-on:click="form.opening.enabled = !form.opening.enabled"
+                                :class="form.opening.enabled ? 'bg-brand-500' : 'bg-gray-200 dark:bg-white/[0.12]'"
+                                class="dc-tap relative mt-0.5 inline-flex h-7 w-12 shrink-0 items-center rounded-full transition
+                                       outline-none focus-visible:ring-4 focus-visible:ring-brand-500/20"
+                            >
+                                <span
+                                    :class="form.opening.enabled ? 'translate-x-6' : 'translate-x-1'"
+                                    class="inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
+                                ></span>
+                            </button>
+                        </div>
+
+                        <div x-show="form.opening.enabled" x-collapse class="flex flex-col gap-4">
+
+                            <div class="grid gap-4 md:grid-cols-2">
+                                <template x-for="t in tones" :key="'opening-' + t">
+                                    <div
+                                        class="flex min-w-0 flex-col gap-2 rounded-xl p-3"
+                                        :class="t === 'respectful'
+                                            ? 'bg-brand-25 ring-1 ring-inset ring-brand-100 dark:bg-brand-500/[0.05] dark:ring-brand-500/20'
+                                            : 'bg-gray-50 ring-1 ring-inset ring-gray-100 dark:bg-white/[0.02] dark:ring-gray-800'"
+                                    >
+                                        <div class="flex items-baseline justify-between gap-2">
+                                            <p
+                                                class="text-[12px] font-semibold"
+                                                :class="t === 'respectful' ? 'text-brand-700 dark:text-brand-300' : 'text-gray-700 dark:text-gray-200'"
+                                                x-text="translations.tones[t]"
+                                            ></p>
+                                            <p class="truncate text-[11px] text-gray-400 dark:text-gray-500" x-text="translations.tones[t + '_hint']"></p>
+                                        </div>
+
+                                        <p
+                                            x-show="answers('opening', t).length === 0"
+                                            class="rounded-lg border border-dashed border-gray-300 px-2.5 py-2 text-[12px] italic text-gray-400
+                                                   dark:border-gray-700 dark:text-gray-500"
+                                            x-text="translations.kind.empty"
+                                        ></p>
+
+                                        <template x-for="(answer, a) in answers('opening', t)" :key="answer.key">
+                                            <div class="rounded-lg bg-white p-2 shadow-xs ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-700">
+                                                <div class="flex items-start gap-1.5">
+                                                    <textarea
+                                                        :id="answerId('opening', t, a)"
+                                                        x-model="answer.text"
+                                                        x-on:focus="focusAnswer('opening', t, a)"
+                                                        rows="1"
+                                                        maxlength="1000"
+                                                        class="min-h-[2.25rem] w-full resize-y rounded-md border-0 bg-transparent px-1.5 py-1 text-[13px]
+                                                               leading-relaxed text-gray-900 outline-none focus:ring-0 dark:text-white"
+                                                    ></textarea>
+
+                                                    <button
+                                                        type="button"
+                                                        x-on:click="removeAnswer('opening', t, a)"
+                                                        class="dc-tap inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-400
+                                                               transition hover:bg-error-50 hover:text-error-600 dark:hover:bg-error-500/10
+                                                               dark:hover:text-error-400"
+                                                        :title="translations.kind.remove_answer"
+                                                        :aria-label="translations.kind.remove_answer"
+                                                    >
+                                                        <x-driver-check.icon name="close" class="h-3.5 w-3.5" />
+                                                    </button>
+                                                </div>
+
+                                                {{-- Already reduced to Telegram's tags by telegramHtml(). --}}
+                                                <div
+                                                    x-show="String(answer.text || '').trim() !== ''"
+                                                    class="mt-1.5 flex items-start gap-1.5 border-t border-gray-100 px-1.5 pt-1.5 dark:border-gray-800"
+                                                >
+                                                    <x-driver-check.icon name="send" class="mt-0.5 h-3 w-3 shrink-0 text-gray-300 dark:text-gray-600" />
+                                                    <p
+                                                        class="dc-break whitespace-pre-wrap text-[12px] leading-relaxed text-gray-500 dark:text-gray-400"
+                                                        x-html="preview(answer.text)"
+                                                    ></p>
+                                                </div>
+                                            </div>
+                                        </template>
+
+                                        <button
+                                            type="button"
+                                            x-on:click="addAnswer('opening', t)"
+                                            class="dc-tap inline-flex h-8 items-center gap-1.5 self-start rounded-lg px-2 text-[12px] font-medium
+                                                   text-gray-500 transition hover:bg-white hover:text-gray-900 dark:text-gray-400
+                                                   dark:hover:bg-white/[0.06] dark:hover:text-white"
+                                        >
+                                            <x-driver-check.icon name="plus" class="h-3.5 w-3.5" />
+                                            <span x-text="translations.kind.add_answer"></span>
+                                        </button>
+                                    </div>
+                                </template>
+                            </div>
+
+                            {{-- GIFs and voice messages: picked at random among the texts --}}
+                            <div class="flex flex-col gap-2">
+                                <span class="text-[13px] font-medium text-gray-700 dark:text-gray-300" x-text="translations.media.title"></span>
+                                @include('pages.driver-check.partials.auto-reply-media', ['owner' => "'opening'"])
+                            </div>
+
+                            <p
+                                x-show="fieldError('opening.answers')"
+                                x-cloak
+                                class="rounded-lg bg-error-50 px-3 py-2 text-[12px] font-medium text-error-600 dark:bg-error-500/10 dark:text-error-400"
+                                x-text="fieldError('opening.answers')"
+                            ></p>
+                        </div>
+                    </div>
+                </article>
             </section>
 
             {{-- ========================================================
