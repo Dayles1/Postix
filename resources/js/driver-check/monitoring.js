@@ -50,7 +50,7 @@ const BANNERS = {
 
 const csrfToken = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
-async function requestJson(url, method = 'GET', body = null) {
+export async function requestJson(url, method = 'GET', body = null) {
     const response = await fetch(url, {
         method,
         headers: {

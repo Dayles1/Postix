@@ -1,0 +1,50 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models\Telegram;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+
+/**
+ * One Telegram user found in a watched group. Unique by telegram_user_id.
+ *
+ * @property int         $id
+ * @property int         $telegram_user_id
+ */
+class TelegramScrapedUser extends Model
+{
+    protected $fillable = [
+        'telegram_user_id',
+        'username',
+        'first_name',
+        'last_name',
+        'phone',
+        'is_bot',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'telegram_user_id' => 'integer',
+            'is_bot' => 'boolean',
+        ];
+    }
+
+    public function groups(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            TelegramScrapeGroup::class,
+            'telegram_scrape_group_user',
+            'scraped_user_id',
+            'group_id',
+        )->withPivot('seen_at');
+    }
+
+    public function contact(): HasOne
+    {
+        return $this->hasOne(TelegramAccountContact::class, 'scraped_user_id');
+    }
+}

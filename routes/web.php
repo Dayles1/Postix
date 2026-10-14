@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\Telegram\ClientCheckController;
+use App\Http\Controllers\Api\Telegram\ContactSyncController;
 use App\Http\Controllers\Api\Telegram\AutoReplyController;
 use App\Http\Controllers\Api\Telegram\ClientCheckRulesController;
 use App\Http\Controllers\Api\Telegram\DriverCheckChatController;
@@ -264,6 +265,14 @@ Route::middleware(['auth', 'role:driverCheck,superadmin'])
             '/queue',
             [DriverCheckController::class, 'queue']
         )->name('driver-check.queue');
+
+        /*
+         * Contact sync: the groups, the accounts' contacts and the log.
+         */
+        Route::get(
+            '/contact-sync',
+            [DriverCheckController::class, 'contactSync']
+        )->name('driver-check.contact-sync');
 
         /*
          * Telegram sessions
@@ -532,6 +541,21 @@ Route::middleware(['auth', 'role:driverCheck,superadmin'])
                 Route::post('/start', 'start')->name('api.telegram.watchdog.start');
                 Route::post('/restart-listener', 'restartListener')->name('api.telegram.watchdog.restart-listener');
                 Route::post('/stop', 'stop')->name('api.telegram.watchdog.stop');
+            });
+
+        /*
+         * Contact sync: group members into the accounts' contacts
+         */
+        Route::prefix('/contact-sync')
+            ->controller(ContactSyncController::class)
+            ->group(function () {
+                Route::get('/', 'show')->name('api.telegram.contact-sync.show');
+                Route::post('/run', 'run')->name('api.telegram.contact-sync.run');
+                Route::get('/logs', 'logs')->name('api.telegram.contact-sync.logs');
+                Route::post('/accounts/{account}/enable', 'enableAccount')->name('api.telegram.contact-sync.accounts.enable');
+                Route::post('/groups', 'storeGroup')->name('api.telegram.contact-sync.groups.store');
+                Route::patch('/groups/{group}', 'updateGroup')->name('api.telegram.contact-sync.groups.update');
+                Route::delete('/groups/{group}', 'destroyGroup')->name('api.telegram.contact-sync.groups.destroy');
             });
 
         /*

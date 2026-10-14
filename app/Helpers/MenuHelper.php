@@ -171,6 +171,11 @@ class MenuHelper
                         'name' => __('telegram.menu.items.queue'),
                         'path' => '/driver-check/queue',
                     ],
+                    [
+                        'icon' => 'authentication',
+                        'name' => __('telegram.menu.items.contact_sync'),
+                        'path' => '/driver-check/contact-sync',
+                    ],
                 ],
             ],
         ];

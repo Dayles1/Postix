@@ -53,6 +53,18 @@ return [
 
         'api_id' => env('TELEGRAM_API_ID'),
         'api_hash' => env('TELEGRAM_API_HASH'),
+
+        /*
+         * Daily save of group members into the accounts' contacts
+         * (telegram:sync-contacts). Kept deliberately slow: Telegram
+         * restricts accounts that add contacts in bulk.
+         */
+        'contact_sync' => [
+            'max_accounts' => (int) env('TELEGRAM_CONTACT_SYNC_MAX_ACCOUNTS', 20),
+            'daily_limit' => (int) env('TELEGRAM_CONTACT_SYNC_DAILY_LIMIT', 100),
+            'delay_min' => (int) env('TELEGRAM_CONTACT_SYNC_DELAY_MIN', 3),
+            'delay_max' => (int) env('TELEGRAM_CONTACT_SYNC_DELAY_MAX', 5),
+        ],
         /*
          * Groups the driver check listener watches, as a comma (or whitespace)
          * separated list: one link, several, or none at all.

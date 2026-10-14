@@ -16,6 +16,7 @@ import { personalAnswersPage } from './personal-answers';
 import { penaltySettingsPage } from './penalty-settings';
 import { fileRoutesPage } from './file-routes';
 import { queuePage, watchdogPage } from './monitoring';
+import { contactSyncPage } from './contact-sync';
 import { statusType } from './status';
 
 /*
@@ -1213,4 +1214,5 @@ export function registerDriverCheck(Alpine) {
     Alpine.data('dcPersonalAnswers', personalAnswersPage);
     Alpine.data('dcWatchdog', watchdogPage);
     Alpine.data('dcQueue', queuePage);
+    Alpine.data('dcContactSync', contactSyncPage);
 }
