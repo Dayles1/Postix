@@ -1198,6 +1198,28 @@ class ClientCheckTest extends TestCase
         $this->assertNotNull($check->reply_answered_at);
     }
 
+    public function test_ok_to_the_top_level_threat_is_not_thanked(): void
+    {
+        $this->person();
+        $check = $this->penaltySent(repeat: 4);
+
+        $this->assertNull($this->reply('Ok rahmat'));
+        $this->assertSame([], $this->messages->kinds());
+
+        /* still kept on the penalty for the journal */
+        $check->refresh();
+        $this->assertSame('Ok rahmat', $check->reply_text);
+        $this->assertNull($check->reply_answer);
+    }
+
+    public function test_ok_to_a_lower_level_is_still_thanked(): void
+    {
+        $this->person();
+        $this->penaltySent(repeat: 1);
+
+        $this->assertNotNull($this->reply('ok'));
+    }
+
     public function test_without_an_address_it_is_left_out_with_its_comma(): void
     {
         $this->person();
@@ -1491,6 +1513,7 @@ class ClientCheckTest extends TestCase
 
     public function test_a_burst_after_it_is_these_too(): void
     {
+        config(['auto_replies.burst_pause' => ['min' => 0, 'max' => 0]]);
         $this->followUpOn();
         $this->person();
 
@@ -1500,9 +1523,25 @@ class ClientCheckTest extends TestCase
         Carbon::setTestNow(now()->addMinutes(10));
         $this->penalty(repeat: 1, request: 'TLS00001');
         $this->penalty(repeat: 1, request: 'TLS00002');
+        $this->penalty(repeat: 1, request: 'TLS00003');
         $this->flushAfterQuiet();
 
-        $this->assertSame('Bular ham', $this->comments()[1]);
+        /*
+         * Each penalty of the second wave is followed at once, one by one:
+         * "this too", "and this", and the last of three or more closes it
+         * with "these all".
+         */
+        $comments = $this->comments();
+        $this->assertCount(4, $comments);
+        $this->assertContains($comments[1], ['Bu ham', 'Bunisi ham']);
+        $this->assertContains($comments[2], ['Bu ham', 'Bunisi ham']);
+        $this->assertSame('Bular ham', $comments[3]);
+
+        /* The comment follows its penalty rather than all of them. */
+        $this->assertSame(
+            ['send', 'forward', 'send', 'forward', 'send', 'forward', 'send'],
+            array_slice($this->messages->kinds(), -7),
+        );
     }
 
     public function test_another_level_or_a_while_later_gets_the_full_phrase(): void

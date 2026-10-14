@@ -107,6 +107,15 @@ return [
         'max' => 3,
     ],
 
+    /*
+     * Between a penalty and its short "это тоже" in a second wave
+     * (PenaltyBurst): the next penalty waits for it.
+     */
+    'burst_pause' => [
+        'min' => 1,
+        'max' => 2,
+    ],
+
     'defaults' => [
 
         'enabled' => true,

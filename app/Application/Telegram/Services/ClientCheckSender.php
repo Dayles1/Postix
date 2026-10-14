@@ -8,6 +8,7 @@ use App\Enums\Telegram\TelegramClientCheckStatus;
 use App\Models\Telegram\OperationUser;
 use App\Models\Telegram\TelegramClientCheck;
 use App\Models\Telegram\TelegramSetting;
+use Amp\Sync\LocalKeyedMutex;
 use danog\MadelineProto\SimpleEventHandler;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -33,8 +34,11 @@ final class ClientCheckSender
         private readonly AutoReplyDelivery $delivery,
         private readonly PenaltyOpening $opening,
         private readonly PenaltyFollowUp $followUp,
+        private readonly PenaltyBurst $burst,
     ) {
     }
+
+    private ?LocalKeyedMutex $mutex = null;
 
     /**
      * Same peer order as the operator DMs: username first, id as fallback.
@@ -47,6 +51,21 @@ final class ClientCheckSender
             return false;
         }
 
+        /*
+         * One at a time per person: the penalty and its short comment
+         * (PenaltyBurst) are done before the next penalty goes.
+         */
+        $lock = ($this->mutex ??= new LocalKeyedMutex())->acquire('person:' . $person->id);
+
+        try {
+            return $this->deliver($telegram, $check, $person);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function deliver(SimpleEventHandler $telegram, TelegramClientCheck $check, OperationUser $person): bool
+    {
         $check->increment('attempts');
 
         $errors = [];
@@ -74,6 +93,8 @@ final class ClientCheckSender
                 ]);
 
                 $this->recordDelivery($person, null);
+
+                $this->burst->after($telegram, $peer, $check, $person);
 
                 return true;
             } catch (Throwable $e) {
