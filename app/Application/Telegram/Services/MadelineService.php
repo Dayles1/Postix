@@ -15,12 +15,20 @@ use Throwable;
 class MadelineService
 {
     /**
+     * Why the last for() returned null, so a caller can tell a revoked
+     * session from a network hiccup instead of seeing "failed to start".
+     */
+    public ?Throwable $lastError = null;
+
+    /**
      * Create and start MadelineProto for the given account.
      *
      * Returns null when the account cannot be started.
      */
     public function for(TelegramAccount $account): ?API
     {
+        $this->lastError = null;
+
         Log::info('MadelineProto connection starting', [
             'account_id' => $account->id,
             'phone' => $account->phone,
@@ -83,6 +91,8 @@ class MadelineService
 
             return $api;
         } catch (Throwable $e) {
+            $this->lastError = $e;
+
             Log::error('MadelineProto start failed', [
                 'account_id' => $account->id,
                 'phone' => $account->phone,

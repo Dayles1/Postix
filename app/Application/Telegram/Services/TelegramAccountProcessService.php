@@ -351,6 +351,31 @@ final class TelegramAccountProcessService
     }
 
     /**
+     * Take the account out of one process for good, until it is enabled
+     * again (TelegramAccountProcess::enable()).
+     *
+     * For failures that will only get worse by trying again: a flood wait,
+     * a banned or revoked account.
+     */
+    public function disable(
+        TelegramAccount $account,
+        TelegramAccountProcessEnum $process,
+        ?string $reason = null,
+    ): void {
+        $this->lockOrCreateState($account, $process)->disable($reason);
+
+        Log::warning(
+            'Telegram account disabled for process',
+            [
+                'process' => $process->value,
+                'account_id' => $account->id,
+                'phone' => $account->phone,
+                'reason' => $reason,
+            ],
+        );
+    }
+
+    /**
      * Release account after every attempt.
      */
     public function release(

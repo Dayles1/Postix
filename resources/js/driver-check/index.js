@@ -13,6 +13,7 @@ import { sessionsPage } from './sessions';
 import { penaltiesPage } from './penalties';
 import { penaltySettingsPage } from './penalty-settings';
 import { queuePage, watchdogPage } from './monitoring';
+import { contactSyncPage } from './contact-sync';
 import { statusType } from './status';
 
 /*
@@ -1178,4 +1179,5 @@ export function registerDriverCheck(Alpine) {
     Alpine.data('dcPenaltySettings', penaltySettingsPage);
     Alpine.data('dcWatchdog', watchdogPage);
     Alpine.data('dcQueue', queuePage);
+    Alpine.data('dcContactSync', contactSyncPage);
 }

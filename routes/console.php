@@ -12,3 +12,5 @@ Artisan::command('inspire', function () {
 // Schedule::command('groups:check-pending')->everyMinute()->runInBackground();
 Schedule::command('bans:sync')->everyMinute();
 
+// Group members into the accounts' contacts, once a day, off-peak.
+Schedule::command('telegram:sync-contacts')->dailyAt('03:30')->runInBackground()->withoutOverlapping();

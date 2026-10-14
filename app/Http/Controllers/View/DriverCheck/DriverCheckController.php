@@ -83,6 +83,13 @@ final class DriverCheckController extends Controller
         );
     }
 
+    public function contactSync()
+    {
+        return view(
+            'pages.driver-check.contact-sync'
+        );
+    }
+
     public function queue()
     {
         return view(
