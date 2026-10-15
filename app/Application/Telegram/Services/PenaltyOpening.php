@@ -66,6 +66,18 @@ final class PenaltyOpening
         }
 
         /*
+         * The mark above lives in the cache, which a deploy, a cache:clear or
+         * a restart of the cache server empties in the middle of the day
+         * (2026-10-15: greeted at 11:14 and again at 14:14). The penalty
+         * that carried the greeting says it too, and that row stays.
+         */
+        if ($this->greetedToday($check, $person)) {
+            Cache::put(self::greetedKey($person), true, now()->endOfDay());
+
+            return;
+        }
+
+        /*
          * The bot posts a person's penalties in bursts: one greets, the
          * others wait for it rather than overtake it.
          */
@@ -112,6 +124,8 @@ final class PenaltyOpening
 
             Cache::put(self::greetedKey($person), true, now()->endOfDay());
 
+            $check->update(['opening_sent_at' => now()]);
+
             Log::info(
                 'Client check: greeted first',
                 [
@@ -128,6 +142,19 @@ final class PenaltyOpening
         } finally {
             Cache::forget($this->pendingKey($person));
         }
+    }
+
+    /**
+     * A greeting of ours already went to this person today (the penalty
+     * that carried it is marked), whatever the cache says.
+     */
+    private function greetedToday(TelegramClientCheck $check, OperationUser $person): bool
+    {
+        return TelegramClientCheck::query()
+            ->where('operation_user_id', $person->id)
+            ->where('id', '!=', $check->id)
+            ->where('opening_sent_at', '>=', now()->startOfDay())
+            ->exists();
     }
 
     private function pendingKey(OperationUser $person): string

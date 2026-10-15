@@ -363,6 +363,7 @@ class ClientCheckTest extends TestCase
             $table->text('error')->nullable();
             $table->string('peer')->nullable();
             $table->timestamp('forwarded_at')->nullable();
+            $table->timestamp('opening_sent_at')->nullable();
             $table->timestamp('sent_at')->nullable();
             $table->text('reply_text')->nullable();
             $table->timestamp('replied_at')->nullable();
@@ -1359,6 +1360,24 @@ class ClientCheckTest extends TestCase
         Carbon::setTestNow(now()->addDay());
         $this->penalty(repeat: 1, request: 'TLS00002');
         $this->assertSame(['send', 'forward'], $this->messages->kinds());
+    }
+
+    public function test_an_emptied_cache_does_not_make_a_second_greeting_the_same_day(): void
+    {
+        $this->openingOn();
+        $this->person(attributes: ['address' => ['uz' => 'Afzal aka']]);
+
+        $this->penalty(repeat: 1);
+        $this->assertSame(['send', 'forward'], $this->messages->kinds());
+
+        /* A deploy runs cache:clear: the "greeted today" mark is gone. */
+        Cache::flush();
+
+        $this->messages->calls = [];
+        Carbon::setTestNow(now()->addMinutes(30));
+        $this->penalty(repeat: 2, request: 'TLS00009');
+
+        $this->assertSame(['forward'], $this->messages->kinds(), 'the penalties already sent today say it is not the first');
     }
 
     public function test_their_answer_to_our_greeting_is_not_greeted_back(): void
