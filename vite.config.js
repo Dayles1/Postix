@@ -7,9 +7,11 @@ export default defineConfig({
         laravel({
             input: [
                 'resources/css/app.css',
+                'resources/css/driver-check.css',
                 'resources/js/app.js',
+                'resources/js/driver-check-app.js',
                 'resources/js/pages/logs.js',
-                'resources/js/telegram/new-user-page.js', 
+                'resources/js/telegram/new-user-page.js',
             ],
             refresh: true,
         }),

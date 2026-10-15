@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('layouts.driver-check')
 
 @section('title', __('telegram.operation_users.title'))
 
@@ -24,9 +24,6 @@
              Header
         ============================================================= --}}
         <x-driver-check.page-header
-            icon="users"
-            tone="blue"
-            :eyebrow="__('telegram.menu.groups.check')"
             :title="__('telegram.operation_users.title')"
             :description="__('telegram.operation_users.description')"
         >
@@ -43,7 +40,6 @@
                 <div class="relative" x-data="{ exportOpen: false }" x-on:click.outside="exportOpen = false">
                     <x-driver-check.button
                         icon="download"
-                        class="w-full"
                         x-on:click="exportOpen = !exportOpen"
                         ::aria-expanded="exportOpen"
                     >
@@ -54,8 +50,8 @@
                         x-show="exportOpen"
                         x-cloak
                         x-transition.origin.top.right
-                        class="absolute right-0 z-30 mt-2 w-64 overflow-hidden rounded-xl border
-                               border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-dark"
+                        class="absolute right-0 z-30 mt-1.5 w-64 overflow-hidden rounded-xl border
+                               border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-dark"
                     >
                         <a
                             href="{{ route('driver-check.export.operators') }}"
@@ -92,7 +88,7 @@
         {{-- ============================================================
              Counters (whole filtered set, not just this page)
         ============================================================= --}}
-        <section class="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
+        <section class="grid grid-cols-2 gap-3 xl:grid-cols-4">
             <x-driver-check.stat-card :label="__('telegram.operation_users.stats.users')" icon="users">
                 <span x-text="number(pagination.total)">0</span>
             </x-driver-check.stat-card>
@@ -100,7 +96,6 @@
             <x-driver-check.stat-card
                 :label="__('telegram.operation_users.stats.drivers')"
                 icon="truck"
-                chip="bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400"
             >
                 <span x-text="compact(globalStats.drivers)">0</span>
             </x-driver-check.stat-card>
@@ -108,7 +103,6 @@
             <x-driver-check.stat-card
                 :label="__('telegram.operation_users.stats.checks')"
                 icon="shield"
-                chip="bg-blue-light-50 text-blue-light-600 dark:bg-blue-light-500/10 dark:text-blue-light-400"
             >
                 <span x-text="compact(globalStats.checks)">0</span>
             </x-driver-check.stat-card>
@@ -116,7 +110,6 @@
             <x-driver-check.stat-card
                 :label="__('telegram.operation_users.stats.avg_match')"
                 icon="trending"
-                chip="bg-success-50 text-success-600 dark:bg-success-500/10 dark:text-success-400"
             >
                 <span x-text="percent(globalStats.match_rate) + '%'">0%</span>
             </x-driver-check.stat-card>
@@ -237,17 +230,17 @@
                     <table class="w-full min-w-[1100px] table-fixed text-left">
                         <colgroup>
                             <col class="w-[22%]">
-                            <col class="w-[16%]">
-                            <col class="w-[9%]">
-                            <col class="w-[9%]">
-                            <col class="w-[15%]">
-                            <col class="w-[15%]">
+                            <col class="w-[17%]">
+                            <col class="w-[10%]">
+                            <col class="w-[10%]">
+                            <col class="w-[13%]">
+                            <col class="w-[14%]">
                             <col class="w-[9%]">
                             <col class="w-[5%]">
                         </colgroup>
 
-                        <thead class="dc-thead border-b border-gray-200 bg-gray-50/70 dark:border-gray-800 dark:bg-white/[0.02]">
-                            <tr class="text-[10px] uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
+                        <thead class="dc-thead border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-transparent">
+                            <tr class="text-[10.5px] uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
                                 <th scope="col" class="px-4 py-2.5 font-semibold">{{ __('telegram.operation_users.table.user') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.operation_users.table.telegram') }}</th>
                                 <th scope="col" class="px-3 py-2.5 text-right font-semibold">{{ __('telegram.operation_users.table.drivers') }}</th>
@@ -263,13 +256,12 @@
                             <x-driver-check.skeleton-rows :cols="8" />
 
                             <template x-for="row in rows" :key="row.id">
-                                <tr class="group align-middle transition hover:bg-gray-50/70 dark:hover:bg-white/[0.02]">
+                                <tr class="group align-middle transition-colors hover:bg-gray-25 dark:hover:bg-white/[0.025]">
                                     {{-- Operator --}}
-                                    <td class="px-4 py-3">
+                                    <td class="px-4 py-3 transition-shadow group-hover:shadow-[inset_2px_0_0_var(--color-brand-500)]">
                                         <div class="flex items-center gap-3">
                                             <x-driver-check.avatar
                                                 size="sm"
-                                                class="bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400"
                                                 x-text="initials(row.name)"
                                             />
 
@@ -349,9 +341,9 @@
                                     {{-- Match rate --}}
                                     <td class="px-3 py-3">
                                         <div class="flex items-center gap-2">
-                                            <div class="h-1.5 w-full max-w-[90px] overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800">
+                                            <div class="h-1.5 w-full max-w-[90px] overflow-hidden rounded-sm bg-gray-200 dark:bg-gray-800">
                                                 <div
-                                                    class="h-full rounded-full transition-all duration-500"
+                                                    class="h-full rounded-sm transition-all duration-500"
                                                     :class="matchTone(row)"
                                                     :style="`width: ${matchWidth(row)}`"
                                                 ></div>
@@ -382,9 +374,9 @@
                                     <td class="px-4 py-3 text-right">
                                         <a
                                             :href="detailUrl(row)"
-                                            class="dc-tap inline-flex h-9 w-9 items-center justify-center rounded-xl
-                                                   text-gray-400 transition hover:bg-gray-100 hover:text-gray-700
-                                                   dark:hover:bg-white/[0.08] dark:hover:text-gray-200"
+                                            class="dc-tap inline-flex h-8 w-8 items-center justify-center rounded-lg
+                                                   text-gray-400 transition group-hover:text-brand-600 hover:bg-gray-100
+                                                   dark:hover:bg-white/[0.08] dark:group-hover:text-brand-300"
                                             :aria-label="row.name"
                                         >
                                             <x-driver-check.icon name="chevron-right" class="h-4 w-4" />
@@ -404,11 +396,10 @@
                 <template x-for="row in rows" :key="'card-' + row.id">
                     <a
                         :href="detailUrl(row)"
-                        class="dc-tap flex flex-col gap-3 p-3.5 transition active:bg-gray-50 dark:active:bg-white/[0.03]"
+                        class="dc-tap flex flex-col gap-3 p-3.5 transition active:bg-gray-25 dark:active:bg-white/[0.03]"
                     >
                         <div class="flex items-center gap-3">
                             <x-driver-check.avatar
-                                class="bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400"
                                 x-text="initials(row.name)"
                             />
 
@@ -425,9 +416,9 @@
 
                         {{-- Match rate bar: the number this page exists for --}}
                         <div class="flex items-center gap-2.5">
-                            <div class="h-2 flex-1 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800">
+                            <div class="h-2 flex-1 overflow-hidden rounded-sm bg-gray-200 dark:bg-gray-800">
                                 <div
-                                    class="h-full rounded-full transition-all duration-500"
+                                    class="h-full rounded-sm transition-all duration-500"
                                     :class="matchTone(row)"
                                     :style="`width: ${matchWidth(row)}`"
                                 ></div>
@@ -439,7 +430,7 @@
                             ></span>
                         </div>
 
-                        <dl class="grid grid-cols-3 gap-2 rounded-xl bg-gray-50 p-3 dark:bg-white/[0.02]">
+                        <dl class="grid grid-cols-3 gap-2 rounded-lg bg-gray-25 p-3 ring-1 ring-inset ring-gray-100 dark:bg-white/[0.02] dark:ring-gray-800">
                             <x-driver-check.kv :label="__('telegram.operation_users.table.drivers')">
                                 <span class="font-medium tabular-nums" x-text="number(stats(row).drivers)"></span>
                             </x-driver-check.kv>

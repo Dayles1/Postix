@@ -4,7 +4,7 @@
     @if ($label)
         <label
             @if ($for) for="{{ $for }}" @endif
-            class="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400"
+            class="mb-1.5 block text-[12px] font-semibold text-gray-600 dark:text-gray-400"
         >
             {{ $label }}
         </label>
@@ -13,7 +13,7 @@
     {{ $slot }}
 
     @if ($hint)
-        <p class="mt-1 text-[11px] leading-snug text-gray-400 dark:text-gray-500">
+        <p class="mt-1.5 text-[11.5px] leading-snug text-gray-400 dark:text-gray-500">
             {{ $hint }}
         </p>
     @endif

@@ -39,7 +39,10 @@ final class ClientCheckRulesStore
 
     public function save(ClientCheckRules $rules): void
     {
-        TelegramSetting::set(TelegramSetting::CLIENT_CHECK_RULES, $rules->toArray());
+        /* Uzbek phrases are kept in Cyrillic, as the person gets them (UzbekScript). */
+        $data = UzbekScript::enabled() ? UzbekScript::penalties($rules->toArray()) : $rules->toArray();
+
+        TelegramSetting::set(TelegramSetting::CLIENT_CHECK_RULES, $data);
     }
 
     public function reset(): void

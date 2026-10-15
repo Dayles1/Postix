@@ -234,7 +234,7 @@ class PeoplePanelTest extends TestCase
     {
         return [
             ['name' => 'First', 'mode' => 'all', 'phrases' => [
-                'uz' => ['plain' => ['Narx {status_limit}'], 'respectful' => ['Narx bering']],
+                'uz' => ['plain' => ['Narx {status_limit}'], 'respectful' => ['Нарх беринг']],
                 'ru' => ['plain' => ['Цену'], 'respectful' => []],
             ]],
             ['name' => null, 'from' => 2, 'mode' => 'forward', 'phrases' => [
@@ -284,8 +284,8 @@ class PeoplePanelTest extends TestCase
             ->assertJsonPath('data.roles.operation.levels.1.from', 2)
             ->assertJsonPath('data.roles.operation.levels.1.mode', 'forward')
             /* blanks are dropped, not stored */
-            ->assertJsonPath('data.roles.operation.levels.1.phrases.uz.plain', ['Ikkinchi'])
-            ->assertJsonPath('data.roles.operation.levels.0.phrases.uz.respectful', ['Narx bering'])
+            ->assertJsonPath('data.roles.operation.levels.1.phrases.uz.plain', ['Иккинчи'])
+            ->assertJsonPath('data.roles.operation.levels.0.phrases.uz.respectful', ['Нарх беринг'])
             /* the roles are kept apart */
             ->assertJsonCount(1, 'data.roles.sales.levels')
             ->assertJsonPath('data.roles.sales.levels.0.phrases.ru.plain', ['Только sales'])
@@ -573,18 +573,18 @@ class PeoplePanelTest extends TestCase
                 ->assertJsonPath('data.cooldown_minutes', 0)
                 /* blanks and repeats dropped */
                 ->assertJsonPath('data.replies.0.keywords', ['ok', '+'])
-                ->assertJsonPath('data.replies.0.answers.uz.plain', ['Rahmat, {address}'])
+                ->assertJsonPath('data.replies.0.answers.uz.plain', ['Рахмат, {address}'])
                 ->assertJsonPath('data.replies.0.max_words', null)
                 ->assertJsonPath('data.replies.1.max_words', 12)
                 ->assertJsonPath('data.replies.1.keywords', ['клиент*'])
                 ->assertJsonPath('data.silence.after_penalties', 7)
-                ->assertJsonPath('data.silence.answers.uz.plain', ['Iltimos, {address}']);
+                ->assertJsonPath('data.silence.answers.uz.plain', ['Илтимос, {address}']);
 
             /* Everything is in the file, readable by hand. */
             $file = json_decode((string) file_get_contents($path), true);
             $this->assertSame('Agreed', $file['replies'][0]['name']);
             $this->assertSame(45, $file['penalty_window_minutes']);
-            $this->assertStringContainsString('Rahmat', (string) file_get_contents($path));
+            $this->assertStringContainsString('Рахмат', (string) file_get_contents($path));
 
             $this->get('/api/telegram/auto-replies/download')
                 ->assertOk()
@@ -645,7 +645,7 @@ class PeoplePanelTest extends TestCase
                     'fillers' => ['aka', ' ', 'aka'],
                     'list' => [
                         ['name' => 'Tong', 'keywords' => ['xayrli tong', ''], 'answers' => [
-                            'uz' => ['plain' => ['Xayrli tong, {address}!', ' ']],
+                            'uz' => ['plain' => ['Хайрли тонг, {address}!', ' ']],
                         ]],
                     ],
                 ],
@@ -653,7 +653,7 @@ class PeoplePanelTest extends TestCase
                 ->assertOk()
                 ->assertJsonPath('data.greetings.fillers', ['aka'])
                 ->assertJsonPath('data.greetings.list.0.keywords', ['xayrli tong'])
-                ->assertJsonPath('data.greetings.list.0.answers.uz.plain', ['Xayrli tong, {address}!']);
+                ->assertJsonPath('data.greetings.list.0.answers.uz.plain', ['Хайрли тонг, {address}!']);
 
             $this->assertSame('Tong', json_decode((string) file_get_contents($path), true)['greetings']['list'][0]['name']);
 

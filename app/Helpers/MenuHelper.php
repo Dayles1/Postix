@@ -87,9 +87,18 @@ class MenuHelper
      */
     public static function getDriverCheckGroups(): array
     {
+        /*
+         * Six sections, each one question:
+         *   check      - what did the checks find?
+         *   people     - who gets the reports?
+         *   bot        - what does the bot write, and when?
+         *   telegram   - which accounts and chats does it work through?
+         *   contacts   - the group members saved into the accounts' contacts
+         *   monitoring - is the machinery alive?
+         */
         return [
             [
-                'title' => __('telegram.menu.groups.check'),
+                'title' => __('driver_check.sections.check'),
                 'items' => [
                     [
                         'icon' => 'statistics',
@@ -114,7 +123,7 @@ class MenuHelper
                 ],
             ],
             [
-                'title' => __('telegram.menu.groups.settings'),
+                'title' => __('driver_check.sections.people'),
                 'items' => [
                     [
                         'icon' => 'operators',
@@ -126,6 +135,11 @@ class MenuHelper
                         'name' => __('telegram.menu.items.sales'),
                         'path' => '/driver-check/sales',
                     ],
+                ],
+            ],
+            [
+                'title' => __('driver_check.sections.bot'),
+                'items' => [
                     [
                         'icon' => 'support-ticket',
                         'name' => __('telegram.menu.items.penalty_settings'),
@@ -141,6 +155,16 @@ class MenuHelper
                         'name' => __('telegram.menu.items.personal_answers'),
                         'path' => '/driver-check/personal-answers',
                     ],
+                ],
+            ],
+            [
+                'title' => __('driver_check.sections.telegram'),
+                'items' => [
+                    [
+                        'icon' => 'authentication',
+                        'name' => __('telegram.menu.items.sessions'),
+                        'path' => '/driver-check/sessions',
+                    ],
                     [
                         'icon' => 'chat',
                         'name' => __('telegram.menu.items.chats'),
@@ -151,15 +175,30 @@ class MenuHelper
                         'name' => __('telegram.menu.items.file_routes'),
                         'path' => '/driver-check/file-routes',
                     ],
+                ],
+            ],
+            [
+                'title' => __('driver_check.sections.contacts'),
+                'items' => [
+                    [
+                        'icon' => 'user-profile',
+                        'name' => __('driver_check.menu.contacts'),
+                        'path' => '/driver-check/contacts',
+                    ],
                     [
                         'icon' => 'authentication',
-                        'name' => __('telegram.menu.items.sessions'),
-                        'path' => '/driver-check/sessions',
+                        'name' => __('driver_check.menu.groups'),
+                        'path' => '/driver-check/contact-sync',
+                    ],
+                    [
+                        'icon' => 'task',
+                        'name' => __('driver_check.menu.contact_settings'),
+                        'path' => '/driver-check/contact-settings',
                     ],
                 ],
             ],
             [
-                'title' => __('telegram.menu.groups.monitoring'),
+                'title' => __('driver_check.sections.monitoring'),
                 'items' => [
                     [
                         'icon' => 'dashboard',
@@ -172,9 +211,9 @@ class MenuHelper
                         'path' => '/driver-check/queue',
                     ],
                     [
-                        'icon' => 'authentication',
-                        'name' => __('telegram.menu.items.contact_sync'),
-                        'path' => '/driver-check/contact-sync',
+                        'icon' => 'statistics',
+                        'name' => __('driver_check.menu.contact_report'),
+                        'path' => '/driver-check/contact-report',
                     ],
                 ],
             ],

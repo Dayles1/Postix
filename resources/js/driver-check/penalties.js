@@ -148,7 +148,7 @@ export function penaltiesPage(config) {
             }
 
             this.pollTimer = setTimeout(() => {
-                if (!this.loading && !document.hidden) {
+                if (!this.loading && !document.hidden && !this.appended) {
                     this.load();
                 } else {
                     this.schedulePoll();

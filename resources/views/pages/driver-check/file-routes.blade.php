@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('layouts.driver-check')
 
 @section('title', __('telegram.file_routes.title'))
 
@@ -17,13 +17,9 @@
 >
     <x-driver-check.shell>
 
-        {{-- ============================================================
-             Header
-        ============================================================= --}}
+        {{-- Header --}}
         <x-driver-check.page-header
             icon="send"
-            tone="brand"
-            :eyebrow="__('telegram.menu.groups.settings')"
             :title="__('telegram.file_routes.title')"
             :description="__('telegram.file_routes.description')"
         >
@@ -43,15 +39,11 @@
             </x-slot:actions>
         </x-driver-check.page-header>
 
-        {{-- ============================================================
-             How a file finds its groups
-        ============================================================= --}}
+        {{-- How a file finds its groups --}}
         <div
-            class="flex items-start gap-2.5 rounded-2xl border border-blue-light-200 bg-blue-light-25 px-3.5 py-3
-                   text-[13px] leading-relaxed text-blue-light-700
-                   dark:border-blue-light-500/20 dark:bg-blue-light-500/[0.07] dark:text-blue-light-300"
+            class="flex items-start gap-2.5 rounded-2xl border border-gray-200 bg-gray-25 px-3.5 py-2.5 text-[13px] leading-relaxed text-gray-600 dark:border-gray-800 dark:bg-white/[0.02] dark:text-gray-300"
         >
-            <x-driver-check.icon name="send" class="mt-0.5 h-4 w-4 shrink-0" />
+            <x-driver-check.icon name="send" class="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
             <div class="min-w-0">
                 <p>{{ __('telegram.file_routes.notice') }}</p>
                 <p class="mt-1 text-[12px]">
@@ -63,9 +55,7 @@
 
         <x-driver-check.error-alert :title="__('telegram.file_routes.errors.title')" />
 
-        {{-- ============================================================
-             Kinds
-        ============================================================= --}}
+        {{-- Kinds --}}
         <x-driver-check.surface class="overflow-hidden">
             {{-- Table (lg and up) --}}
             <div class="hidden lg:block">
@@ -81,7 +71,7 @@
                         </colgroup>
 
                         <thead class="dc-thead border-b border-gray-200 bg-gray-50/70 dark:border-gray-800 dark:bg-white/[0.02]">
-                            <tr class="text-[10px] uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
+                            <tr class="text-[10.5px] uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
                                 <th scope="col" class="px-4 py-2.5 font-semibold">{{ __('telegram.file_routes.table.name') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.file_routes.table.keywords') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.file_routes.table.targets') }}</th>
@@ -95,12 +85,13 @@
                             <x-driver-check.skeleton-rows :cols="6" />
 
                             <template x-for="row in rows" :key="row.id">
-                                <tr class="align-middle transition hover:bg-gray-50/70 dark:hover:bg-white/[0.02]">
+                                <tr class="align-middle transition-colors hover:bg-gray-25 dark:hover:bg-white/[0.025]">
                                     <td class="px-4 py-3">
                                         <p class="truncate text-sm font-medium text-gray-900 dark:text-white" :title="row.name" x-text="row.name"></p>
-                                        <x-driver-check.badge ::class="rowStatusClass(row)" class="mt-1">
+                                        <span class="mt-0.5 inline-flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
+                                            <span class="h-1.5 w-1.5 rounded-full" :class="row.is_active ? 'bg-success-500' : 'bg-gray-400'"></span>
                                             <span x-text="row.is_active ? translations.status.active : translations.status.paused"></span>
-                                        </x-driver-check.badge>
+                                        </span>
                                     </td>
 
                                     <td class="px-3 py-3">
@@ -119,8 +110,8 @@
                                         <div class="flex flex-wrap gap-1">
                                             <template x-for="id in row.target_chat_ids" :key="id">
                                                 <span
-                                                    class="rounded-md bg-brand-50 px-1.5 py-0.5 text-[11px] tabular-nums text-brand-700
-                                                           dark:bg-brand-500/10 dark:text-brand-400"
+                                                    class="rounded-md bg-gray-100 px-1.5 py-0.5 text-[11px] tabular-nums text-gray-700
+                                                           dark:bg-white/[0.06] dark:text-gray-300"
                                                     x-text="id"
                                                 ></span>
                                             </template>
@@ -165,12 +156,13 @@
                         <div class="flex items-start justify-between gap-3">
                             <p class="dc-break text-sm font-semibold text-gray-900 dark:text-white" x-text="row.name"></p>
 
-                            <x-driver-check.badge ::class="rowStatusClass(row)">
+                            <span class="inline-flex shrink-0 items-center gap-1.5 text-[12.5px] font-medium text-gray-700 dark:text-gray-200">
+                                <span class="h-1.5 w-1.5 rounded-full" :class="row.is_active ? 'bg-success-500' : 'bg-gray-400'"></span>
                                 <span x-text="row.is_active ? translations.status.active : translations.status.paused"></span>
-                            </x-driver-check.badge>
+                            </span>
                         </div>
 
-                        <dl class="grid grid-cols-2 gap-x-3 gap-y-2.5 rounded-xl bg-gray-50 p-3 dark:bg-white/[0.02]">
+                        <dl class="grid grid-cols-2 gap-x-3 gap-y-2.5 rounded-xl bg-gray-25 p-3 dark:bg-white/[0.02]">
                             <x-driver-check.kv :label="__('telegram.file_routes.table.keywords')" class="col-span-2">
                                 <span class="dc-break font-mono text-[12px]" x-text="keywordList(row).join(', ')"></span>
                             </x-driver-check.kv>
@@ -205,9 +197,7 @@
             />
         </x-driver-check.surface>
 
-        {{-- ============================================================
-             Recent forwards
-        ============================================================= --}}
+        {{-- Recent forwards --}}
         <x-driver-check.surface class="overflow-hidden">
             <div class="border-b border-gray-200 px-4 py-3 dark:border-gray-800">
                 <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('telegram.file_routes.recent.title') }}</p>
@@ -217,7 +207,7 @@
             <div class="overflow-x-auto">
                 <table class="w-full min-w-[760px] text-left">
                     <thead class="dc-thead border-b border-gray-200 bg-gray-50/70 dark:border-gray-800 dark:bg-white/[0.02]">
-                        <tr class="text-[10px] uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
+                        <tr class="text-[10.5px] uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
                             <th scope="col" class="px-4 py-2.5 font-semibold">{{ __('telegram.file_routes.recent.time') }}</th>
                             <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.file_routes.recent.file') }}</th>
                             <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.file_routes.recent.route') }}</th>
@@ -228,7 +218,7 @@
 
                     <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                         <template x-for="item in recent" :key="item.id">
-                            <tr class="align-top">
+                            <tr class="align-top transition-colors hover:bg-gray-25 dark:hover:bg-white/[0.025]">
                                 <td
                                     class="whitespace-nowrap px-4 py-2.5 text-[13px] text-gray-700 dark:text-gray-300"
                                     :title="date(item.created_at)"
@@ -274,9 +264,7 @@
         </x-driver-check.surface>
     </x-driver-check.shell>
 
-    {{-- ================================================================
-         Create / edit dialog
-    ================================================================= --}}
+    {{-- Create / edit dialog --}}
     <x-driver-check.modal
         open="formOpen"
         close="closeForm()"
@@ -418,9 +406,7 @@
         </x-slot:footer>
     </x-driver-check.modal>
 
-    {{-- ================================================================
-         Delete confirmation
-    ================================================================= --}}
+    {{-- Delete confirmation --}}
     <x-driver-check.modal
         open="confirmOpen"
         close="closeConfirm()"

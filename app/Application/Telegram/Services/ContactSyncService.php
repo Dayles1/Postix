@@ -55,21 +55,26 @@ final class ContactSyncService
     public function __construct(
         private readonly MadelineService $madeline,
         private readonly TelegramAccountProcessService $pool,
+        private readonly ContactSyncSettings $settings,
     ) {}
 
     /**
      * @param callable(string): void|null $output console echo, optional
      *
+     * @param string $trigger who started it, kept on the run: "manual" (the
+     *                        button, the console) or "schedule" (the daily one)
+     *
      * @return array{accounts: int, added: int, failed: int, members: int}
      */
-    public function run(?int $groupId = null, ?callable $output = null): array
+    public function run(?int $groupId = null, ?callable $output = null, string $trigger = 'manual'): array
     {
         $this->runId = (string) Str::uuid();
 
         $say = $output ?? static function (string $line): void {};
 
-        $config = (array) config('services.telegram.contact_sync');
-        $maxAccounts = max(1, (int) ($config['max_accounts'] ?? 20));
+        /* The panel's settings, read once: a run is not changed half way. */
+        $config = $this->settings->current();
+        $maxAccounts = max(1, (int) $config['max_accounts']);
 
         $totals = ['accounts' => 0, 'added' => 0, 'failed' => 0, 'members' => 0];
 
@@ -79,9 +84,12 @@ final class ContactSyncService
             ->get();
 
         $this->log('started', 'Sync started', null, null, [
+            'trigger' => $trigger,
             'groups' => $groups->pluck('link')->all(),
             'max_accounts' => $maxAccounts,
-            'daily_limit' => (int) ($config['daily_limit'] ?? 100),
+            'daily_limit' => (int) $config['daily_limit'],
+            'nick_base' => $config['nick_base'] !== '' ? $config['nick_base'] : null,
+            'excluded_accounts' => $config['excluded_accounts'],
         ]);
 
         if ($groups->isEmpty()) {
@@ -90,7 +98,8 @@ final class ContactSyncService
             return $totals;
         }
 
-        $usedAccountIds = [];
+        /* Accounts left out in the panel are taken for used from the start. */
+        $usedAccountIds = array_map('intval', (array) $config['excluded_accounts']);
 
         for ($i = 0; $i < $maxAccounts; $i++) {
             /*
@@ -197,6 +206,13 @@ final class ContactSyncService
         $existing = null;
         $streak = 0;
 
+        /*
+         * With a base nick set, people are saved as "base", "base-1",
+         * "base-2" ... counted per account and carried on from run to run.
+         */
+        $nickBase = (string) ($config['nick_base'] ?? '');
+        $nickNext = $nickBase !== '' ? $this->nickCount($account, $nickBase) : 0;
+
         foreach ($groups as $group) {
             try {
                 $members = $this->readMembers($api, $group, $account, $config);
@@ -262,17 +278,24 @@ final class ContactSyncService
                 }
 
                 try {
-                    $this->addContact($api, $user);
+                    $nick = $nickBase !== '' ? ContactSyncSettings::nick($nickBase, $nickNext) : null;
 
-                    $this->finishClaim($account, $user, TelegramAccountContact::STATUS_ADDED);
+                    $this->addContact($api, $user, $nick);
+
+                    $this->finishClaim($account, $user, TelegramAccountContact::STATUS_ADDED, null, $nick);
 
                     $result['added']++;
                     $remaining--;
                     $streak = 0;
 
+                    if ($nick !== null) {
+                        $nickNext++;
+                    }
+
                     $this->log('added', 'Contact added', $account->id, $group->id, [
                         'telegram_user_id' => $user->telegram_user_id,
                         'username' => $user->username,
+                        'contact_name' => $nick,
                     ]);
 
                     $this->pause($config);
@@ -525,6 +548,7 @@ final class ContactSyncService
         TelegramScrapedUser $user,
         string $status,
         ?string $error = null,
+        ?string $contactName = null,
     ): void {
         TelegramAccountContact::query()
             ->where('scraped_user_id', $user->id)
@@ -532,13 +556,42 @@ final class ContactSyncService
             ->update([
                 'status' => $status,
                 'error' => $error,
+                'contact_name' => $contactName,
                 'added_at' => $status === TelegramAccountContact::STATUS_ADDED ? now() : null,
                 'updated_at' => now(),
             ]);
     }
 
-    private function addContact(API $api, TelegramScrapedUser $user): void
+    /**
+     * How many people this account has saved under the base nick so far -
+     * the number the next one gets.
+     */
+    private function nickCount(TelegramAccount $account, string $base): int
     {
+        $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $base);
+
+        return TelegramAccountContact::query()
+            ->where('telegram_account_id', $account->id)
+            ->where(fn ($q) => $q->where('contact_name', $base)->orWhere('contact_name', 'like', $escaped . '-%'))
+            ->count();
+    }
+
+    /**
+     * @param string|null $nick the name to save them under; null keeps their own
+     */
+    private function addContact(API $api, TelegramScrapedUser $user, ?string $nick = null): void
+    {
+        if ($nick !== null) {
+            $api->contacts->addContact(
+                id: $user->telegram_user_id,
+                first_name: $nick,
+                last_name: '',
+                add_phone_privacy_exception: false,
+            );
+
+            return;
+        }
+
         $first = trim((string) $user->first_name);
 
         if ($first === '') {

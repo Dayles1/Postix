@@ -53,11 +53,13 @@ final class ContactSyncController extends Controller
             ->get()
             ->keyBy('telegram_account_id');
 
+        $excluded = app(\App\Application\Telegram\Services\ContactSyncSettings::class)->current()['excluded_accounts'];
+
         $accounts = TelegramAccount::query()
             ->where('is_authorized', true)
             ->orderBy('id')
             ->get()
-            ->map(function (TelegramAccount $account) use ($perAccount, $held): array {
+            ->map(function (TelegramAccount $account) use ($perAccount, $held, $excluded): array {
                 $stats = $perAccount->get($account->id);
 
                 return [
@@ -66,6 +68,7 @@ final class ContactSyncController extends Controller
                     'username' => $account->username,
                     'status' => $account->status,
                     'is_primary' => $account->isPrimary(),
+                    'excluded' => in_array($account->id, $excluded, true),
                     'held' => $held->has($account->id),
                     'held_reason' => $held->get($account->id)?->disabled_reason,
                     'held_at' => $held->get($account->id)?->disabled_at,
@@ -91,7 +94,7 @@ final class ContactSyncController extends Controller
         return response()->json(['data' => [
             'running' => TelegramProcessLock::isHeldByOtherProcess(TelegramSyncContactsCommand::LOCK_NAME),
             'pid' => TelegramProcessLock::holderPid(TelegramSyncContactsCommand::LOCK_NAME),
-            'daily_limit' => (int) config('services.telegram.contact_sync.daily_limit'),
+            'daily_limit' => app(\App\Application\Telegram\Services\ContactSyncSettings::class)->current()['daily_limit'],
             'last_event' => $lastRun ? [
                 'event' => $lastRun->event,
                 'at' => $lastRun->created_at,
@@ -154,6 +157,7 @@ final class ContactSyncController extends Controller
             'event' => ['nullable', 'string', 'max:24'],
             'account_id' => ['nullable', 'integer'],
             'group_id' => ['nullable', 'integer'],
+            'run_id' => ['nullable', 'uuid'],
             'per_page' => ['nullable', 'integer', 'min:5', 'max:200'],
         ]);
 
@@ -162,7 +166,13 @@ final class ContactSyncController extends Controller
             ->when($request->filled('event'), fn ($q) => $q->where('event', $request->input('event')))
             ->when($request->filled('account_id'), fn ($q) => $q->where('telegram_account_id', $request->integer('account_id')))
             ->when($request->filled('group_id'), fn ($q) => $q->where('group_id', $request->integer('group_id')))
-            ->latest('id')
+            ->when($request->filled('run_id'), fn ($q) => $q->where('run_id', $request->input('run_id')))
+            /* One run reads from its start; the rest of the log is newest first. */
+            ->when(
+                $request->filled('run_id'),
+                fn ($q) => $q->oldest('id'),
+                fn ($q) => $q->latest('id'),
+            )
             ->paginate($request->integer('per_page', 50));
 
         return response()->json($logs);

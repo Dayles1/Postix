@@ -88,6 +88,14 @@ export function createListPage({
 
         loading: false,
 
+        /** The next page is being appended (infinite scroll). */
+        appending: false,
+
+        /** More than the first page is on screen: a reload would drop it. */
+        appended: false,
+
+        moreError: null,
+
         error: null,
 
         /** Advanced filters stay folded away until asked for. */
@@ -98,7 +106,7 @@ export function createListPage({
         pagination: {
             current_page: 1,
             last_page: 1,
-            per_page: Number(defaults.per_page ?? 10),
+            per_page: Number(defaults.per_page ?? 20),
             total: 0,
             from: 0,
             to: 0,
@@ -192,6 +200,9 @@ export function createListPage({
 
             this.pendingRequest = controller;
             this.loading = true;
+            this.appending = false;
+            this.appended = false;
+            this.moreError = null;
             this.error = null;
 
             try {
@@ -220,6 +231,8 @@ export function createListPage({
                 }
 
                 this.syncUrl();
+
+                this.$nextTick(() => this.fillScreen());
             } catch (error) {
                 /* A cancelled request is not a failure the user should see. */
                 if (error?.name === 'AbortError') {
@@ -238,6 +251,103 @@ export function createListPage({
                     this.loading = false;
                 }
             }
+        },
+
+        /*
+        |----------------------------------------------------------------
+        | Infinite scroll
+        |----------------------------------------------------------------
+        |
+        | The list loads the next page by itself when its end comes into
+        | view (see x-driver-check.pagination). The URL keeps page 1: a
+        | reload or a shared link starts from the top, with the same
+        | filters.
+        */
+
+        hasMore() {
+            return Number(this.pagination.current_page) < Number(this.pagination.last_page);
+        },
+
+        /** Whether the end-of-list marker is on, or just below, the screen. */
+        nearEnd() {
+            const marker = this.$refs.moreSentinel;
+
+            if (!marker) {
+                return false;
+            }
+
+            return marker.getBoundingClientRect().top < window.innerHeight + 320;
+        },
+
+        /** A short page that does not fill the screen asks for the next one. */
+        fillScreen() {
+            if (this.hasMore() && !this.loading && !this.appending && !this.moreError && this.nearEnd()) {
+                this.loadMore();
+            }
+        },
+
+        async loadMore() {
+            if (this.loading || this.appending || !this.hasMore()) {
+                return;
+            }
+
+            const controller = new AbortController();
+            const next = Number(this.pagination.current_page) + 1;
+
+            this.pendingRequest = controller;
+            this.appending = true;
+            this.moreError = null;
+
+            try {
+                const params = this.buildParams(false);
+
+                params.set('page', String(next));
+
+                const response = await fetch(`${this.endpoint}?${params.toString()}`, {
+                    method: 'GET',
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    credentials: 'same-origin',
+                    cache: 'no-store',
+                    signal: controller.signal,
+                });
+
+                const json = await this.readJson(response);
+                const meta = json.meta || {};
+                const seen = new Set(this.rows.map((row) => row?.id).filter((id) => id !== undefined));
+                const fresh = (Array.isArray(json.data) ? json.data : [])
+                    .filter((row) => row?.id === undefined || !seen.has(row.id));
+
+                this.rows = this.rows.concat(fresh);
+                this.appended = true;
+
+                this.pagination = {
+                    ...this.pagination,
+                    current_page: next,
+                    last_page: Number(meta.last_page ?? this.pagination.last_page),
+                    total: Number(meta.total ?? this.pagination.total),
+                    from: this.rows.length > 0 ? 1 : 0,
+                    to: this.rows.length,
+                };
+            } catch (error) {
+                /* A newer load() cancelled this one and owns the flags now. */
+                if (error?.name === 'AbortError') {
+                    return;
+                }
+
+                this.moreError = error?.message
+                    || this.translations?.errors?.load_failed
+                    || 'Error';
+            } finally {
+                if (this.pendingRequest === controller) {
+                    this.pendingRequest = null;
+                    this.appending = false;
+                }
+            }
+
+            this.$nextTick(() => this.fillScreen());
         },
 
         async readJson(response) {
@@ -262,7 +372,7 @@ export function createListPage({
             this.pagination = {
                 current_page: Number(meta.current_page ?? this.filters.page ?? 1),
                 last_page: Number(meta.last_page ?? 1),
-                per_page: Number(meta.per_page ?? this.filters.per_page ?? 10),
+                per_page: Number(meta.per_page ?? this.filters.per_page ?? 20),
                 total: Number(meta.total ?? 0),
                 from: Number(meta.from ?? 0),
                 to: Number(meta.to ?? 0),

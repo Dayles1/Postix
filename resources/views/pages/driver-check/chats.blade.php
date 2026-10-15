@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('layouts.driver-check')
 
 @section('title', __('telegram.chats.title'))
 
@@ -17,13 +17,9 @@
 >
     <x-driver-check.shell>
 
-        {{-- ============================================================
-             Header
-        ============================================================= --}}
+        {{-- Header --}}
         <x-driver-check.page-header
             icon="telegram"
-            tone="brand"
-            :eyebrow="__('telegram.menu.groups.settings')"
             :title="__('telegram.chats.title')"
             :description="__('telegram.chats.description')"
         >
@@ -43,21 +39,15 @@
             </x-slot:actions>
         </x-driver-check.page-header>
 
-        {{-- ============================================================
-             Why a new chat is not watched the second it is saved
-        ============================================================= --}}
+        {{-- Why a new chat is not watched the second it is saved --}}
         <div
-            class="flex items-start gap-2.5 rounded-2xl border border-blue-light-200 bg-blue-light-25 px-3.5 py-3
-                   text-[13px] leading-relaxed text-blue-light-700
-                   dark:border-blue-light-500/20 dark:bg-blue-light-500/[0.07] dark:text-blue-light-300"
+            class="flex items-start gap-2.5 rounded-2xl border border-gray-200 bg-gray-25 px-3.5 py-2.5 text-[13px] leading-relaxed text-gray-600 dark:border-gray-800 dark:bg-white/[0.02] dark:text-gray-300"
         >
             <x-driver-check.icon name="clock" class="mt-0.5 h-4 w-4 shrink-0" />
             <p>{{ __('telegram.chats.notice') }}</p>
         </div>
 
-        {{-- ============================================================
-             Counters
-        ============================================================= --}}
+        {{-- Counters --}}
         <section class="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
             <x-driver-check.stat-card
                 :label="__('telegram.chats.stats.total')"
@@ -69,8 +59,6 @@
             <x-driver-check.stat-card
                 :label="__('telegram.chats.stats.active')"
                 icon="check-circle"
-                tone="text-brand-600 dark:text-brand-400"
-                chip="bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400"
             >
                 <span x-text="number(stats.active)">0</span>
             </x-driver-check.stat-card>
@@ -78,8 +66,6 @@
             <x-driver-check.stat-card
                 :label="__('telegram.chats.stats.watching')"
                 icon="telegram"
-                tone="text-success-600 dark:text-success-400"
-                chip="bg-success-50 text-success-600 dark:bg-success-500/10 dark:text-success-400"
             >
                 <span x-text="number(stats.watching)">0</span>
             </x-driver-check.stat-card>
@@ -149,7 +135,7 @@
                         </colgroup>
 
                         <thead class="dc-thead border-b border-gray-200 bg-gray-50/70 dark:border-gray-800 dark:bg-white/[0.02]">
-                            <tr class="text-[10px] uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
+                            <tr class="text-[10.5px] uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
                                 <th scope="col" class="px-4 py-2.5 font-semibold">{{ __('telegram.chats.table.chat') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.chats.table.peer') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.chats.table.status') }}</th>
@@ -163,13 +149,12 @@
                             <x-driver-check.skeleton-rows :cols="6" />
 
                             <template x-for="row in rows" :key="row.id">
-                                <tr class="group align-middle transition hover:bg-gray-50/70 dark:hover:bg-white/[0.02]">
+                                <tr class="group align-middle transition-colors hover:bg-gray-25 dark:hover:bg-white/[0.025]">
                                     {{-- Chat --}}
                                     <td class="px-4 py-3">
                                         <div class="flex items-center gap-3">
                                             <x-driver-check.avatar
                                                 size="sm"
-                                                ::class="avatarClass(row)"
                                             >
                                                 <x-driver-check.icon name="telegram" class="h-4 w-4" />
                                             </x-driver-check.avatar>
@@ -209,8 +194,8 @@
 
                                                     <template x-if="row.source === 'env'">
                                                         <span
-                                                            class="shrink-0 whitespace-nowrap rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px]
-                                                                   font-medium text-gray-500 dark:bg-white/[0.06] dark:text-gray-400"
+                                                            class="shrink-0 whitespace-nowrap rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px]
+                                                                   font-semibold text-gray-500 dark:bg-white/[0.06] dark:text-gray-400"
                                                             x-text="translations.table.source_env"
                                                         ></span>
                                                     </template>
@@ -238,10 +223,7 @@
 
                                     {{-- Status --}}
                                     <td class="px-3 py-3">
-                                        <x-driver-check.badge ::class="stateClass(row)">
-                                            <span class="h-1.5 w-1.5 rounded-full" :class="stateDot(row)"></span>
-                                            <span x-text="stateLabel(row)"></span>
-                                        </x-driver-check.badge>
+                                        <span class="inline-flex items-center gap-1.5 whitespace-nowrap text-[12.5px] font-medium text-gray-700 dark:text-gray-200"><span class="h-1.5 w-1.5 rounded-full" :class="stateDot(row)"></span><span x-text="stateLabel(row)"></span></span>
                                     </td>
 
                                     {{-- Counts: checks, CRM penalties, routed files --}}
@@ -297,7 +279,7 @@
                 <template x-for="row in rows" :key="'card-' + row.id">
                     <article class="flex flex-col gap-3 p-3.5">
                         <div class="flex items-start gap-3">
-                            <x-driver-check.avatar ::class="avatarClass(row)">
+                            <x-driver-check.avatar>
                                 <x-driver-check.icon name="telegram" class="h-5 w-5" />
                             </x-driver-check.avatar>
 
@@ -320,13 +302,10 @@
                                 </a>
                             </div>
 
-                            <x-driver-check.badge ::class="stateClass(row)">
-                                <span class="h-1.5 w-1.5 rounded-full" :class="stateDot(row)"></span>
-                                <span x-text="stateLabel(row)"></span>
-                            </x-driver-check.badge>
+                            <span class="inline-flex items-center gap-1.5 whitespace-nowrap text-[12.5px] font-medium text-gray-700 dark:text-gray-200"><span class="h-1.5 w-1.5 rounded-full" :class="stateDot(row)"></span><span x-text="stateLabel(row)"></span></span>
                         </div>
 
-                        <dl class="grid grid-cols-2 gap-x-3 gap-y-2.5 rounded-xl bg-gray-50 p-3 dark:bg-white/[0.02]">
+                        <dl class="grid grid-cols-2 gap-x-3 gap-y-2.5 rounded-xl bg-gray-25 p-3 dark:bg-white/[0.02]">
                             <x-driver-check.kv :label="__('telegram.chats.table.peer')" class="col-span-2">
                                 <span class="tabular-nums" x-text="row.chat_id || translations.table.no_id"></span>
                             </x-driver-check.kv>
@@ -383,9 +362,7 @@
         </x-driver-check.surface>
     </x-driver-check.shell>
 
-    {{-- ================================================================
-         Create / edit dialog
-    ================================================================= --}}
+    {{-- Create / edit dialog --}}
     <x-driver-check.modal
         open="formOpen"
         close="closeForm()"
@@ -517,9 +494,7 @@
         </x-slot:footer>
     </x-driver-check.modal>
 
-    {{-- ================================================================
-         Delete confirmation
-    ================================================================= --}}
+    {{-- Delete confirmation --}}
     <x-driver-check.modal
         open="confirmOpen"
         close="closeConfirm()"

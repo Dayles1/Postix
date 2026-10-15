@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('layouts.driver-check')
 
 @section('title', __('telegram.watchdog.title'))
 
@@ -24,60 +24,13 @@
              Header
         ============================================================= --}}
         <x-driver-check.page-header
-            icon="shield"
-            tone="brand"
-            :eyebrow="__('telegram.menu.groups.monitoring')"
             :title="__('telegram.watchdog.title')"
             :description="__('telegram.watchdog.description')"
         >
             <x-slot:actions>
-                {{-- Control: one joined group, the colour only on the icons --}}
-                <div
-                    class="col-span-2 inline-flex overflow-hidden rounded-xl border border-gray-300 bg-white shadow-xs
-                           divide-x divide-gray-200 dark:divide-gray-700 dark:border-gray-700 dark:bg-white/[0.03]"
-                    role="group"
-                >
-                    <button
-                        type="button"
-                        x-on:click="start()"
-                        :disabled="!!busy"
-                        class="dc-tap inline-flex h-11 flex-1 items-center justify-center gap-2 px-3.5 text-sm font-medium text-gray-700
-                               transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 sm:h-10
-                               dark:text-gray-200 dark:hover:bg-white/[0.06]"
-                    >
-                        <x-driver-check.icon name="refresh" class="h-4 w-4 animate-spin text-success-600" x-show="busy === 'start'" x-cloak />
-                        <x-driver-check.icon name="play" class="h-4 w-4 text-success-600 dark:text-success-400" x-show="busy !== 'start'" />
-                        <span class="whitespace-nowrap">{{ __('telegram.watchdog.actions.start') }}</span>
-                    </button>
-
-                    <button
-                        type="button"
-                        x-on:click="askConfirm('restart')"
-                        :disabled="!!busy || !canRestart()"
-                        class="dc-tap inline-flex h-11 flex-1 items-center justify-center gap-2 px-3.5 text-sm font-medium text-gray-700
-                               transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 sm:h-10
-                               dark:text-gray-200 dark:hover:bg-white/[0.06]"
-                    >
-                        <x-driver-check.icon name="refresh" class="h-4 w-4 text-brand-500 dark:text-brand-400" />
-                        <span class="hidden whitespace-nowrap sm:inline" title="{{ __('telegram.watchdog.actions.restart') }}">{{ __('telegram.watchdog.actions.restart_short') }}</span>
-                    </button>
-
-                    <button
-                        type="button"
-                        x-on:click="askConfirm('stop')"
-                        :disabled="!!busy || !canStop()"
-                        class="dc-tap inline-flex h-11 flex-1 items-center justify-center gap-2 px-3.5 text-sm font-medium text-gray-700
-                               transition hover:bg-error-50 disabled:cursor-not-allowed disabled:opacity-50 sm:h-10
-                               dark:text-gray-200 dark:hover:bg-error-500/10"
-                    >
-                        <x-driver-check.icon name="stop" class="h-4 w-4 text-error-500" />
-                        <span class="whitespace-nowrap">{{ __('telegram.watchdog.actions.stop') }}</span>
-                    </button>
-                </div>
-
+                {{-- Refresh and the destructive stop first, the one primary (start) last --}}
                 <x-driver-check.button
                     size="icon"
-                    class="hidden sm:inline-flex"
                     x-on:click="load()"
                     ::disabled="loading"
                     :title="__('telegram.ui.refresh')"
@@ -85,33 +38,52 @@
                 >
                     <x-driver-check.icon name="refresh" class="h-4 w-4" ::class="loading && 'animate-spin'" />
                 </x-driver-check.button>
+
+                <x-driver-check.button variant="danger" x-on:click="askConfirm('stop')" ::disabled="!!busy || !canStop()">
+                    <x-driver-check.icon name="stop" class="h-4 w-4" />
+                    {{ __('telegram.watchdog.actions.stop') }}
+                </x-driver-check.button>
+
+                <x-driver-check.button x-on:click="askConfirm('restart')" ::disabled="!!busy || !canRestart()" :title="__('telegram.watchdog.actions.restart')">
+                    <x-driver-check.icon name="refresh" class="h-4 w-4" />
+                    {{ __('telegram.watchdog.actions.restart_short') }}
+                </x-driver-check.button>
+
+                <x-driver-check.button variant="primary" x-on:click="start()" ::disabled="!!busy">
+                    <x-driver-check.icon name="refresh" class="h-4 w-4 animate-spin" x-show="busy === 'start'" x-cloak />
+                    <x-driver-check.icon name="play" class="h-4 w-4" x-show="busy !== 'start'" />
+                    {{ __('telegram.watchdog.actions.start') }}
+                </x-driver-check.button>
             </x-slot:actions>
         </x-driver-check.page-header>
 
         <x-driver-check.error-alert :title="__('telegram.watchdog.errors.title')" />
 
         {{-- First load --}}
-        <div x-show="!status && loading" class="grid gap-3 sm:grid-cols-3">
-            <template x-for="i in 3" :key="'sk-' + i">
-                <div class="dc-skeleton h-28 rounded-2xl bg-gray-100 dark:bg-white/[0.06]"></div>
-            </template>
+        <div x-show="!status && loading" class="flex flex-col gap-5">
+            <div class="dc-skeleton h-20 rounded-2xl bg-gray-100 dark:bg-white/[0.06]"></div>
+            <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <template x-for="i in 4" :key="'sk-' + i">
+                    <div class="dc-skeleton h-24 rounded-2xl bg-gray-100 dark:bg-white/[0.06]"></div>
+                </template>
+            </div>
+            <div class="dc-skeleton h-64 rounded-2xl bg-gray-100 dark:bg-white/[0.06]"></div>
         </div>
 
         <template x-if="status">
-            <div class="flex flex-col gap-4 sm:gap-5">
+            <div
+                class="flex flex-col gap-5"
+                x-data="{ dotTone: { success: 'text-success-500', progress: 'text-blue-light-500', waiting: 'text-warning-500', error: 'text-error-500', muted: 'text-gray-400' } }"
+            >
 
                 {{-- ====================================================
-                     Overall state
+                     Overall state: the one loud thing on the page
                 ===================================================== --}}
-                <section class="flex items-start gap-3 rounded-2xl border p-4 sm:p-5" :class="bannerClass()">
-                    <span class="mt-0.5 shrink-0">
-                        <x-driver-check.icon name="check-circle" class="h-6 w-6" x-show="stateTone() === 'success'" />
-                        <x-driver-check.icon name="alert" class="h-6 w-6" x-show="stateTone() === 'waiting' || stateTone() === 'muted'" x-cloak />
-                        <x-driver-check.icon name="x-circle" class="h-6 w-6" x-show="stateTone() === 'error'" x-cloak />
-                    </span>
+                <section class="flex items-center gap-4 rounded-2xl border px-4 py-4 sm:px-5 sm:py-5" :class="bannerClass()">
+                    <span class="dc-dot shrink-0 !h-3 !w-3" :class="dotTone[stateTone()]"></span>
 
                     <div class="min-w-0 flex-1">
-                        <p class="text-base font-semibold" x-text="t.state[state()]"></p>
+                        <p class="text-lg font-semibold leading-6" x-text="t.state[state()]"></p>
                         <p class="mt-0.5 text-[13px] leading-relaxed opacity-90" x-text="t.state_hint[state()]"></p>
                     </div>
 
@@ -121,226 +93,222 @@
                 <p
                     x-show="!status.can_signal"
                     x-cloak
-                    class="flex items-start gap-2 rounded-xl bg-gray-50 px-3 py-2.5 text-[12px] text-gray-600 dark:bg-white/[0.03] dark:text-gray-400"
+                    class="flex items-start gap-2 rounded-lg border border-gray-200 bg-gray-25 px-3 py-2.5 text-[12px] text-gray-600 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-400"
                 >
                     <x-driver-check.icon name="alert" class="mt-px h-4 w-4 shrink-0" />
                     <span x-text="t.signals_unavailable"></span>
                 </p>
 
                 {{-- ====================================================
-                     Processes
+                     Activity
                 ===================================================== --}}
-                <section class="grid gap-3 sm:grid-cols-3">
-                    @foreach (['watchdog', 'spare', 'listener'] as $role)
-                        <x-driver-check.surface class="p-4">
-                            <div class="flex items-start justify-between gap-3">
-                                <div class="min-w-0">
+                <section class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    <x-driver-check.stat-card :label="__('telegram.watchdog.activity.last_check')">
+                        <span
+                            class="inline-block align-top text-[20px] leading-7"
+                            :title="status.activity.last_check_at ? date(status.activity.last_check_at) : ''"
+                            x-text="status.activity.last_check_at ? relative(status.activity.last_check_at) : ui.never"
+                        ></span>
+                    </x-driver-check.stat-card>
+
+                    <x-driver-check.stat-card :label="__('telegram.watchdog.activity.last_report')">
+                        <span
+                            class="inline-block align-top text-[20px] leading-7"
+                            :title="status.activity.last_report_at ? date(status.activity.last_report_at) : ''"
+                            x-text="status.activity.last_report_at ? relative(status.activity.last_report_at) : ui.never"
+                        ></span>
+                    </x-driver-check.stat-card>
+
+                    <x-driver-check.stat-card :label="__('telegram.watchdog.activity.checks_today')">
+                        <span x-text="number(status.activity.checks_today)"></span>
+                    </x-driver-check.stat-card>
+
+                    <x-driver-check.stat-card :label="__('telegram.watchdog.activity.pending')">
+                        <span x-text="number(status.activity.pending)"></span>
+                    </x-driver-check.stat-card>
+                </section>
+
+                {{-- ====================================================
+                     Components: one row each, dot + name + detail + state
+                ===================================================== --}}
+                <x-driver-check.surface class="overflow-hidden">
+                    <ul class="divide-y divide-gray-100 dark:divide-gray-800">
+                        @foreach (['watchdog', 'spare', 'listener'] as $role)
+                            <li class="flex items-center gap-3 px-4 py-3.5">
+                                <span class="dc-dot shrink-0" :class="dotTone[processTone('{{ $role }}')]"></span>
+
+                                <div class="min-w-0 flex-1">
                                     <p class="text-sm font-semibold text-gray-900 dark:text-white">
                                         {{ __('telegram.watchdog.processes.' . $role) }}
                                     </p>
-                                    <p class="mt-0.5 text-[11px] leading-snug text-gray-500 dark:text-gray-400">
+                                    <p class="mt-0.5 text-[12px] leading-snug text-gray-500 dark:text-gray-400">
                                         {{ __('telegram.watchdog.processes.' . $role . '_hint') }}
                                     </p>
                                 </div>
 
-                                <x-driver-check.badge ::class="processBadge('{{ $role }}')">
-                                    <span class="h-1.5 w-1.5 rounded-full" :class="processDot('{{ $role }}')"></span>
+                                <p class="hidden shrink-0 text-[12px] tabular-nums text-gray-500 sm:block dark:text-gray-400">
+                                    {{ __('telegram.watchdog.processes.pid') }}:
+                                    <span class="font-mono text-gray-800 dark:text-gray-200" x-text="process('{{ $role }}').pid ?? dash"></span>
+                                </p>
+
+                                <x-driver-check.badge class="w-24 justify-center" ::class="processBadge('{{ $role }}')">
                                     <span x-text="processLabel('{{ $role }}')"></span>
+                                </x-driver-check.badge>
+                            </li>
+                        @endforeach
+
+                        {{-- Queue worker (the start button goes through it) --}}
+                        <li class="flex flex-col gap-2 px-4 py-3.5">
+                            <div class="flex items-center gap-3">
+                                <span class="dc-dot shrink-0" :class="status.queue_worker_alive ? 'text-success-500' : 'text-error-500'"></span>
+
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('telegram.watchdog.worker.title') }}</p>
+                                    <a :href="queueUrl" class="text-[12px] font-medium text-brand-600 hover:underline dark:text-brand-400">
+                                        {{ __('telegram.watchdog.worker.open_queue') }} →
+                                    </a>
+                                </div>
+
+                                <x-driver-check.badge
+                                    class="w-24 justify-center"
+                                    ::class="status.queue_worker_alive
+                                        ? 'bg-success-50 text-success-700 ring-1 ring-inset ring-success-600/20 dark:bg-success-500/10 dark:text-success-400'
+                                        : 'bg-error-50 text-error-700 ring-1 ring-inset ring-error-600/20 dark:bg-error-500/10 dark:text-error-400'"
+                                >
+                                    <span x-text="status.queue_worker_alive ? t.worker.alive : t.worker.dead"></span>
                                 </x-driver-check.badge>
                             </div>
 
-                            <p class="mt-3 text-[12px] tabular-nums text-gray-500 dark:text-gray-400">
-                                {{ __('telegram.watchdog.processes.pid') }}:
-                                <span class="font-mono text-gray-800 dark:text-gray-200" x-text="process('{{ $role }}').pid ?? dash"></span>
-                            </p>
-                        </x-driver-check.surface>
-                    @endforeach
-                </section>
+                            <p
+                                x-show="!status.queue_worker_alive"
+                                x-cloak
+                                class="pl-[19px] text-[12px] leading-relaxed text-gray-600 dark:text-gray-400"
+                                x-text="t.worker.dead_hint"
+                            ></p>
 
-                <section class="grid gap-3 lg:grid-cols-3">
+                            <p
+                                x-show="status.start_queued > 0"
+                                x-cloak
+                                class="ml-[19px] rounded-lg bg-warning-50 px-2.5 py-1.5 text-[12px] text-warning-800 dark:bg-warning-500/10 dark:text-warning-300"
+                                x-text="t.worker.start_queued.replace(':count', status.start_queued)"
+                            ></p>
+                        </li>
 
-                    {{-- ================================================
-                         Main account
-                    ================================================= --}}
-                    <x-driver-check.surface class="p-4">
-                        <div class="flex items-center justify-between gap-3">
-                            <h2 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('telegram.watchdog.account.title') }}</h2>
+                        {{-- Main account --}}
+                        <li class="flex flex-col gap-2 px-4 py-3.5">
+                            <div class="flex items-center gap-3">
+                                <span
+                                    class="dc-dot shrink-0"
+                                    :class="account() && account().is_authorized ? 'text-success-500' : 'text-error-500'"
+                                ></span>
 
-                            <a :href="sessionsUrl" class="text-[12px] font-medium text-brand-600 hover:underline dark:text-brand-400">
-                                {{ __('telegram.watchdog.account.open_sessions') }} →
-                            </a>
-                        </div>
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('telegram.watchdog.account.title') }}</p>
 
-                        <template x-if="account()">
-                            <div class="mt-3 flex flex-col gap-2.5">
-                                <div class="flex items-center gap-3">
-                                    <x-driver-check.avatar
-                                        size="sm"
-                                        ::class="account().is_authorized
-                                            ? 'bg-success-50 text-success-600 dark:bg-success-500/10 dark:text-success-400'
-                                            : 'bg-error-50 text-error-600 dark:bg-error-500/10 dark:text-error-400'"
-                                    >
-                                        <x-driver-check.icon name="telegram" class="h-4 w-4" />
-                                    </x-driver-check.avatar>
-
-                                    <div class="min-w-0">
-                                        <p class="truncate text-sm font-medium text-gray-900 dark:text-white" x-text="accountName()"></p>
-                                        <p class="truncate text-[11px] tabular-nums text-gray-500 dark:text-gray-400">
-                                            <span x-text="phone(account().phone)"></span>
+                                    <template x-if="account()">
+                                        <p class="truncate text-[12px] tabular-nums text-gray-500 dark:text-gray-400">
+                                            <span x-text="accountName()"></span>
+                                            <span x-text="' · ' + phone(account().phone)"></span>
                                             <template x-if="account().username">
                                                 <span x-text="' · ' + handle(account().username)"></span>
                                             </template>
                                         </p>
-                                    </div>
+                                    </template>
                                 </div>
 
-                                <dl class="grid grid-cols-2 gap-x-3 gap-y-2 rounded-xl bg-gray-50 p-3 dark:bg-white/[0.02]">
-                                    <x-driver-check.kv :label="__('telegram.watchdog.account.status')">
-                                        <span class="font-mono text-[12px]" x-text="account().status || dash"></span>
-                                    </x-driver-check.kv>
+                                <template x-if="account()">
+                                    <p class="hidden shrink-0 text-[12px] tabular-nums text-gray-500 sm:block dark:text-gray-400">
+                                        {{ __('telegram.watchdog.account.status') }}:
+                                        <span class="font-mono text-gray-800 dark:text-gray-200" x-text="account().status || dash"></span>
+                                        · ID <span class="text-gray-800 dark:text-gray-200" x-text="account().id"></span>
+                                    </p>
+                                </template>
 
-                                    <x-driver-check.kv label="ID">
-                                        <span class="tabular-nums" x-text="account().id"></span>
-                                    </x-driver-check.kv>
+                                <template x-if="account()">
+                                    <x-driver-check.badge
+                                        class="w-24 justify-center"
+                                        ::class="account().is_authorized
+                                            ? 'bg-success-50 text-success-700 ring-1 ring-inset ring-success-600/20 dark:bg-success-500/10 dark:text-success-400'
+                                            : 'bg-error-50 text-error-700 ring-1 ring-inset ring-error-600/20 dark:bg-error-500/10 dark:text-error-400'"
+                                    >
+                                        <span x-text="account().is_authorized ? t.account.authorized : t.account.not_authorized"></span>
+                                    </x-driver-check.badge>
+                                </template>
 
-                                    <div class="col-span-2 text-[13px]">
-                                        <span
-                                            :class="account().is_authorized ? 'text-success-600 dark:text-success-400' : 'text-error-600 dark:text-error-400'"
-                                            x-text="account().is_authorized ? t.account.authorized : t.account.not_authorized"
-                                        ></span>
-                                        <span
-                                            x-show="!account().session_exists"
-                                            x-cloak
-                                            class="block text-[11px] text-error-600 dark:text-error-400"
-                                            x-text="t.account.session_missing"
-                                        ></span>
-                                    </div>
-                                </dl>
+                                <a :href="sessionsUrl" class="hidden shrink-0 text-[12px] font-medium text-brand-600 hover:underline sm:inline dark:text-brand-400">
+                                    {{ __('telegram.watchdog.account.open_sessions') }} →
+                                </a>
                             </div>
-                        </template>
 
-                        <template x-if="!account()">
-                            <div class="mt-3 rounded-xl bg-error-50 px-3 py-2.5 text-[12px] text-error-700 dark:bg-error-500/10 dark:text-error-400">
-                                <p class="font-semibold" x-text="status.account_configured ? t.account.not_found : t.account.missing"></p>
-                                <p x-show="!status.account_configured" class="mt-0.5" x-text="t.account.missing_hint"></p>
-                            </div>
-                        </template>
-                    </x-driver-check.surface>
-
-                    {{-- ================================================
-                         Activity
-                    ================================================= --}}
-                    <x-driver-check.surface class="p-4">
-                        <h2 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('telegram.watchdog.activity.title') }}</h2>
-
-                        <dl class="mt-3 grid grid-cols-2 gap-x-3 gap-y-3">
-                            <x-driver-check.kv :label="__('telegram.watchdog.activity.last_check')">
-                                <span
-                                    :title="status.activity.last_check_at ? date(status.activity.last_check_at) : ''"
-                                    x-text="status.activity.last_check_at ? relative(status.activity.last_check_at) : ui.never"
-                                ></span>
-                            </x-driver-check.kv>
-
-                            <x-driver-check.kv :label="__('telegram.watchdog.activity.last_report')">
-                                <span
-                                    :title="status.activity.last_report_at ? date(status.activity.last_report_at) : ''"
-                                    x-text="status.activity.last_report_at ? relative(status.activity.last_report_at) : ui.never"
-                                ></span>
-                            </x-driver-check.kv>
-
-                            <x-driver-check.kv :label="__('telegram.watchdog.activity.checks_today')">
-                                <span class="text-lg font-semibold tabular-nums" x-text="number(status.activity.checks_today)"></span>
-                            </x-driver-check.kv>
-
-                            <x-driver-check.kv :label="__('telegram.watchdog.activity.pending')">
-                                <span class="text-lg font-semibold tabular-nums" x-text="number(status.activity.pending)"></span>
-                            </x-driver-check.kv>
-                        </dl>
-                    </x-driver-check.surface>
-
-                    {{-- ================================================
-                         Queue worker (the start button goes through it)
-                    ================================================= --}}
-                    <x-driver-check.surface class="p-4">
-                        <div class="flex items-center justify-between gap-3">
-                            <h2 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('telegram.watchdog.worker.title') }}</h2>
-
-                            <a :href="queueUrl" class="text-[12px] font-medium text-brand-600 hover:underline dark:text-brand-400">
-                                {{ __('telegram.watchdog.worker.open_queue') }} →
+                            <a :href="sessionsUrl" class="pl-[19px] text-[12px] font-medium text-brand-600 hover:underline sm:hidden dark:text-brand-400">
+                                {{ __('telegram.watchdog.account.open_sessions') }} →
                             </a>
-                        </div>
 
-                        <div class="mt-3">
-                            <x-driver-check.badge
-                                ::class="status.queue_worker_alive
-                                    ? 'bg-success-50 text-success-700 ring-1 ring-inset ring-success-600/20 dark:bg-success-500/10 dark:text-success-400'
-                                    : 'bg-error-50 text-error-700 ring-1 ring-inset ring-error-600/20 dark:bg-error-500/10 dark:text-error-400'"
-                            >
-                                <span class="h-1.5 w-1.5 rounded-full" :class="status.queue_worker_alive ? 'bg-success-500' : 'bg-error-500'"></span>
-                                <span x-text="status.queue_worker_alive ? t.worker.alive : t.worker.dead"></span>
-                            </x-driver-check.badge>
-                        </div>
+                            <template x-if="account()">
+                                <p
+                                    x-show="!account().session_exists"
+                                    x-cloak
+                                    class="pl-[19px] text-[12px] text-error-600 dark:text-error-400"
+                                    x-text="t.account.session_missing"
+                                ></p>
+                            </template>
 
-                        <p
-                            x-show="!status.queue_worker_alive"
-                            x-cloak
-                            class="mt-2.5 text-[12px] leading-relaxed text-gray-600 dark:text-gray-400"
-                            x-text="t.worker.dead_hint"
-                        ></p>
-
-                        <p
-                            x-show="status.start_queued > 0"
-                            x-cloak
-                            class="mt-2.5 rounded-lg bg-warning-50 px-2.5 py-1.5 text-[12px] text-warning-800 dark:bg-warning-500/10 dark:text-warning-300"
-                            x-text="t.worker.start_queued.replace(':count', status.start_queued)"
-                        ></p>
-                    </x-driver-check.surface>
-                </section>
+                            <template x-if="!account()">
+                                <div class="ml-[19px] rounded-lg bg-error-50 px-3 py-2.5 text-[12px] text-error-700 dark:bg-error-500/10 dark:text-error-400">
+                                    <p class="font-semibold" x-text="status.account_configured ? t.account.not_found : t.account.missing"></p>
+                                    <p x-show="!status.account_configured" class="mt-0.5" x-text="t.account.missing_hint"></p>
+                                </div>
+                            </template>
+                        </li>
+                    </ul>
+                </x-driver-check.surface>
 
                 {{-- ====================================================
                      Why it went down last
                 ===================================================== --}}
                 <template x-if="restartNotice() || healthMarker()">
-                    <x-driver-check.surface class="p-4">
-                        <h2 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('telegram.watchdog.restart.title') }}</h2>
+                    <x-driver-check.surface class="overflow-hidden">
+                        <h2 class="border-b border-gray-100 px-4 py-3 text-sm font-semibold text-gray-900 dark:border-gray-800 dark:text-white">{{ __('telegram.watchdog.restart.title') }}</h2>
 
-                        <template x-if="restartNotice()">
-                            <dl class="mt-3 grid grid-cols-2 gap-x-3 gap-y-3 sm:grid-cols-5">
-                                <x-driver-check.kv :label="__('telegram.watchdog.restart.reason')">
-                                    <span class="font-mono text-[12px]" x-text="restartNotice().reason ?? dash"></span>
-                                </x-driver-check.kv>
+                        <div class="flex flex-col gap-3 p-4">
+                            <template x-if="restartNotice()">
+                                <dl class="grid grid-cols-2 gap-x-3 gap-y-3 sm:grid-cols-5">
+                                    <x-driver-check.kv :label="__('telegram.watchdog.restart.reason')">
+                                        <span class="font-mono text-[12px]" x-text="restartNotice().reason ?? dash"></span>
+                                    </x-driver-check.kv>
 
-                                <x-driver-check.kv :label="__('telegram.watchdog.restart.exit_code')">
-                                    <span class="tabular-nums" x-text="restartNotice().exit_code ?? dash"></span>
-                                </x-driver-check.kv>
+                                    <x-driver-check.kv :label="__('telegram.watchdog.restart.exit_code')">
+                                        <span class="tabular-nums" x-text="restartNotice().exit_code ?? dash"></span>
+                                    </x-driver-check.kv>
 
-                                <x-driver-check.kv :label="__('telegram.watchdog.restart.uptime')">
-                                    <span x-text="duration(restartNotice().uptime_seconds)"></span>
-                                </x-driver-check.kv>
+                                    <x-driver-check.kv :label="__('telegram.watchdog.restart.uptime')">
+                                        <span x-text="duration(restartNotice().uptime_seconds)"></span>
+                                    </x-driver-check.kv>
 
-                                <x-driver-check.kv :label="__('telegram.watchdog.restart.restarts')">
-                                    <span class="tabular-nums" x-text="restartNotice().restart_count ?? dash"></span>
-                                </x-driver-check.kv>
+                                    <x-driver-check.kv :label="__('telegram.watchdog.restart.restarts')">
+                                        <span class="tabular-nums" x-text="restartNotice().restart_count ?? dash"></span>
+                                    </x-driver-check.kv>
 
-                                <x-driver-check.kv :label="__('telegram.watchdog.restart.at')">
-                                    <span x-text="restartNotice().recorded_at ? relative(restartNotice().recorded_at) : dash"></span>
-                                </x-driver-check.kv>
+                                    <x-driver-check.kv :label="__('telegram.watchdog.restart.at')">
+                                        <span x-text="restartNotice().recorded_at ? relative(restartNotice().recorded_at) : dash"></span>
+                                    </x-driver-check.kv>
 
-                                <x-driver-check.kv :label="__('telegram.watchdog.restart.detail')" class="col-span-2 sm:col-span-5">
-                                    <span class="dc-break font-mono text-[12px]" x-text="restartNotice().detail || dash"></span>
-                                </x-driver-check.kv>
-                            </dl>
-                        </template>
+                                    <x-driver-check.kv :label="__('telegram.watchdog.restart.detail')" class="col-span-2 sm:col-span-5">
+                                        <span class="dc-break font-mono text-[12px]" x-text="restartNotice().detail || dash"></span>
+                                    </x-driver-check.kv>
+                                </dl>
+                            </template>
 
-                        <p
-                            x-show="healthMarker()"
-                            x-cloak
-                            class="mt-3 rounded-lg bg-warning-50 px-3 py-2 text-[12px] text-warning-800 dark:bg-warning-500/10 dark:text-warning-300"
-                        >
-                            <span class="font-semibold" x-text="t.restart.marker + ':'"></span>
-                            <span class="font-mono" x-text="healthMarker()?.reason"></span>
-                            <span x-text="healthMarker()?.marked_at ? '· ' + relative(healthMarker().marked_at) : ''"></span>
-                        </p>
+                            <p
+                                x-show="healthMarker()"
+                                x-cloak
+                                class="rounded-lg bg-warning-50 px-3 py-2 text-[12px] text-warning-800 dark:bg-warning-500/10 dark:text-warning-300"
+                            >
+                                <span class="font-semibold" x-text="t.restart.marker + ':'"></span>
+                                <span class="font-mono" x-text="healthMarker()?.reason"></span>
+                                <span x-text="healthMarker()?.marked_at ? '· ' + relative(healthMarker().marked_at) : ''"></span>
+                            </p>
+                        </div>
                     </x-driver-check.surface>
                 </template>
             </div>
@@ -363,7 +331,7 @@
         <p
             x-show="confirmError"
             x-cloak
-            class="dc-break mt-3 rounded-xl bg-error-50 px-3 py-2.5 text-xs text-error-600 dark:bg-error-500/10 dark:text-error-400"
+            class="dc-break mt-3 rounded-lg bg-error-50 px-3 py-2.5 text-xs text-error-600 dark:bg-error-500/10 dark:text-error-400"
             x-text="confirmError"
         ></p>
 

@@ -85,6 +85,20 @@ final class FakeClientCheckMessages
         return ['id' => count($this->calls)];
     }
 
+    /** Telegram's read mark of the chat: our last message read or not. */
+    public bool $read = true;
+
+    public bool $readFails = false;
+
+    public function getPeerDialogs(array $params): array
+    {
+        if ($this->readFails) {
+            throw new RuntimeException('PEER_ID_INVALID');
+        }
+
+        return ['dialogs' => [['top_message' => 10, 'read_outbox_max_id' => $this->read ? 10 : 9]]];
+    }
+
     public function setTyping(array $params): bool
     {
         $this->calls[] = ['typing', $params];
@@ -181,6 +195,9 @@ class ClientCheckTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        /* These tests read the Uzbek phrases as written; the Cyrillic output has its own (UzbekScriptTest). */
+        config()->set('auto_replies.uz_script', 'latin');
 
         $this->createTables();
 
@@ -353,6 +370,7 @@ class ClientCheckTest extends TestCase
             $table->text('reply_answer')->nullable();
             $table->timestamp('reply_answered_at')->nullable();
             $table->timestamp('nudged_at')->nullable();
+            $table->timestamp('seen_at')->nullable();
             $table->text('nudge_text')->nullable();
             $table->timestamps();
             $table->unique(['telegram_chat_id', 'telegram_message_id']);
@@ -1864,6 +1882,7 @@ class ClientCheckTest extends TestCase
 
     private function nudge(): void
     {
+        Cache::flush();
         app(NudgeSilentClientChecks::class)->execute($this->telegram);
     }
 
@@ -1917,9 +1936,96 @@ class ClientCheckTest extends TestCase
         $this->assertSame([], $this->messages->kinds());
 
         $this->penaltySent();
+        $this->nudge();
         Carbon::setTestNow(now()->addMinutes(3));
         $this->nudge();
         $this->assertSame(['send'], $this->messages->kinds());
+    }
+
+    public function test_uzbek_goes_out_in_cyrillic_and_only_the_uzbek_part(): void
+    {
+        config()->set('auto_replies.uz_script', 'cyrillic');
+
+        $this->person(attributes: ['address' => ['uz' => 'Afzal aka']]);
+        $this->ignoredPenalties(2);
+        $third = $this->penaltySent(repeat: 3);
+
+        $this->nudge();
+        Carbon::setTestNow(now()->addMinutes(3));
+        $this->nudge();
+
+        $this->assertSame('Жавоб кутяпман, Афзал ака', $this->messages->sent()[0]['message']);
+
+        /* The request number and the CRM status are not Uzbek: they stay as they are. */
+        $text = app(\App\Application\Telegram\Services\ClientCheckEscalation::class)
+            ->render("Zo'r, {request}, {address}", $third, $third->operationUser, 'uz');
+
+        $this->assertStringStartsWith('Зур, ', $text);
+        $this->assertStringContainsString((string) $third->request_number, $text);
+        $this->assertStringContainsString('Афзал ака', $text);
+
+        /* Russian is never touched, and the old Latin output is one config line away. */
+        $this->assertSame('Спасибо, Ali', app(\App\Application\Telegram\Services\ClientCheckEscalation::class)->render('Спасибо, {address}', $third, $third->operationUser->setAttribute('address', ['ru' => 'Ali']), 'ru'));
+
+        config()->set('auto_replies.uz_script', 'latin');
+        $this->assertSame("Zo'r", app(\App\Application\Telegram\Services\ClientCheckEscalation::class)->render("Zo'r", $third, $third->operationUser, 'uz'));
+    }
+
+    public function test_the_nudge_waits_for_the_comment_to_be_read(): void
+    {
+        $this->person();
+        $this->ignoredPenalties(2);
+        $third = $this->penaltySent(repeat: 3);
+        $this->messages->read = false;
+
+        /* Unread, however long: not ignored. */
+        foreach ([3, 10, 30] as $minutes) {
+            Carbon::setTestNow(now()->addMinutes($minutes));
+            $this->nudge();
+        }
+
+        $this->assertSame([], $this->messages->kinds());
+        $this->assertNull($third->refresh()->seen_at);
+
+        /* Read: the silence is counted from here. */
+        $this->messages->read = true;
+        $this->nudge();
+        $this->assertNotNull($third->refresh()->seen_at);
+        $this->assertSame([], $this->messages->kinds());
+
+        Carbon::setTestNow(now()->addMinutes(3));
+        $this->nudge();
+        $this->assertSame(['send'], $this->messages->kinds());
+    }
+
+    public function test_a_read_mark_that_cannot_be_fetched_is_not_a_nudge(): void
+    {
+        $this->person();
+        $this->ignoredPenalties(2);
+        $this->penaltySent(repeat: 3);
+        $this->messages->readFails = true;
+
+        Carbon::setTestNow(now()->addMinutes(3));
+        $this->nudge();
+        $this->assertSame([], $this->messages->kinds());
+    }
+
+    public function test_a_reply_after_the_read_spares_the_nudge(): void
+    {
+        $this->person();
+        $this->ignoredPenalties(2);
+        $third = $this->penaltySent(repeat: 3);
+        Carbon::setTestNow(now()->addMinutes(3));
+        $this->nudge();
+
+        /* "беринг" a minute after the read. */
+        Carbon::setTestNow(now()->addMinute());
+        OperationUser::query()->update(['last_private_message_at' => now()]);
+        Carbon::setTestNow(now()->addMinutes(2));
+        $this->nudge();
+
+        $this->assertSame([], $this->messages->kinds());
+        $this->assertNull($third->refresh()->nudged_at);
     }
 
     public function test_any_message_of_theirs_starts_the_count_over(): void
@@ -1937,6 +2043,12 @@ class ClientCheckTest extends TestCase
         $this->assertSame([], $this->messages->kinds());
 
         $this->ignoredPenalties(1);
+
+        /* Read now, and silent for the two minutes after. */
+        $this->nudge();
+        $this->assertSame([], $this->messages->kinds());
+
+        Carbon::setTestNow(now()->addMinutes(3));
         $this->nudge();
         $this->assertSame(['send'], $this->messages->kinds());
     }
@@ -2270,7 +2382,7 @@ class ClientCheckTest extends TestCase
         $this->saveRules([], ['roles' => [
             'operation' => ['levels' => [
                 ['phrases' => ['uz' => ['plain' => ['MY OWN']]]],
-                ['from' => 4, 'phrases' => ['uz' => ['plain' => ['Nima qilay, boshqaga olaymi?']]]],
+                ['from' => 4, 'phrases' => ['uz' => ['plain' => ['Нима килай, бошкага олайми?']]]],
             ]],
         ]]);
 
@@ -2280,10 +2392,10 @@ class ClientCheckTest extends TestCase
 
         /* Theirs first, then the new ones; the old default not twice, not brought back where it was removed. */
         $this->assertSame('MY OWN', $levels[0]['phrases']['uz']['plain'][0]);
-        $this->assertNotContains('Narx berib yubor, {status_limit} vaqt o\'tdi', $levels[0]['phrases']['uz']['plain']);
-        $this->assertContains('Narx tashla, {status_limit} bo\'ldi', $levels[0]['phrases']['uz']['plain']);
-        $this->assertSame(1, count(array_keys($levels[1]['phrases']['uz']['plain'], 'Nima qilay, boshqaga olaymi?', true)));
-        $this->assertContains('Boshqaga beraymi?', $levels[1]['phrases']['uz']['plain']);
+        $this->assertNotContains('Нарх бериб юбор, {status_limit} вакт утди', $levels[0]['phrases']['uz']['plain']);
+        $this->assertContains('Нарх ташла, {status_limit} булди', $levels[0]['phrases']['uz']['plain']);
+        $this->assertSame(1, count(array_keys($levels[1]['phrases']['uz']['plain'], 'Нима килай, бошкага олайми?', true)));
+        $this->assertContains('Бошкага берайми?', $levels[1]['phrases']['uz']['plain']);
     }
 
     public function test_media_names_from_a_hand_edit_are_not_trusted(): void

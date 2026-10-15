@@ -22,9 +22,9 @@
                     x-on:keydown.enter.prevent="searchTelegramGifs()"
                     placeholder="{{ __('telegram.auto_replies.media.telegram_search') }}"
                     aria-label="{{ __('telegram.auto_replies.media.telegram_search') }}"
-                    class="h-11 w-full rounded-xl border border-gray-300 bg-white pl-10 pr-3 text-sm text-gray-900
-                           outline-none transition placeholder:text-gray-400 focus:border-brand-500 focus:ring-4
-                           focus:ring-brand-500/10 sm:h-10 dark:border-gray-700 dark:bg-gray-900 dark:text-white
+                    class="h-11 w-full rounded-lg border border-gray-300 bg-white pl-10 pr-3 text-sm text-gray-900
+                           outline-none transition placeholder:text-gray-400 focus:border-brand-500 focus:ring-[3px]
+                           focus:ring-brand-500/15 sm:h-10 dark:border-gray-700 dark:bg-gray-900 dark:text-white
                            dark:placeholder:text-gray-500"
                 >
             </div>

@@ -25,7 +25,7 @@ class StartContactSyncJob implements ShouldQueue
     public function handle(): void
     {
         $command = sprintf(
-            'cd %s && nohup %s %s telegram:sync-contacts%s >> %s 2>&1 &',
+            'cd %s && nohup %s %s telegram:sync-contacts --trigger=manual%s >> %s 2>&1 &',
             escapeshellarg(base_path()),
             escapeshellarg(PHP_BINARY),
             escapeshellarg(base_path('artisan')),

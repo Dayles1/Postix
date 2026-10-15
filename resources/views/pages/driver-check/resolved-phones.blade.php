@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('layouts.driver-check')
 
 @section('title', __('telegram.resolved_phones.title'))
 
@@ -21,14 +21,11 @@
              Header
         ============================================================= --}}
         <x-driver-check.page-header
-            icon="telegram"
-            tone="blue"
-            :eyebrow="__('telegram.menu.groups.check')"
             :title="__('telegram.resolved_phones.title')"
             :description="__('telegram.resolved_phones.description')"
         >
             <x-slot:actions>
-                <x-driver-check.button class="col-span-2" x-on:click="load()" ::disabled="loading">
+                <x-driver-check.button x-on:click="load()" ::disabled="loading">
                     <x-driver-check.icon
                         name="refresh"
                         class="h-4 w-4"
@@ -99,8 +96,8 @@
 
                 <x-driver-check.field class="sm:col-span-2 sm:self-end">
                     <label
-                        class="dc-tap flex h-11 cursor-pointer items-center gap-2.5 rounded-xl border px-3.5
-                               transition sm:h-10"
+                        class="dc-tap flex h-10 cursor-pointer items-center gap-2.5 rounded-lg border px-3
+                               transition sm:h-9"
                         :class="filters.stale
                             ? 'border-warning-500 bg-warning-25 dark:border-warning-500/50 dark:bg-warning-500/[0.07]'
                             : 'border-gray-300 bg-white hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-white/[0.05]'"
@@ -109,38 +106,38 @@
                             type="checkbox"
                             x-model="filters.stale"
                             x-on:change="applyFilters()"
-                            class="h-[18px] w-[18px] rounded border-gray-300 text-warning-500
+                            class="h-4 w-4 rounded border-gray-300 text-warning-500
                                    focus:ring-warning-500/30 dark:border-gray-600 dark:bg-gray-900"
                         >
 
-                        <span class="text-sm text-gray-700 dark:text-gray-200">
+                        <span class="text-[13px] text-gray-700 dark:text-gray-200">
                             {{ __('telegram.resolved_phones.filters.stale') }}
                         </span>
                     </label>
                 </x-driver-check.field>
             </x-driver-check.filters>
 
-            {{-- Table (lg and up) --}}
-            <div class="hidden lg:block">
+            {{-- Table (xl and up) --}}
+            <div class="hidden xl:block">
                 <div class="overflow-x-auto">
-                    <table class="w-full min-w-[1040px] table-fixed text-left">
+                    <table class="w-full min-w-[1100px] table-fixed text-left">
                         <colgroup>
                             <col class="w-[19%]">
-                            <col class="w-[21%]">
-                            <col class="w-[19%]">
+                            <col class="w-[20%]">
+                            <col class="w-[20%]">
                             <col class="w-[15%]">
-                            <col class="w-[14%]">
-                            <col class="w-[12%]">
+                            <col class="w-[13%]">
+                            <col class="w-[13%]">
                         </colgroup>
 
-                        <thead class="dc-thead border-b border-gray-200 bg-gray-50/70 dark:border-gray-800 dark:bg-white/[0.02]">
-                            <tr class="text-[10px] uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
+                        <thead class="dc-thead border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-transparent">
+                            <tr class="text-[10.5px] uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
                                 <th scope="col" class="px-4 py-2.5 font-semibold">{{ __('telegram.resolved_phones.table.phone') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.resolved_phones.table.telegram') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.resolved_phones.table.driver') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.resolved_phones.table.operator') }}</th>
-                                <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.resolved_phones.table.resolved_at') }}</th>
-                                <th scope="col" class="px-4 py-2.5 font-semibold">{{ __('telegram.resolved_phones.table.result') }}</th>
+                                <th scope="col" class="px-3 py-2.5 text-right font-semibold">{{ __('telegram.resolved_phones.table.resolved_at') }}</th>
+                                <th scope="col" class="px-4 py-2.5 text-right font-semibold">{{ __('telegram.resolved_phones.table.result') }}</th>
                             </tr>
                         </thead>
 
@@ -148,9 +145,9 @@
                             <x-driver-check.skeleton-rows :cols="6" />
 
                             <template x-for="row in rows" :key="row.id">
-                                <tr class="group align-middle transition hover:bg-gray-50/70 dark:hover:bg-white/[0.02]">
+                                <tr class="group align-middle transition-colors hover:bg-gray-25 dark:hover:bg-white/[0.025]">
                                     {{-- Phone --}}
-                                    <td class="px-4 py-3">
+                                    <td class="px-4 py-3 transition-shadow group-hover:shadow-[inset_2px_0_0_var(--color-brand-500)]">
                                         <div class="flex items-center gap-1">
                                             <span
                                                 class="truncate text-[13px] font-medium tabular-nums text-gray-900 dark:text-white"
@@ -193,15 +190,12 @@
                                     <td class="px-3 py-3">
                                         <template x-if="row.driver">
                                             <div class="min-w-0">
-                                                <p class="truncate text-[13px] text-gray-900 dark:text-white" x-text="row.driver.name"></p>
+                                                <p class="truncate text-[13px] font-medium text-gray-900 dark:text-white" x-text="row.driver.name"></p>
 
-                                                <x-driver-check.badge
-                                                    class="mt-0.5"
-                                                    ::class="statusTone(row.driver.status, 'soft')"
-                                                >
+                                                <p class="flex items-center gap-1.5 text-[11px]" :class="statusTone(row.driver.status, 'text')">
                                                     <span class="h-1.5 w-1.5 rounded-full" :class="statusTone(row.driver.status, 'dot')"></span>
                                                     <span x-text="statusLabel(row.driver.status)"></span>
-                                                </x-driver-check.badge>
+                                                </p>
                                             </div>
                                         </template>
 
@@ -229,9 +223,9 @@
                                     </td>
 
                                     {{-- Resolved --}}
-                                    <td class="px-3 py-3">
+                                    <td class="px-3 py-3 text-right">
                                         <p
-                                            class="text-[13px] text-gray-700 dark:text-gray-300"
+                                            class="text-[13px] tabular-nums text-gray-600 dark:text-gray-300"
                                             :title="row.resolved_at ? date(row.resolved_at) : ''"
                                             x-text="row.resolved_at ? relative(row.resolved_at) : translations.dates.never"
                                         ></p>
@@ -239,22 +233,22 @@
 
                                     {{-- Result --}}
                                     <td class="px-4 py-3">
-                                        <div class="flex flex-wrap items-center gap-1">
+                                        <div class="flex flex-wrap items-center justify-end gap-1">
                                             <span
-                                                class="text-[13px] font-medium tabular-nums text-gray-800 dark:text-gray-100"
+                                                class="mr-1 text-sm font-medium tabular-nums text-gray-800 dark:text-gray-100"
                                                 x-text="number(stats(row).checks)"
                                             ></span>
 
                                             <template x-if="stats(row).confirmed > 0">
-                                                <x-driver-check.badge class="bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400">
-                                                    <x-driver-check.icon name="check" class="h-3 w-3" />
+                                                <x-driver-check.badge ::class="statusTone('confirmed', 'soft')">
+                                                    <span class="h-1.5 w-1.5 rounded-full" :class="statusTone('confirmed', 'dot')"></span>
                                                     <span class="tabular-nums" x-text="number(stats(row).confirmed)"></span>
                                                 </x-driver-check.badge>
                                             </template>
 
                                             <template x-if="stats(row).not_confirmed > 0">
-                                                <x-driver-check.badge class="bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400">
-                                                    <x-driver-check.icon name="close" class="h-3 w-3" />
+                                                <x-driver-check.badge ::class="statusTone('not_confirmed', 'soft')">
+                                                    <span class="h-1.5 w-1.5 rounded-full" :class="statusTone('not_confirmed', 'dot')"></span>
                                                     <span class="tabular-nums" x-text="number(stats(row).not_confirmed)"></span>
                                                 </x-driver-check.badge>
                                             </template>
@@ -267,14 +261,14 @@
                 </div>
             </div>
 
-            {{-- Cards (below lg) --}}
-            <div class="divide-y divide-gray-100 lg:hidden dark:divide-gray-800">
+            {{-- Cards (below xl) --}}
+            <div class="divide-y divide-gray-100 xl:hidden dark:divide-gray-800">
                 <x-driver-check.skeleton-cards />
 
                 <template x-for="row in rows" :key="'card-' + row.id">
                     <article class="flex flex-col gap-3 p-3.5">
                         <div class="flex items-start gap-3">
-                            <x-driver-check.avatar class="bg-blue-light-50 text-blue-light-600 dark:bg-blue-light-500/10 dark:text-blue-light-400">
+                            <x-driver-check.avatar>
                                 <x-driver-check.icon name="phone" class="h-4 w-4" />
                             </x-driver-check.avatar>
 
@@ -301,7 +295,7 @@
                             </div>
                         </div>
 
-                        <dl class="grid grid-cols-2 gap-x-3 gap-y-2.5 rounded-xl bg-gray-50 p-3 dark:bg-white/[0.02]">
+                        <dl class="grid grid-cols-2 gap-x-3 gap-y-2.5 rounded-lg bg-gray-25 p-3 ring-1 ring-inset ring-gray-100 dark:bg-white/[0.02] dark:ring-gray-800">
                             <x-driver-check.kv :label="__('telegram.resolved_phones.table.telegram')" class="col-span-2">
                                 <span x-text="fullName(row) || dash"></span>
                                 <span

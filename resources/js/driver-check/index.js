@@ -17,6 +17,9 @@ import { penaltySettingsPage } from './penalty-settings';
 import { fileRoutesPage } from './file-routes';
 import { queuePage, watchdogPage } from './monitoring';
 import { contactSyncPage } from './contact-sync';
+import { contactsPage } from './contacts';
+import { contactReportPage } from './contact-report';
+import { contactSettingsPage } from './contact-settings';
 import { statusType } from './status';
 
 /*
@@ -442,7 +445,7 @@ function operationUsersPage(config) {
                 period_to: '',
                 sort: 'created_at',
                 direction: 'desc',
-                per_page: 10,
+                per_page: 20,
                 page: 1,
             },
 
@@ -556,7 +559,7 @@ function operationUserPage(config) {
                 period_to: '',
                 sort: 'created_at',
                 direction: 'desc',
-                per_page: 10,
+                per_page: 20,
                 page: 1,
             },
         }),
@@ -758,7 +761,7 @@ function driversPage(config) {
                 period_to: '',
                 sort: 'created_at',
                 direction: 'desc',
-                per_page: 10,
+                per_page: 20,
                 page: 1,
             },
         }),
@@ -1144,7 +1147,7 @@ function resolvedPhonesPage(config) {
                 period_to: '',
                 sort: 'resolved_at',
                 direction: 'desc',
-                per_page: 10,
+                per_page: 20,
                 page: 1,
             },
         }),
@@ -1215,4 +1218,7 @@ export function registerDriverCheck(Alpine) {
     Alpine.data('dcWatchdog', watchdogPage);
     Alpine.data('dcQueue', queuePage);
     Alpine.data('dcContactSync', contactSyncPage);
+    Alpine.data('dcContacts', contactsPage);
+    Alpine.data('dcContactReport', contactReportPage);
+    Alpine.data('dcContactSettings', contactSettingsPage);
 }

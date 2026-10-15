@@ -83,11 +83,53 @@ export function toDate(value) {
     return Number.isNaN(date.getTime()) ? null : date;
 }
 
+/*
+ * Uzbek (Latin) has no usable month or relative-time names in many browsers'
+ * Intl data: the panel showed "2026 M10 15" and "-29 d". These are written
+ * out here for `uz` only; the other languages keep Intl.
+ */
+const UZ_MONTHS = ['yan', 'fev', 'mar', 'apr', 'may', 'iyn', 'iyl', 'avg', 'sen', 'okt', 'noy', 'dek'];
+
+const isUzbek = () => locale().toLowerCase().startsWith('uz');
+
+function uzDate(date, withTime) {
+    const pad = (n) => String(n).padStart(2, '0');
+    const day = `${pad(date.getDate())} ${UZ_MONTHS[date.getMonth()]} ${date.getFullYear()}`;
+
+    return withTime ? `${day}, ${pad(date.getHours())}:${pad(date.getMinutes())}` : day;
+}
+
+function uzRelative(date) {
+    const seconds = Math.round((date.getTime() - Date.now()) / 1000);
+    const absolute = Math.abs(seconds);
+
+    if (absolute < 60) {
+        return 'hozirgina';
+    }
+
+    const units = [
+        ['yil', 31536000],
+        ['oy', 2592000],
+        ['kun', 86400],
+        ['soat', 3600],
+        ['daqiqa', 60],
+    ];
+
+    const [name, size] = units.find(([, size]) => absolute >= size);
+    const count = Math.round(absolute / size);
+
+    return seconds < 0 ? `${count} ${name} oldin` : `${count} ${name}dan keyin`;
+}
+
 export function formatDate(value, withTime = true) {
     const date = toDate(value);
 
     if (!date) {
         return value ? String(value) : EM_DASH;
+    }
+
+    if (isUzbek()) {
+        return uzDate(date, withTime);
     }
 
     return new Intl.DateTimeFormat(locale(), {
@@ -108,6 +150,10 @@ export function formatRelative(value) {
 
     if (!date) {
         return EM_DASH;
+    }
+
+    if (isUzbek()) {
+        return uzRelative(date);
     }
 
     const seconds = Math.round((date.getTime() - Date.now()) / 1000);

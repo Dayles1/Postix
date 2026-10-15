@@ -1,7 +1,7 @@
 @props(['title' => null, 'sortOptions' => []])
 
 {{--
-    Header strip of the results card: how many rows, how they are ordered,
+    Header strip of a results panel: how many rows, how they are ordered,
     how many per page. Ordering lives here rather than with the filters
     because it describes the table, not the query.
 
@@ -12,17 +12,17 @@
 --}}
 
 <div
-    class="flex flex-col gap-3 border-b border-gray-200 px-3.5 py-3 sm:flex-row sm:items-center
-           sm:justify-between sm:px-4 dark:border-gray-800"
+    class="flex flex-col gap-3 border-b border-gray-200 px-3.5 py-2.5 sm:flex-row sm:items-center
+           sm:justify-between dark:border-gray-800"
 >
-    <div class="flex min-w-0 items-center gap-2">
+    <div class="flex min-w-0 items-center gap-2.5">
         @if ($title)
             <h2 class="truncate text-sm font-semibold text-gray-900 dark:text-white">{{ $title }}</h2>
         @endif
 
         <span
-            class="inline-flex h-6 items-center rounded-full bg-gray-100 px-2 text-[11px]
-                   font-semibold tabular-nums text-gray-600 dark:bg-white/[0.06] dark:text-gray-300"
+            class="inline-flex h-5 items-center rounded bg-gray-100 px-1.5 text-[11px] font-bold
+                   tabular-nums text-gray-600 dark:bg-white/[0.07] dark:text-gray-300"
             x-text="number(pagination.total)"
         >0</span>
 
@@ -60,9 +60,9 @@
                 x-on:click="toggleDirection()"
                 :aria-label="filters.direction === 'asc' ? @js(__('telegram.ui.sort_asc')) : @js(__('telegram.ui.sort_desc'))"
                 :title="filters.direction === 'asc' ? @js(__('telegram.ui.sort_asc')) : @js(__('telegram.ui.sort_desc'))"
-                class="dc-tap flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border
-                       border-gray-300 bg-white text-gray-600 transition hover:bg-gray-50 sm:h-10 sm:w-10
-                       dark:border-gray-700 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.07]"
+                class="dc-tap flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border
+                       border-gray-300 bg-white text-gray-600 transition hover:border-gray-400 sm:h-9 sm:w-9
+                       dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300 dark:hover:border-gray-600"
             >
                 <x-driver-check.icon
                     name="arrow-up"
@@ -75,7 +75,7 @@
         <x-driver-check.select
             x-model.number="filters.per_page"
             x-on:change="changePerPage()"
-            class="sm:w-28"
+            class="sm:w-24"
             aria-label="{{ __('telegram.ui.per_page') }}"
         >
             @foreach ([10, 20, 50, 100] as $option)

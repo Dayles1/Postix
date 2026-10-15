@@ -3,7 +3,7 @@
 {{-- Label/value pair used inside the mobile cards. --}}
 
 <div {{ $attributes->merge(['class' => 'min-w-0']) }}>
-    <dt class="text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+    <dt class="text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-400 dark:text-gray-500">
         {{ $label }}
     </dt>
 

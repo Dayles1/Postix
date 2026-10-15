@@ -16,6 +16,7 @@ use App\Models\Telegram\TelegramSetting;
 use danog\MadelineProto\SimpleEventHandler;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -24,10 +25,14 @@ use Throwable;
  * them in a row with not a word back, a nudge from the auto replies file -
  * what was done by hand on 2026-10-06 ("Рушана апа, илтимос").
  *
+ * Only after they have read our last message (Telegram's read mark on the
+ * chat) and kept silent for DELAY_MINUTES from the moment that was seen:
+ * an unread comment is not an ignored one.
+ *
  * Counted from their last private message, their last nudge, or
  * COUNT_DAYS back, whichever is latest; so after a nudge it takes as many
- * penalties again for the next one. It goes a little after the comment of
- * the penalty that made the count (DELAY_MINUTES), not glued to it.
+ * penalties again for the next one. It goes a little after the read was
+ * seen, not glued to it.
  *
  * Runs on the listener's cron, after the comments. Not outside the
  * penalties' working hours, and only for a fresh comment: a backlog after
@@ -36,7 +41,7 @@ use Throwable;
 final class NudgeSilentClientChecks
 {
     /**
-     * Between the comment and the nudge: a quick "ok" still spares it.
+     * Between the read and the nudge: a quick "ok" still spares it.
      */
     private const DELAY_MINUTES = 2;
 
@@ -44,6 +49,16 @@ final class NudgeSilentClientChecks
      * How late a nudge may still go out, past its time.
      */
     private const GRACE_MINUTES = 30;
+
+    /**
+     * How long after the comment a read is still waited for.
+     */
+    private const READ_WINDOW_MINUTES = 180;
+
+    /**
+     * Seconds between two looks at the read mark of one penalty's chat.
+     */
+    private const READ_CHECK_SECONDS = 20;
 
     /**
      * Older penalties do not count: silence a week ago is not today's.
@@ -83,7 +98,7 @@ final class NudgeSilentClientChecks
             ->whereNotNull('comment')
             ->whereNotNull('peer')
             ->whereNull('nudged_at')
-            ->whereBetween('sent_at', [$due->copy()->subMinutes(self::GRACE_MINUTES), $due])
+            ->whereBetween('sent_at', [now()->subMinutes(self::READ_WINDOW_MINUTES), now()])
             ->whereNotExists(function (QueryBuilder $later): void {
                 $later->selectRaw('1')
                     ->from('telegram_client_checks as later')
@@ -102,10 +117,61 @@ final class NudgeSilentClientChecks
                 continue;
             }
 
-            if ($this->ignored($person, $check) >= $rules->silence['after_penalties']) {
+            if ($this->ignored($person, $check) < $rules->silence['after_penalties']) {
+                continue;
+            }
+
+            if ($check->seen_at === null && ! $this->noticeRead($telegram, $check)) {
+                continue;
+            }
+
+            /*
+             * Read, and silent since: DELAY_MINUTES after the read was
+             * seen, and not later than GRACE_MINUTES past that.
+             */
+            if ($check->seen_at->between($due->copy()->subMinutes(self::GRACE_MINUTES), $due)) {
                 $this->nudge($telegram, $check, $person, $rules);
             }
         }
+    }
+
+    /**
+     * Whether they have read everything we wrote to the chat; when they
+     * have, the moment is kept on the check. A failed look is "not yet".
+     */
+    private function noticeRead(SimpleEventHandler $telegram, TelegramClientCheck $check): bool
+    {
+        if (! Cache::add('client-checks:read-look:' . $check->id, 1, self::READ_CHECK_SECONDS)) {
+            return false;
+        }
+
+        $peer = (string) $check->peer;
+
+        try {
+            $dialogs = $telegram->messages->getPeerDialogs([
+                'peers' => [[
+                    '_' => 'inputDialogPeer',
+                    'peer' => preg_match('/^-?\d+$/', $peer) === 1 ? (int) $peer : $peer,
+                ]],
+            ])['dialogs'] ?? [];
+        } catch (Throwable $e) {
+            Log::warning(
+                'Client check read mark was not fetched',
+                ['check_id' => $check->id, 'error' => $e->getMessage()],
+            );
+
+            return false;
+        }
+
+        $dialog = $dialogs[0] ?? null;
+
+        if (! is_array($dialog) || (int) ($dialog['read_outbox_max_id'] ?? 0) < (int) ($dialog['top_message'] ?? 0)) {
+            return false;
+        }
+
+        $check->update(['seen_at' => now()]);
+
+        return true;
     }
 
     /**

@@ -117,6 +117,7 @@ class TelegramClientCheck extends Model
         'reply_answer',
         'reply_answered_at',
         'nudged_at',
+        'seen_at',
         'nudge_text',
     ];
 
@@ -141,6 +142,7 @@ class TelegramClientCheck extends Model
             'replied_at' => 'datetime',
             'reply_answered_at' => 'datetime',
             'nudged_at' => 'datetime',
+            'seen_at' => 'datetime',
         ];
     }
 

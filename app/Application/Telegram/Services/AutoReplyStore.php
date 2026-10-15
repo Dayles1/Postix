@@ -81,8 +81,11 @@ final class AutoReplyStore
             throw new RuntimeException("Cannot create {$directory}");
         }
 
+        /* Uzbek answers are kept in Cyrillic, as the person gets them (UzbekScript). */
+        $data = UzbekScript::enabled() ? UzbekScript::autoReplies($rules->toArray()) : $rules->toArray();
+
         $json = json_encode(
-            $rules->toArray(),
+            $data,
             JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR,
         );
 

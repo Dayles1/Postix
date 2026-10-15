@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('layouts.driver-check')
 
 @section('title', __('telegram.penalties.title'))
 
@@ -61,11 +61,9 @@
             <x-slot:actions>
                 <a
                     href="{{ route('driver-check.penalties.settings') }}"
-                    class="dc-tap col-span-2 inline-flex h-11 items-center justify-center gap-2 rounded-xl border px-3.5 text-[13px]
-                           font-medium transition sm:col-span-1 sm:h-10"
-                    :class="settings.enabled
-                        ? 'border-success-200 bg-success-50 text-success-700 hover:bg-success-100 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400'
-                        : 'border-warning-200 bg-warning-50 text-warning-800 hover:bg-warning-100 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300'"
+                    class="dc-tap col-span-2 inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3
+                           text-[13px] font-medium text-gray-700 transition hover:border-gray-400 sm:col-span-1 sm:h-9
+                           dark:border-gray-700 dark:bg-gray-950 dark:text-gray-200 dark:hover:border-gray-600"
                 >
                     <span
                         class="h-2 w-2 rounded-full"
@@ -75,7 +73,7 @@
                     <span
                         x-show="settings.enabled && !settings.comments_enabled"
                         x-cloak
-                        class="opacity-75"
+                        class="text-gray-500 dark:text-gray-400"
                         x-text="'· ' + translations.comments_off"
                     ></span>
                 </a>
@@ -99,7 +97,7 @@
         <div
             x-show="!settings.enabled"
             x-cloak
-            class="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border border-warning-200 bg-warning-50 px-4 py-3
+            class="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-warning-200 bg-warning-50 px-4 py-2.5
                    text-[13px] text-warning-800 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300"
         >
             <x-driver-check.icon name="alert" class="h-4 w-4 shrink-0" />
@@ -113,7 +111,7 @@
              Counters: four, one row; the rest rides along as hints
              (the status filter is left out of them)
         ============================================================= --}}
-        <section class="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
+        <section class="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <x-driver-check.stat-card :label="__('telegram.penalties.stats.total')" icon="inbox">
                 <span x-text="number(stats.total)">0</span>
                 <x-slot:hint>
@@ -124,8 +122,6 @@
             <x-driver-check.stat-card
                 :label="__('telegram.penalties.stats.sent')"
                 icon="check-circle"
-                tone="text-success-600 dark:text-success-400"
-                chip="bg-success-50 text-success-600 dark:bg-success-500/10 dark:text-success-400"
             >
                 <span x-text="number(stats.sent)">0</span>
                 <x-slot:hint>
@@ -136,7 +132,6 @@
             <x-driver-check.stat-card
                 :label="__('telegram.penalties.stats.failed')"
                 icon="x-circle"
-                chip="bg-error-50 text-error-600 dark:bg-error-500/10 dark:text-error-400"
             >
                 <span
                     :class="stats.failed > 0 ? 'text-error-600 dark:text-error-400' : 'text-gray-900 dark:text-white'"
@@ -150,7 +145,6 @@
             <x-driver-check.stat-card
                 :label="__('telegram.penalties.stats.skipped')"
                 icon="unlink"
-                chip="bg-warning-50 text-warning-600 dark:bg-warning-500/10 dark:text-warning-400"
             >
                 <span x-text="number(stats.skipped)">0</span>
             </x-driver-check.stat-card>
@@ -176,7 +170,7 @@
                     <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         {{-- All | Operation | Sales --}}
                         <nav
-                            class="inline-flex w-full gap-1 rounded-xl bg-gray-100 p-1 sm:w-auto dark:bg-white/[0.04]"
+                            class="inline-flex w-full gap-0.5 rounded-lg bg-gray-100 p-0.5 sm:w-auto dark:bg-white/[0.06]"
                             aria-label="{{ __('telegram.penalties.filters.role') }}"
                         >
                             <template x-for="tab in roleTabs()" :key="'tab-' + tab.value">
@@ -185,17 +179,17 @@
                                     x-on:click="setRole(tab.value)"
                                     :aria-pressed="filters.role === tab.value"
                                     :class="filters.role === tab.value
-                                        ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
+                                        ? 'bg-white text-gray-950 shadow-sm dark:bg-gray-700 dark:text-white'
                                         : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'"
-                                    class="dc-tap inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-lg px-3.5 text-[13px]
-                                           font-medium transition sm:flex-none"
+                                    class="dc-tap inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-md px-3.5 text-[13px]
+                                           font-medium transition outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50 sm:h-8 sm:flex-none"
                                 >
                                     <span x-text="tab.label"></span>
                                     <span
                                         :class="filters.role === tab.value
-                                            ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300'
+                                            ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
                                             : 'bg-gray-200/70 text-gray-600 dark:bg-white/[0.08] dark:text-gray-300'"
-                                        class="inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5
+                                        class="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded px-1
                                                text-[11px] font-semibold tabular-nums"
                                         x-text="number(tab.count)"
                                     ></span>
@@ -207,15 +201,15 @@
                         <span
                             x-show="filters.operation_user_id"
                             x-cloak
-                            class="inline-flex h-9 max-w-full items-center gap-2 self-start rounded-full bg-brand-50 pl-3 pr-1.5 text-[13px]
-                                   text-brand-700 sm:self-auto dark:bg-brand-500/10 dark:text-brand-300"
+                            class="inline-flex h-9 max-w-full items-center gap-2 self-start rounded-lg border border-brand-200 bg-brand-50 pl-3 pr-1.5
+                                   text-[13px] text-brand-700 sm:self-auto dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-300"
                         >
                             <x-driver-check.icon name="user" class="h-3.5 w-3.5 shrink-0" />
                             <span class="truncate font-medium" x-text="personFilterName()"></span>
                             <button
                                 type="button"
                                 x-on:click="clearPerson()"
-                                class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full hover:bg-brand-100
+                                class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md hover:bg-brand-100
                                        dark:hover:bg-brand-500/20"
                                 :title="translations.filters.person_clear"
                                 :aria-label="translations.filters.person_clear"
@@ -270,36 +264,38 @@
             </x-driver-check.filters>
 
             {{-- Table (lg and up) --}}
-            <div class="hidden lg:block">
+            <div class="hidden xl:block">
                 <div class="overflow-x-auto">
-                    <table class="w-full min-w-[960px] table-fixed text-left">
+                    <table class="w-full min-w-[1080px] table-fixed text-left">
                         <colgroup>
-                            <col class="w-[14%]">
-                            <col class="w-[24%]">
-                            <col class="w-[8%]">
-                            <col class="w-[12%]">
-                            <col class="w-[22%]">
+                            <col class="w-[10%]">
+                            <col class="w-[19%]">
+                            <col class="w-[6%]">
                             <col class="w-[11%]">
-                            <col class="w-[9%]">
+                            <col class="w-[13%]">
+                            <col class="w-[24%]">
+                            <col class="w-[10%]">
+                            <col class="w-[7%]">
                         </colgroup>
 
-                        <thead class="dc-thead border-b border-gray-200 bg-gray-50/70 dark:border-gray-800 dark:bg-white/[0.02]">
-                            <tr class="text-[10px] uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
+                        <thead class="dc-thead border-b border-gray-200 bg-gray-25 dark:border-gray-800 dark:bg-white/[0.02]">
+                            <tr class="text-[10.5px] uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
                                 <th scope="col" class="px-4 py-2.5 font-semibold">{{ __('telegram.penalties.table.request') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.penalties.table.responsible') }}</th>
                                 <th scope="col" class="px-3 py-2.5 text-right font-semibold">{{ __('telegram.penalties.table.repeat') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.penalties.table.level') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.penalties.table.status') }}</th>
+                                <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.penalties.detail.comment') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.penalties.table.created') }}</th>
                                 <th scope="col" class="px-4 py-2.5 text-right font-semibold">{{ __('telegram.penalties.table.actions') }}</th>
                             </tr>
                         </thead>
 
                         <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                            <x-driver-check.skeleton-rows :cols="7" />
+                            <x-driver-check.skeleton-rows :cols="8" />
 
                             <template x-for="row in rows" :key="row.id">
-                                <tr class="align-middle transition hover:bg-gray-50/70 dark:hover:bg-white/[0.02]">
+                                <tr class="dc-row align-middle transition hover:bg-gray-25 dark:hover:bg-white/[0.025]">
                                     {{-- Request --}}
                                     <td class="px-4 py-3">
                                         <p class="truncate font-mono text-sm font-medium text-gray-900 dark:text-white"
@@ -327,7 +323,7 @@
 
                                             <span
                                                 x-show="responsibleRole(row)"
-                                                class="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+                                                class="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium"
                                                 :class="roleClass(responsibleRole(row))"
                                                 x-text="roleText(responsibleRole(row))"
                                             ></span>
@@ -348,7 +344,7 @@
                                     {{-- Level --}}
                                     <td class="px-3 py-3">
                                         <span
-                                            class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium"
+                                            class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium"
                                             :class="levelClass(row.level, responsibleRole(row))"
                                             x-text="levelLabel(row)"
                                         ></span>
@@ -373,6 +369,17 @@
                                         ></p>
                                     </td>
 
+                                    {{-- Comment --}}
+                                    <td class="px-3 py-3">
+                                        <p
+                                            x-show="row.comment"
+                                            class="dc-break line-clamp-2 text-[12px] leading-snug text-gray-700 dark:text-gray-300"
+                                            :title="row.comment"
+                                            x-text="row.comment"
+                                        ></p>
+                                        <span x-show="!row.comment" class="text-[12px] text-gray-300 dark:text-gray-600" x-text="dash"></span>
+                                    </td>
+
                                     <td class="px-3 py-3">
                                         <p class="text-[13px] text-gray-700 dark:text-gray-300"
                                            :title="date(row.created_at)"
@@ -390,11 +397,11 @@
             </div>
 
             {{-- Cards (below lg) --}}
-            <div class="divide-y divide-gray-100 lg:hidden dark:divide-gray-800">
+            <div class="divide-y divide-gray-100 xl:hidden dark:divide-gray-800">
                 <x-driver-check.skeleton-cards />
 
                 <template x-for="row in rows" :key="'card-' + row.id">
-                    <article class="flex flex-col gap-3 p-3.5">
+                    <article class="dc-row flex flex-col gap-3 p-3.5">
                         <div class="flex items-start justify-between gap-3">
                             <div class="min-w-0">
                                 <p class="dc-break font-mono text-sm font-semibold text-gray-900 dark:text-white"
@@ -408,12 +415,12 @@
                             </x-driver-check.badge>
                         </div>
 
-                        <dl class="grid grid-cols-2 gap-x-3 gap-y-2.5 rounded-xl bg-gray-50 p-3 dark:bg-white/[0.02]">
+                        <dl class="grid grid-cols-2 gap-x-3 gap-y-2.5 rounded-lg bg-gray-25 p-3 ring-1 ring-inset ring-gray-100 dark:bg-white/[0.02] dark:ring-gray-800">
                             <x-driver-check.kv :label="__('telegram.penalties.table.responsible')" class="col-span-2">
                                 <span x-text="responsibleName(row)"></span>
                                 <span
                                     x-show="responsibleRole(row)"
-                                    class="ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+                                    class="ml-1 rounded px-1.5 py-0.5 text-[10px] font-medium"
                                     :class="roleClass(responsibleRole(row))"
                                     x-text="roleText(responsibleRole(row))"
                                 ></span>
@@ -425,7 +432,7 @@
 
                             <x-driver-check.kv :label="__('telegram.penalties.table.level')">
                                 <span
-                                    class="rounded-full px-2 py-0.5 text-[11px] font-medium"
+                                    class="rounded-md px-2 py-0.5 text-[11px] font-medium"
                                     :class="levelClass(row.level, responsibleRole(row))"
                                     x-text="levelLabel(row)"
                                 ></span>
@@ -437,9 +444,15 @@
                         </dl>
 
                         <p
+                            x-show="row.comment"
+                            class="dc-break line-clamp-3 rounded-lg border border-gray-100 px-3 py-2 text-[12px] leading-snug text-gray-700 dark:border-gray-800 dark:text-gray-300"
+                            x-text="row.comment"
+                        ></p>
+
+                        <p
                             x-show="row.reason"
                             x-cloak
-                            class="dc-break rounded-xl px-3 py-2 text-[11px] leading-snug"
+                            class="dc-break rounded-lg px-3 py-2 text-[11px] leading-snug"
                             :class="row.status === 'failed'
                                 ? 'bg-error-50 text-error-600 dark:bg-error-500/10 dark:text-error-400'
                                 : 'bg-gray-50 text-gray-600 dark:bg-white/[0.03] dark:text-gray-300'"
@@ -481,14 +494,14 @@
                     </x-driver-check.badge>
 
                     <span
-                        class="rounded-full px-2 py-0.5 text-[11px] font-medium"
+                        class="rounded-md px-2 py-0.5 text-[11px] font-medium"
                         :class="levelClass(detail.level, responsibleRole(detail))"
                         x-text="levelLabel(detail)"
                     ></span>
 
                     <span
                         x-show="responsibleRole(detail)"
-                        class="rounded-full px-2 py-0.5 text-[11px] font-medium"
+                        class="rounded-md px-2 py-0.5 text-[11px] font-medium"
                         :class="roleClass(responsibleRole(detail))"
                         x-text="roleText(responsibleRole(detail))"
                     ></span>
@@ -509,7 +522,7 @@
                 {{-- What went wrong, and what fixes it --}}
                 <div
                     x-show="detail.status === 'failed' || detail.status === 'skipped'"
-                    class="dc-break rounded-xl px-3 py-2.5 text-xs"
+                    class="dc-break rounded-lg px-3 py-2.5 text-xs"
                     :class="detail.status === 'failed'
                         ? 'bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400'
                         : 'bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400'"
@@ -519,7 +532,7 @@
                     <p class="mt-1.5 opacity-90">{{ __('telegram.penalties.detail.retry_hint') }}</p>
                 </div>
 
-                <dl class="grid grid-cols-2 gap-x-3 gap-y-3 rounded-xl bg-gray-50 p-3 dark:bg-white/[0.02]">
+                <dl class="grid grid-cols-2 gap-x-3 gap-y-3 rounded-lg bg-gray-50 p-3 dark:bg-white/[0.02]">
                     <x-driver-check.kv :label="__('telegram.penalties.table.responsible')" class="col-span-2">
                         <a
                             x-show="detail.person"
@@ -581,14 +594,14 @@
 
                     <p
                         x-show="detail.comment"
-                        class="dc-break whitespace-pre-wrap rounded-xl bg-brand-25 px-3 py-2.5 text-[13px] leading-relaxed
+                        class="dc-break whitespace-pre-wrap rounded-lg bg-brand-25 px-3 py-2.5 text-[13px] leading-relaxed
                                text-gray-800 dark:bg-brand-500/[0.07] dark:text-gray-200"
                         x-text="detail.comment"
                     ></p>
 
                     <p
                         x-show="!detail.comment"
-                        class="rounded-xl border border-dashed border-gray-200 px-3 py-2.5 text-[12px] text-gray-500
+                        class="rounded-lg border border-dashed border-gray-200 px-3 py-2.5 text-[12px] text-gray-500
                                dark:border-gray-800 dark:text-gray-400"
                     >{{ __('telegram.penalties.detail.comment_on_last') }}</p>
                 </section>
@@ -598,7 +611,7 @@
                     <h3 class="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                         {{ __('telegram.penalties.detail.sales_turn') }}
                     </h3>
-                    <p class="rounded-xl bg-gray-50 px-3 py-2 text-[13px] leading-relaxed text-gray-800 dark:bg-white/[0.04] dark:text-gray-200">
+                    <p class="rounded-lg bg-gray-50 px-3 py-2 text-[13px] leading-relaxed text-gray-800 dark:bg-white/[0.04] dark:text-gray-200">
                         {{ __('telegram.penalties.detail.sales_turn_price') }}:
                         <span
                             class="font-medium tabular-nums"
@@ -617,7 +630,7 @@
                         {{ __('telegram.penalties.detail.nudge') }}
                     </h3>
                     <p
-                        class="dc-break whitespace-pre-wrap rounded-xl bg-warning-50 px-3 py-2 text-[13px] leading-relaxed
+                        class="dc-break whitespace-pre-wrap rounded-lg bg-warning-50 px-3 py-2 text-[13px] leading-relaxed
                                text-gray-800 dark:bg-warning-500/10 dark:text-gray-200"
                         x-text="detail.nudge_text"
                     ></p>
@@ -634,14 +647,14 @@
 
                     <div class="flex flex-col gap-1.5">
                         <p
-                            class="dc-break self-start whitespace-pre-wrap rounded-xl bg-gray-100 px-3 py-2 text-[13px] leading-relaxed
+                            class="dc-break self-start whitespace-pre-wrap rounded-lg bg-gray-100 px-3 py-2 text-[13px] leading-relaxed
                                    text-gray-800 dark:bg-white/[0.06] dark:text-gray-200"
                             x-text="detail.reply_text"
                         ></p>
 
                         <p
                             x-show="detail.reply_answer"
-                            class="dc-break self-end whitespace-pre-wrap rounded-xl bg-brand-25 px-3 py-2 text-[13px] leading-relaxed
+                            class="dc-break self-end whitespace-pre-wrap rounded-lg bg-brand-25 px-3 py-2 text-[13px] leading-relaxed
                                    text-gray-800 dark:bg-brand-500/[0.07] dark:text-gray-200"
                             x-text="detail.reply_answer"
                         ></p>
@@ -659,7 +672,7 @@
                     </h3>
 
                     <pre
-                        class="dc-break max-h-64 overflow-y-auto whitespace-pre-wrap rounded-xl bg-gray-50 px-3 py-2.5 font-sans
+                        class="dc-break max-h-64 overflow-y-auto whitespace-pre-wrap rounded-lg bg-gray-50 px-3 py-2.5 font-sans
                                text-[12px] leading-relaxed text-gray-700 dark:bg-white/[0.02] dark:text-gray-300"
                         x-text="detail.message_text || dash"
                     ></pre>

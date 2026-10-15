@@ -14,6 +14,7 @@
 */
 
 import { escapeHtml, telegramHtml } from './telegram-html';
+import { toCyrillic } from './uzbek-script';
 import { telegramGifPicker, uploadAnswerMedia } from './media-picker';
 
 const LANGUAGES = ['uz', 'ru'];
@@ -788,9 +789,16 @@ export function autoRepliesPage(config) {
          * {address} included.
          */
         preview(text, language = this.language) {
-            const sample = SAMPLE[language];
+            const sample = { ...SAMPLE[language] };
 
-            const html = String(text || '').replace(
+            /* Uzbek goes out in Cyrillic (UzbekScript): the phrase and the address are converted. */
+            const cyrillic = config.uzCyrillic && language === 'uz';
+
+            if (cyrillic) {
+                sample.address = toCyrillic(sample.address);
+            }
+
+            const html = (cyrillic ? toCyrillic(String(text || '')) : String(text || '')).replace(
                 /\{([a-z_]+)\}/g,
                 (match, key) => (key in sample ? escapeHtml(sample[key]) : match),
             );

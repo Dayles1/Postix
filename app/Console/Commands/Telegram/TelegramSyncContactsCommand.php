@@ -17,7 +17,7 @@ final class TelegramSyncContactsCommand extends Command
      */
     public const LOCK_NAME = 'contact-sync';
 
-    protected $signature = 'telegram:sync-contacts {--group= : Only this group id}';
+    protected $signature = 'telegram:sync-contacts {--group= : Only this group id} {--trigger=manual : Who started it: manual or schedule}';
 
     protected $description = 'Save the members of the watched groups into the accounts\' contacts';
 
@@ -33,6 +33,7 @@ final class TelegramSyncContactsCommand extends Command
             $totals = $sync->run(
                 $this->option('group') ? (int) $this->option('group') : null,
                 fn (string $line) => $this->line($line),
+                $this->option('trigger') === 'schedule' ? 'schedule' : 'manual',
             );
         } catch (Throwable $e) {
             $this->error($e->getMessage());

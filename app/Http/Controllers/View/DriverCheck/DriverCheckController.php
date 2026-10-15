@@ -111,6 +111,27 @@ final class DriverCheckController extends Controller
         );
     }
 
+    public function contacts()
+    {
+        return view(
+            'pages.driver-check.contacts'
+        );
+    }
+
+    public function contactReport()
+    {
+        return view(
+            'pages.driver-check.contact-report'
+        );
+    }
+
+    public function contactSettings()
+    {
+        return view(
+            'pages.driver-check.contact-settings'
+        );
+    }
+
     public function queue()
     {
         return view(

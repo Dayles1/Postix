@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('layouts.driver-check')
 
 @section('title', __('telegram.queue.title'))
 
@@ -25,9 +25,6 @@
              Header
         ============================================================= --}}
         <x-driver-check.page-header
-            icon="inbox"
-            tone="blue"
-            :eyebrow="__('telegram.menu.groups.monitoring')"
             :title="__('telegram.queue.title')"
             :description="__('telegram.queue.description')"
         >
@@ -47,22 +44,22 @@
         ></p>
 
         {{-- ============================================================
-             Worker
+             Worker: the health line of the queue
         ============================================================= --}}
         <template x-if="summary">
-            <section class="flex flex-col gap-3 rounded-2xl border p-4 sm:flex-row sm:items-start sm:justify-between sm:p-5" :class="workerBanner()">
-                <div class="flex min-w-0 items-start gap-3">
-                    <span class="mt-0.5 shrink-0">
-                        <x-driver-check.icon name="check-circle" class="h-6 w-6" x-show="workerState() === 'alive'" />
-                        <x-driver-check.icon name="x-circle" class="h-6 w-6" x-show="workerState() === 'dead'" x-cloak />
-                        <x-driver-check.icon name="alert" class="h-6 w-6" x-show="workerState() === 'never'" x-cloak />
-                    </span>
+            <section
+                class="flex flex-col gap-3 rounded-2xl border px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"
+                :class="workerBanner()"
+                x-data="{ dotTone: { alive: 'text-success-500', dead: 'text-error-500', never: 'text-warning-500' } }"
+            >
+                <div class="flex min-w-0 items-start gap-3.5">
+                    <span class="dc-dot mt-1.5 shrink-0" :class="dotTone[workerState()]"></span>
 
                     <div class="min-w-0">
-                        <p class="text-base font-semibold" x-text="t.worker[workerState()]"></p>
+                        <p class="text-base font-semibold leading-6" x-text="t.worker[workerState()]"></p>
                         <p
                             x-show="workerState() !== 'alive'"
-                            class="mt-0.5 font-mono text-[12px] leading-relaxed opacity-90"
+                            class="mt-0.5 text-[12px] leading-relaxed opacity-90"
                             x-text="workerState() === 'dead' ? t.worker.dead_hint : t.worker.never_hint"
                         ></p>
 
@@ -101,10 +98,8 @@
         {{-- ============================================================
              Counters (the main queue)
         ============================================================= --}}
-        <section class="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
-            <x-driver-check.stat-card :label="__('telegram.queue.stats.ready')" icon="clock"
-                tone="text-success-600 dark:text-success-400"
-                chip="bg-success-50 text-success-600 dark:bg-success-500/10 dark:text-success-400">
+        <section class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <x-driver-check.stat-card :label="__('telegram.queue.stats.ready')" icon="clock">
                 <span x-text="number(mainQueue().ready)">0</span>
             </x-driver-check.stat-card>
 
@@ -112,29 +107,30 @@
                 <span x-text="number(mainQueue().delayed)">0</span>
             </x-driver-check.stat-card>
 
-            <x-driver-check.stat-card :label="__('telegram.queue.stats.reserved')" icon="refresh"
-                tone="text-blue-light-600 dark:text-blue-light-400"
-                chip="bg-blue-light-50 text-blue-light-600 dark:bg-blue-light-500/10 dark:text-blue-light-400">
+            <x-driver-check.stat-card :label="__('telegram.queue.stats.reserved')" icon="refresh">
                 <span x-text="number(mainQueue().reserved)">0</span>
             </x-driver-check.stat-card>
 
+            {{-- The failed counter is the way into the failed tab --}}
             <x-driver-check.stat-card :label="__('telegram.queue.stats.failed')" icon="alert"
                 role="button" tabindex="0" class="dc-tap cursor-pointer"
-                x-on:click="switchTab('failed')">
-                <span :class="failedTotal() > 0 ? 'text-error-600 dark:text-error-400' : 'text-gray-900 dark:text-white'"
+                x-on:click="switchTab('failed')"
+                x-on:keydown.enter="switchTab('failed')">
+                <span :class="failedTotal() > 0 ? 'text-error-600 dark:text-error-400' : ''"
                     x-text="number(failedTotal())">0</span>
-                <span class="block text-[11px] font-normal text-gray-500 dark:text-gray-400"
-                    x-text="t.stats.failed_day.replace(':count', number(summary?.failed?.last_day ?? 0))"></span>
+                <x-slot:hint>
+                    <span x-text="t.stats.failed_day.replace(':count', number(summary?.failed?.last_day ?? 0))"></span>
+                </x-slot:hint>
             </x-driver-check.stat-card>
         </section>
 
-        <section class="grid gap-4 lg:grid-cols-2">
+        <section class="grid gap-5 lg:grid-cols-2">
 
             {{-- ========================================================
                  Queues
             ========================================================= --}}
             <x-driver-check.surface class="overflow-hidden">
-                <h2 class="border-b border-gray-200 px-4 py-3 text-sm font-semibold text-gray-900 dark:border-gray-800 dark:text-white">
+                <h2 class="border-b border-gray-100 px-4 py-3 text-sm font-semibold text-gray-900 dark:border-gray-800 dark:text-white">
                     {{ __('telegram.queue.queues.title') }}
                 </h2>
 
@@ -144,24 +140,24 @@
                             <div class="flex flex-wrap items-center gap-2">
                                 <span class="font-mono text-sm font-semibold text-gray-900 dark:text-white" x-text="queue.queue"></span>
 
-                                <span
+                                <x-driver-check.badge
                                     x-show="queue.is_main"
-                                    class="rounded-md bg-brand-50 px-1.5 py-0.5 text-[10px] font-semibold text-brand-600 dark:bg-brand-500/10 dark:text-brand-400"
+                                    class="bg-gray-100 text-gray-600 dark:bg-white/[0.06] dark:text-gray-300"
                                     x-text="t.queues.main"
-                                ></span>
+                                ></x-driver-check.badge>
 
-                                <span
+                                <x-driver-check.badge
                                     x-show="isOrphan(queue)"
                                     x-cloak
-                                    class="rounded-md bg-error-50 px-1.5 py-0.5 text-[10px] font-semibold text-error-600 dark:bg-error-500/10 dark:text-error-400"
-                                    :title="t.queues.not_listened_hint"
+                                    class="bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400"
+                                    :title="__('telegram.queue.queues.not_listened_hint')"
                                     x-text="t.queues.not_listened"
-                                ></span>
+                                ></x-driver-check.badge>
 
-                                <span class="ml-auto text-[12px] tabular-nums text-gray-500 dark:text-gray-400" x-text="number(queue.total)"></span>
+                                <span class="ml-auto text-[13px] font-semibold tabular-nums text-gray-900 dark:text-white" x-text="number(queue.total)"></span>
                             </div>
 
-                            <div class="flex flex-wrap gap-x-4 gap-y-1 text-[12px] tabular-nums text-gray-600 dark:text-gray-400">
+                            <div class="flex flex-wrap gap-x-4 gap-y-1 text-[12px] tabular-nums text-gray-500 dark:text-gray-400">
                                 <span x-text="t.stats.ready + ': ' + number(queue.ready)"></span>
                                 <span x-text="t.stats.delayed + ': ' + number(queue.delayed)"></span>
                                 <span x-text="t.stats.reserved + ': ' + number(queue.reserved)"></span>
@@ -178,7 +174,7 @@
                             <p x-show="isOrphan(queue)" x-cloak class="text-[12px] text-error-600 dark:text-error-400" x-text="t.queues.not_listened_hint"></p>
 
                             <div x-show="!queue.is_main && queue.total > queue.reserved" x-cloak>
-                                <x-driver-check.button size="sm" variant="primary" x-on:click="askConfirm('move', { queue: queue.queue })">
+                                <x-driver-check.button size="sm" x-on:click="askConfirm('move', { queue: queue.queue })">
                                     {{ __('telegram.queue.queues.move') }}
                                 </x-driver-check.button>
                             </div>
@@ -191,14 +187,14 @@
                  Waiting, by job class
             ========================================================= --}}
             <x-driver-check.surface class="overflow-hidden">
-                <h2 class="border-b border-gray-200 px-4 py-3 text-sm font-semibold text-gray-900 dark:border-gray-800 dark:text-white">
+                <h2 class="border-b border-gray-100 px-4 py-3 text-sm font-semibold text-gray-900 dark:border-gray-800 dark:text-white">
                     {{ __('telegram.queue.classes.title') }}
                 </h2>
 
-                <p x-show="summary && classes().length === 0" x-cloak class="px-4 py-6 text-center text-[13px] text-gray-500 dark:text-gray-400" x-text="t.classes.empty"></p>
+                <p x-show="summary && classes().length === 0" x-cloak class="px-4 py-8 text-center text-[13px] text-gray-500 dark:text-gray-400" x-text="t.classes.empty"></p>
 
                 <table x-show="classes().length > 0" class="w-full text-left text-[13px]">
-                    <thead class="bg-gray-50/70 text-[10px] uppercase tracking-[0.08em] text-gray-500 dark:bg-white/[0.02] dark:text-gray-400">
+                    <thead class="dc-thead border-b border-gray-100 bg-gray-25 text-[10.5px] uppercase tracking-[0.08em] text-gray-500 dark:border-gray-800 dark:bg-white/[0.015] dark:text-gray-400">
                         <tr>
                             <th class="px-4 py-2 font-semibold">{{ __('telegram.queue.classes.job') }}</th>
                             <th class="px-2 py-2 text-right font-semibold">{{ __('telegram.queue.stats.ready') }}</th>
@@ -208,8 +204,8 @@
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                         <template x-for="row in classes()" :key="'c-' + row.job_class">
-                            <tr>
-                                <td class="max-w-0 px-4 py-2">
+                            <tr class="dc-row hover:bg-gray-25 dark:hover:bg-white/[0.025]">
+                                <td class="max-w-0 px-4 py-2.5">
                                     <button
                                         type="button"
                                         class="block w-full truncate text-left font-medium text-gray-900 hover:text-brand-600 dark:text-white dark:hover:text-brand-400"
@@ -218,9 +214,9 @@
                                         x-text="row.job || dash"
                                     ></button>
                                 </td>
-                                <td class="px-2 py-2 text-right tabular-nums text-gray-700 dark:text-gray-300" x-text="number(row.ready)"></td>
-                                <td class="px-2 py-2 text-right tabular-nums text-gray-700 dark:text-gray-300" x-text="number(row.delayed)"></td>
-                                <td class="px-4 py-2 text-right font-semibold tabular-nums text-gray-900 dark:text-white" x-text="number(row.total)"></td>
+                                <td class="px-2 py-2.5 text-right tabular-nums text-gray-700 dark:text-gray-300" x-text="number(row.ready)"></td>
+                                <td class="px-2 py-2.5 text-right tabular-nums text-gray-700 dark:text-gray-300" x-text="number(row.delayed)"></td>
+                                <td class="px-4 py-2.5 text-right font-semibold tabular-nums text-gray-900 dark:text-white" x-text="number(row.total)"></td>
                             </tr>
                         </template>
                     </tbody>
@@ -228,74 +224,67 @@
             </x-driver-check.surface>
         </section>
 
-        {{-- ============================================================
-             Tabs
-        ============================================================= --}}
-        <div class="inline-flex w-full gap-1 self-start rounded-xl bg-gray-100 p-1 sm:w-auto dark:bg-white/[0.04]" role="tablist">
-            @foreach (['pending', 'failed'] as $tab)
-                <button
-                    type="button"
-                    role="tab"
-                    x-on:click="switchTab('{{ $tab }}')"
-                    :aria-selected="filters.tab === '{{ $tab }}'"
-                    class="dc-tap inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg px-4 text-[13px] font-medium transition sm:flex-none"
-                    :class="filters.tab === '{{ $tab }}'
-                        ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
-                        : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'"
-                >
-                    {{ __('telegram.queue.tabs.' . $tab) }}
-                    @if ($tab === 'failed')
-                        <span
-                            x-show="failedTotal() > 0"
-                            x-cloak
-                            class="ml-1 rounded-full bg-error-500 px-1.5 py-0.5 text-[10px] font-semibold text-white"
-                            x-text="number(failedTotal())"
-                        ></span>
-                    @endif
-                </button>
-            @endforeach
-        </div>
-
         <x-driver-check.error-alert :title="__('telegram.queue.errors.title')" />
 
-        {{-- One card for the jobs: the filters on top, then the list of the tab --}}
+        {{-- One panel for the jobs: tabs (and the failed-bulk actions) on top, the filters, then the list of the tab --}}
         <x-driver-check.surface class="overflow-hidden" x-ref="listTop">
-            <div class="border-b border-gray-200 p-3 sm:p-4 dark:border-gray-800">
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <div class="sm:col-span-1">
-                        <x-driver-check.search
-                            model="filters.search"
-                            :placeholder="__('telegram.queue.filters.search')"
-                        />
-                    </div>
-
-                        <x-driver-check.select x-model="filters.queue" x-on:change="applyFilters()">
-                            <option value="">{{ __('telegram.queue.filters.queue_all') }}</option>
-                            <template x-for="queue in queues()" :key="'fq-' + queue.queue">
-                                <option :value="queue.queue" x-text="queue.queue" :selected="filters.queue === queue.queue"></option>
-                            </template>
-                        </x-driver-check.select>
-
-                        <div x-show="!isFailedTab()">
-                            <x-driver-check.select x-model="filters.state" x-on:change="applyFilters()">
-                                <option value="">{{ __('telegram.queue.filters.state_all') }}</option>
-                                @foreach (['ready', 'delayed', 'reserved', 'stuck'] as $state)
-                                    <option value="{{ $state }}">{{ __('telegram.queue.state.' . $state) }}</option>
-                                @endforeach
-                            </x-driver-check.select>
-                        </div>
-
-                        <div x-show="isFailedTab()" x-cloak class="flex gap-2">
-                            <x-driver-check.button class="flex-1" x-on:click="askConfirm('retry_all')" ::disabled="failedTotal() === 0 || !!busy">
-                                {{ __('telegram.queue.actions.retry_all') }}
-                            </x-driver-check.button>
-
-                            <x-driver-check.button variant="ghost" class="flex-1" x-on:click="askConfirm('flush')" ::disabled="failedTotal() === 0 || !!busy">
-                                {{ __('telegram.queue.actions.flush') }}
-                            </x-driver-check.button>
-                        </div>
-                    </div>
+            <div class="flex flex-col gap-2 border-b border-gray-200 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between dark:border-gray-800">
+                <div class="inline-flex gap-0.5 rounded-lg bg-gray-100 p-0.5 dark:bg-white/[0.06]" role="tablist">
+                    @foreach (['pending', 'failed'] as $tab)
+                        <button
+                            type="button"
+                            role="tab"
+                            x-on:click="switchTab('{{ $tab }}')"
+                            :aria-selected="filters.tab === '{{ $tab }}'"
+                            class="dc-tap inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-md px-4 text-[13px] font-medium transition outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50 sm:h-7 sm:flex-none"
+                            :class="filters.tab === '{{ $tab }}'
+                                ? 'bg-white text-gray-950 shadow-sm dark:bg-gray-700 dark:text-white'
+                                : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'"
+                        >
+                            {{ __('telegram.queue.tabs.' . $tab) }}
+                            @if ($tab === 'failed')
+                                <span
+                                    x-show="failedTotal() > 0"
+                                    x-cloak
+                                    class="rounded-md bg-error-50 px-1.5 text-[10.5px] font-semibold leading-4 tabular-nums text-error-700 dark:bg-error-500/10 dark:text-error-400"
+                                    x-text="number(failedTotal())"
+                                ></span>
+                            @endif
+                        </button>
+                    @endforeach
                 </div>
+
+                <div x-show="isFailedTab()" x-cloak class="flex gap-2">
+                    <x-driver-check.button class="flex-1 sm:flex-none" x-on:click="askConfirm('flush')" variant="danger" ::disabled="failedTotal() === 0 || !!busy">
+                        {{ __('telegram.queue.actions.flush') }}
+                    </x-driver-check.button>
+
+                    <x-driver-check.button class="flex-1 sm:flex-none" variant="primary" x-on:click="askConfirm('retry_all')" ::disabled="failedTotal() === 0 || !!busy">
+                        {{ __('telegram.queue.actions.retry_all') }}
+                    </x-driver-check.button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-2 border-b border-gray-200 bg-gray-25 p-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] dark:border-gray-800 dark:bg-white/[0.015]">
+                <x-driver-check.search
+                    model="filters.search"
+                    :placeholder="__('telegram.queue.filters.search')"
+                />
+
+                <x-driver-check.select class="sm:w-44" x-model="filters.queue" x-on:change="applyFilters()">
+                    <option value="">{{ __('telegram.queue.filters.queue_all') }}</option>
+                    <template x-for="queue in queues()" :key="'fq-' + queue.queue">
+                        <option :value="queue.queue" x-text="queue.queue" :selected="filters.queue === queue.queue"></option>
+                    </template>
+                </x-driver-check.select>
+
+                <x-driver-check.select x-show="!isFailedTab()" class="sm:w-40" x-model="filters.state" x-on:change="applyFilters()">
+                    <option value="">{{ __('telegram.queue.filters.state_all') }}</option>
+                    @foreach (['ready', 'delayed', 'reserved', 'stuck'] as $state)
+                        <option value="{{ $state }}">{{ __('telegram.queue.state.' . $state) }}</option>
+                    @endforeach
+                </x-driver-check.select>
+            </div>
 
             {{-- ============================================================
                  Waiting jobs
@@ -303,8 +292,8 @@
             <div x-show="!isFailedTab()">
                 <div class="overflow-x-auto">
                     <table class="w-full min-w-[720px] text-left">
-                        <thead class="dc-thead border-b border-gray-200 bg-gray-50/70 dark:border-gray-800 dark:bg-white/[0.02]">
-                            <tr class="text-[10px] uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
+                        <thead class="dc-thead border-b border-gray-200 bg-gray-25 dark:border-gray-800 dark:bg-white/[0.015]">
+                            <tr class="text-[10.5px] uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
                                 <th class="px-4 py-2.5 font-semibold">#</th>
                                 <th class="px-3 py-2.5 font-semibold">{{ __('telegram.queue.table.job') }}</th>
                                 <th class="px-3 py-2.5 font-semibold">{{ __('telegram.queue.table.queue') }}</th>
@@ -318,7 +307,7 @@
                             <x-driver-check.skeleton-rows :cols="6" />
 
                             <template x-for="row in (isFailedTab() ? [] : rows)" :key="'j-' + row.id">
-                                <tr class="text-[13px] transition hover:bg-gray-50/70 dark:hover:bg-white/[0.02]">
+                                <tr class="dc-row text-[13px] hover:bg-gray-25 dark:hover:bg-white/[0.025]">
                                     <td class="px-4 py-2.5 font-mono text-[12px] text-gray-500 dark:text-gray-400" x-text="row.id"></td>
                                     <td class="px-3 py-2.5 font-medium text-gray-900 dark:text-white" :title="row.job_class" x-text="row.job || dash"></td>
                                     <td class="px-3 py-2.5 font-mono text-[12px] text-gray-600 dark:text-gray-300" x-text="row.queue"></td>
@@ -335,7 +324,7 @@
                                         ></span>
                                     </td>
                                     <td class="px-3 py-2.5 text-right tabular-nums text-gray-700 dark:text-gray-300" x-text="attempts(row)"></td>
-                                    <td class="px-4 py-2.5 text-gray-600 dark:text-gray-400" :title="date(row.created_at)" x-text="relative(row.created_at)"></td>
+                                    <td class="px-4 py-2.5 text-gray-500 dark:text-gray-400" :title="date(row.created_at)" x-text="relative(row.created_at)"></td>
                                 </tr>
                             </template>
                         </tbody>
@@ -351,37 +340,47 @@
 
                 <x-driver-check.pagination />
             </div>
-            {{-- ============================================================
-                 Failed jobs
-            ============================================================= --}}
 
+            {{-- ============================================================
+                 Failed jobs: a grid row from xl, a card below
+            ============================================================= --}}
             <div x-show="isFailedTab()" x-cloak>
+                <div class="dc-thead hidden grid-cols-[minmax(0,1.1fr)_minmax(0,2fr)_auto] gap-4 border-b border-gray-200 bg-gray-25 px-4 py-2.5 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-gray-500 xl:grid dark:border-gray-800 dark:bg-white/[0.015] dark:text-gray-400">
+                    <span>{{ __('telegram.queue.table.job') }}</span>
+                    <span>{{ __('telegram.queue.detail.exception') }}</span>
+                    <span class="w-[184px]"></span>
+                </div>
+
                 <ul class="divide-y divide-gray-100 dark:divide-gray-800">
                     <template x-for="row in (isFailedTab() ? rows : [])" :key="'f-' + row.uuid">
-                        <li class="flex flex-col gap-2 p-4 sm:flex-row sm:items-start sm:justify-between">
+                        <li class="dc-row flex flex-col gap-3 px-4 py-3.5 hover:bg-gray-25 xl:grid xl:grid-cols-[minmax(0,1.1fr)_minmax(0,2fr)_auto] xl:items-center xl:gap-4 dark:hover:bg-white/[0.025]">
                             <div class="min-w-0">
-                                <div class="flex flex-wrap items-center gap-2">
-                                    <span class="text-sm font-semibold text-gray-900 dark:text-white" :title="row.job_class" x-text="row.job || dash"></span>
-                                    <span class="rounded-md bg-gray-100 px-1.5 py-0.5 font-mono text-[10px] text-gray-600 dark:bg-white/[0.06] dark:text-gray-300" x-text="row.queue"></span>
-                                    <span class="text-[11px] text-gray-500 dark:text-gray-400" :title="date(row.failed_at)" x-text="relative(row.failed_at)"></span>
-                                </div>
-
-                                <p class="dc-break mt-1 line-clamp-2 font-mono text-[12px] text-error-600 dark:text-error-400" :title="row.error" x-text="row.error"></p>
+                                <p class="truncate text-sm font-semibold text-gray-900 dark:text-white" :title="row.job_class" x-text="row.job || dash"></p>
+                                <p class="mt-0.5 text-[12px] text-gray-500 dark:text-gray-400">
+                                    <span class="font-mono" x-text="row.queue"></span>
+                                    <span :title="date(row.failed_at)" x-text="' · ' + relative(row.failed_at)"></span>
+                                </p>
                             </div>
 
-                            <div class="flex shrink-0 gap-1.5">
-                                <x-driver-check.button size="sm" x-on:click="openDetail(row)">
+                            <p class="dc-break line-clamp-2 font-mono text-[12px] text-error-600 dark:text-error-400" :title="row.error" x-text="row.error"></p>
+
+                            <div class="flex shrink-0 items-center gap-1.5 xl:w-[184px] xl:justify-end">
+                                <x-driver-check.button size="sm" class="flex-1 xl:flex-none" x-on:click="openDetail(row)">
                                     {{ __('telegram.queue.actions.details') }}
                                 </x-driver-check.button>
 
-                                <x-driver-check.button size="sm" variant="primary" x-on:click="retry(row)" ::disabled="!!busy">
+                                <x-driver-check.button size="sm" class="flex-1 xl:flex-none" x-on:click="retry(row)" ::disabled="!!busy">
                                     <x-driver-check.icon name="refresh" class="h-4 w-4 animate-spin" x-show="busy === 'retry-' + row.uuid" x-cloak />
                                     {{ __('telegram.queue.actions.retry') }}
                                 </x-driver-check.button>
 
-                                <x-driver-check.button size="sm" variant="ghost" x-on:click="askConfirm('delete', { uuid: row.uuid })" ::disabled="!!busy">
-                                    {{ __('telegram.queue.actions.delete') }}
-                                </x-driver-check.button>
+                                <x-driver-check.row-action
+                                    icon="trash"
+                                    :label="__('telegram.queue.actions.delete')"
+                                    class="h-10 w-10 sm:h-8 sm:w-8 hover:!text-error-600"
+                                    x-on:click="askConfirm('delete', { uuid: row.uuid })"
+                                    ::disabled="!!busy"
+                                />
                             </div>
                         </li>
                     </template>
@@ -411,7 +410,7 @@
 
         <template x-if="detail">
             <div class="flex flex-col gap-3">
-                <dl class="grid grid-cols-2 gap-x-3 gap-y-2 rounded-xl bg-gray-50 p-3 sm:grid-cols-3 dark:bg-white/[0.02]">
+                <dl class="grid grid-cols-2 gap-x-3 gap-y-2 rounded-lg bg-gray-50 p-3 sm:grid-cols-3 dark:bg-white/[0.02]">
                     <x-driver-check.kv :label="__('telegram.queue.table.queue')">
                         <span class="font-mono" x-text="detail.queue"></span>
                     </x-driver-check.kv>
@@ -434,11 +433,11 @@
                         {{ __('telegram.queue.detail.exception') }}
                     </p>
 
-                    <div x-show="detailLoading" class="dc-skeleton h-40 rounded-xl bg-gray-100 dark:bg-white/[0.06]"></div>
+                    <div x-show="detailLoading" class="dc-skeleton h-40 rounded-lg bg-gray-100 dark:bg-white/[0.06]"></div>
 
                     <pre
                         x-show="!detailLoading"
-                        class="max-h-[50vh] overflow-auto whitespace-pre-wrap break-words rounded-xl bg-gray-900 p-3 font-mono text-[11px] leading-relaxed text-gray-100"
+                        class="max-h-[50vh] overflow-auto whitespace-pre-wrap break-words rounded-lg bg-gray-900 p-3 font-mono text-[11px] leading-relaxed text-gray-100"
                         x-text="detail.exception || detail.error"
                     ></pre>
                 </div>
@@ -473,7 +472,7 @@
         <p
             x-show="confirmError"
             x-cloak
-            class="dc-break mt-3 rounded-xl bg-error-50 px-3 py-2.5 text-xs text-error-600 dark:bg-error-500/10 dark:text-error-400"
+            class="dc-break mt-3 rounded-lg bg-error-50 px-3 py-2.5 text-xs text-error-600 dark:bg-error-500/10 dark:text-error-400"
             x-text="confirmError"
         ></p>
 

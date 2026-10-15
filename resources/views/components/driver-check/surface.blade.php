@@ -1,8 +1,8 @@
-{{-- The one card surface used across the panel. --}}
+{{-- The one panel of the console: flat, a hairline, no shadow. --}}
 
 <div
     {{ $attributes->merge([
-        'class' => 'rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-white/[0.03]',
+        'class' => 'dc-surface rounded-2xl',
     ]) }}
 >
     {{ $slot }}

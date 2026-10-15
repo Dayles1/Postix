@@ -318,7 +318,7 @@ export function sessionsPage(config) {
             }
 
             this.listPollTimer = setTimeout(() => {
-                if (!this.loading) {
+                if (!this.loading && !this.appended) {
                     this.load();
                 }
             }, LIST_POLL_MS);

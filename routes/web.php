@@ -1,7 +1,11 @@
 <?php
 
 use App\Http\Controllers\Api\Telegram\ClientCheckController;
+use App\Http\Controllers\Api\Telegram\ContactCatalogController;
 use App\Http\Controllers\Api\Telegram\ContactSyncController;
+use App\Http\Controllers\Api\Telegram\ContactSyncReportController;
+use App\Http\Controllers\Api\Telegram\ContactSyncRunController;
+use App\Http\Controllers\Api\Telegram\ContactSyncSettingsController;
 use App\Http\Controllers\Api\Telegram\AutoReplyController;
 use App\Http\Controllers\Api\Telegram\ClientCheckRulesController;
 use App\Http\Controllers\Api\Telegram\DriverCheckChatController;
@@ -27,6 +31,7 @@ use App\Http\Controllers\View\Department\DepartmentController;
 use App\Http\Controllers\View\Department\UserDepartmenIndexController;
 use App\Http\Controllers\View\Department\UserDepartmentController;
 use App\Http\Controllers\View\DriverCheck\DriverCheckController;
+use App\Http\Controllers\View\DriverCheck\DriverCheckProfileController;
 use App\Http\Controllers\View\MessageGroupController;
 use App\Http\Controllers\View\Messages\ShowController;
 use App\Http\Controllers\View\ProfileController;
@@ -167,6 +172,13 @@ Route::middleware(['auth', 'role:driverCheck,superadmin'])
         })->name('driver-check.dashboard');
 
         /*
+         * The signed-in person's own profile.
+         */
+        Route::get('/profile', [DriverCheckProfileController::class, 'show'])->name('driver-check.profile');
+        Route::post('/profile', [DriverCheckProfileController::class, 'update'])->name('driver-check.profile.update');
+        Route::post('/profile/password', [DriverCheckProfileController::class, 'password'])->name('driver-check.profile.password');
+
+        /*
          * Operation Users
          */
         Route::get(
@@ -273,6 +285,24 @@ Route::middleware(['auth', 'role:driverCheck,superadmin'])
             '/contact-sync',
             [DriverCheckController::class, 'contactSync']
         )->name('driver-check.contact-sync');
+
+        /*
+         * The catalog of everyone the sync found, and its daily report.
+         */
+        Route::get(
+            '/contacts',
+            [DriverCheckController::class, 'contacts']
+        )->name('driver-check.contacts');
+
+        Route::get(
+            '/contact-report',
+            [DriverCheckController::class, 'contactReport']
+        )->name('driver-check.contact-report');
+
+        Route::get(
+            '/contact-settings',
+            [DriverCheckController::class, 'contactSettings']
+        )->name('driver-check.contact-settings');
 
         /*
          * Telegram sessions
@@ -552,6 +582,13 @@ Route::middleware(['auth', 'role:driverCheck,superadmin'])
                 Route::get('/', 'show')->name('api.telegram.contact-sync.show');
                 Route::post('/run', 'run')->name('api.telegram.contact-sync.run');
                 Route::get('/logs', 'logs')->name('api.telegram.contact-sync.logs');
+                Route::get('/report', [ContactSyncReportController::class, 'show'])->name('api.telegram.contact-sync.report');
+                Route::get('/runs', [ContactSyncRunController::class, 'index'])->name('api.telegram.contact-sync.runs');
+                Route::get('/runs/{runId}', [ContactSyncRunController::class, 'show'])->whereUuid('runId')->name('api.telegram.contact-sync.runs.show');
+                Route::get('/settings', [ContactSyncSettingsController::class, 'show'])->name('api.telegram.contact-sync.settings');
+                Route::put('/settings', [ContactSyncSettingsController::class, 'update'])->name('api.telegram.contact-sync.settings.update');
+                Route::delete('/settings', [ContactSyncSettingsController::class, 'reset'])->name('api.telegram.contact-sync.settings.reset');
+                Route::get('/contacts', [ContactCatalogController::class, 'index'])->name('api.telegram.contact-sync.contacts');
                 Route::post('/accounts/{account}/enable', 'enableAccount')->name('api.telegram.contact-sync.accounts.enable');
                 Route::post('/groups', 'storeGroup')->name('api.telegram.contact-sync.groups.store');
                 Route::patch('/groups/{group}', 'updateGroup')->name('api.telegram.contact-sync.groups.update');

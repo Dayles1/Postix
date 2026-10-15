@@ -5,9 +5,9 @@
 <template x-if="loading && rows.length === 0">
     <template x-for="i in {{ $count }}" :key="'skeleton-row-' + i">
         <tr>
-            <td colspan="{{ $cols }}" class="px-4 py-3.5">
+            <td colspan="{{ $cols }}" class="px-4 py-3">
                 <div class="flex items-center gap-3">
-                    <div class="dc-skeleton h-9 w-9 shrink-0 rounded-full bg-gray-100 dark:bg-white/[0.06]"></div>
+                    <div class="dc-skeleton h-8 w-8 shrink-0 rounded-lg bg-gray-100 dark:bg-white/[0.06]"></div>
 
                     <div class="flex-1 space-y-2">
                         <div class="dc-skeleton h-3 w-2/5 rounded bg-gray-100 dark:bg-white/[0.06]"></div>

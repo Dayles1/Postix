@@ -5,12 +5,12 @@
     'show' => '!loading && rows.length === 0 && !error',
 ])
 
-<div x-show="{{ $show }}" x-cloak class="flex flex-col items-center px-6 py-14 text-center sm:py-20">
+<div x-show="{{ $show }}" x-cloak class="flex flex-col items-center px-6 py-16 text-center sm:py-24">
     <span
-        class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100
-               text-gray-400 dark:bg-white/[0.06] dark:text-gray-500"
+        class="flex h-11 w-11 items-center justify-center rounded-xl border border-dashed border-gray-300
+               text-gray-400 dark:border-gray-700 dark:text-gray-500"
     >
-        <x-driver-check.icon :name="$icon" class="h-6 w-6" />
+        <x-driver-check.icon :name="$icon" class="h-5 w-5" />
     </span>
 
     <p class="mt-4 text-sm font-semibold text-gray-900 dark:text-white">{{ $title }}</p>
@@ -21,11 +21,7 @@
         </p>
     @endif
 
-    <div
-        x-show="hasActiveFilters()"
-        x-cloak
-        class="mt-4"
-    >
+    <div x-show="hasActiveFilters()" x-cloak class="mt-4">
         <x-driver-check.button size="sm" x-on:click="resetFilters()" icon="close">
             {{ __('telegram.ui.reset') }}
         </x-driver-check.button>

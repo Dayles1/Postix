@@ -27,6 +27,7 @@ class TelegramAccountContact extends Model
         'scraped_user_id',
         'status',
         'error',
+        'contact_name',
         'added_at',
     ];
 

@@ -10,7 +10,7 @@
 <button
     type="button"
     x-on:click.stop.prevent="copy({{ $value }}, @js(__('telegram.ui.copied')))"
-    class="dc-tap inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-gray-400
+    class="dc-tap inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-400
            transition hover:bg-gray-100 hover:text-gray-700 focus-visible:opacity-100
            lg:opacity-0 lg:group-hover:opacity-100
            dark:hover:bg-white/[0.08] dark:hover:text-gray-200"

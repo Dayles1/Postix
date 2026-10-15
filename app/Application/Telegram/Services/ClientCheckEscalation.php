@@ -259,6 +259,22 @@ final class ClientCheckEscalation
         $address = $person->addressFor($language);
 
         /*
+         * Uzbek goes out in Cyrillic (UzbekScript). Only what is Uzbek is
+         * converted - the template, the address, the durations - never the
+         * request number, the CRM status or the person's name.
+         */
+        $cyrillic = $language === OperationUser::LANGUAGE_UZ && UzbekScript::enabled();
+
+        if ($cyrillic) {
+            $template = UzbekScript::toCyrillic($template);
+            $address = $address === null ? null : UzbekScript::toCyrillic($address);
+        }
+
+        $duration = fn (?string $seconds): string => $cyrillic
+            ? UzbekScript::toCyrillic(self::duration($seconds, $language))
+            : self::duration($seconds, $language);
+
+        /*
          * Nobody wrote how to call this person: the address goes, with the
          * comma that led to it or followed it - "Rahmat, {address}!" reads
          * "Rahmat!", "{address}, narx bering" reads "narx bering".
@@ -273,11 +289,11 @@ final class ClientCheckEscalation
 
         return strtr($template, [
             '{address}' => $e($address),
-            '{name}' => $e($name !== '' ? $name : ($language === OperationUser::LANGUAGE_UZ ? 'Hamkasb' : 'Коллега')),
+            '{name}' => $e($name !== '' ? $name : ($language === OperationUser::LANGUAGE_UZ ? ($cyrillic ? 'Ҳамкасб' : 'Hamkasb') : 'Коллега')),
             '{request}' => $e($last->request_number ?? '—'),
             '{repeat_number}' => (string) $last->repeat_number,
-            '{status_limit}' => $e(self::duration($parsed['status_limit'] ?? null, $language)),
-            '{time_in_status}' => $e(self::duration($parsed['time_in_status'] ?? null, $language)),
+            '{status_limit}' => $e($duration($parsed['status_limit'] ?? null)),
+            '{time_in_status}' => $e($duration($parsed['time_in_status'] ?? null)),
             '{crm_status}' => $e($last->crm_status ?? '—'),
         ]);
     }

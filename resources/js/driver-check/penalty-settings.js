@@ -13,6 +13,7 @@
 */
 
 import { escapeHtml, telegramHtml } from './telegram-html';
+import { toCyrillic } from './uzbek-script';
 import { formatNumber } from './format';
 
 const LANGUAGES = ['uz', 'ru'];
@@ -624,7 +625,20 @@ export function penaltySettingsPage(config) {
                 ...SAMPLE[this.language],
             };
 
-            const html = String(text || '').replace(
+            /*
+             * Uzbek goes out in Cyrillic (UzbekScript): the phrase, the
+             * address and the durations are converted, the request number
+             * and the name are not.
+             */
+            const cyrillic = config.uzCyrillic && this.language === 'uz';
+
+            if (cyrillic) {
+                ['status_limit', 'time_in_status', 'address'].forEach((key) => {
+                    sample[key] = toCyrillic(sample[key]);
+                });
+            }
+
+            const html = (cyrillic ? toCyrillic(String(text || '')) : String(text || '')).replace(
                 /\{([a-z_]+)\}/g,
                 (match, key) => (key in sample ? escapeHtml(sample[key]) : match),
             );

@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('layouts.driver-check')
 
 {{--
     One page, two lists: operators (/driver-check/operators) and sales
@@ -34,9 +34,6 @@
              Header
         ============================================================= --}}
         <x-driver-check.page-header
-            icon="operator"
-            tone="brand"
-            :eyebrow="__('telegram.menu.groups.settings')"
             :title="$page['title']"
             :description="$page['description']"
         >
@@ -60,23 +57,23 @@
              Operation | Sales
         ============================================================= --}}
         <nav
-            class="inline-flex w-full gap-1 self-start rounded-xl bg-gray-100 p-1 sm:w-auto dark:bg-white/[0.04]"
+            class="dc-chips inline-flex w-full gap-0.5 self-start rounded-lg bg-gray-100 p-0.5 sm:w-auto dark:bg-white/[0.06]"
             aria-label="{{ __('telegram.operators.form.role') }}"
         >
             @foreach (\App\Models\Telegram\OperationUser::ROLES as $tab)
                 <a
                     href="{{ $tab === \App\Models\Telegram\OperationUser::ROLE_SALES ? route('driver-check.sales') : route('driver-check.operators') }}"
                     @if ($tab === $role) aria-current="page" @endif
-                    class="dc-tap inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-lg px-4 text-[13px] font-medium
-                           transition sm:flex-none
+                    class="dc-tap inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-md px-4 text-[13px] font-medium
+                           transition sm:h-8 sm:flex-none
                            {{ $tab === $role
-                               ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
+                               ? 'bg-white text-gray-950 shadow-sm dark:bg-gray-700 dark:text-white'
                                : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white' }}"
                 >
                     {{ __("telegram.operators.tabs.{$tab}") }}
 
                     <span
-                        class="inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold tabular-nums
+                        class="inline-flex h-5 min-w-5 items-center justify-center rounded px-1.5 text-[11px] font-semibold tabular-nums
                                {{ $tab === $role
                                    ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300'
                                    : 'bg-gray-200/70 text-gray-600 dark:bg-white/[0.08] dark:text-gray-300' }}"
@@ -89,7 +86,7 @@
         {{-- ============================================================
              Counters
         ============================================================= --}}
-        <section class="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
+        <section class="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <x-driver-check.stat-card
                 :label="$page['total']"
                 icon="users"
@@ -100,8 +97,6 @@
             <x-driver-check.stat-card
                 :label="__('telegram.operators.stats.linked')"
                 icon="link"
-                tone="text-brand-600 dark:text-brand-400"
-                chip="bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400"
             >
                 <span x-text="number(stats.linked)">0</span>
             </x-driver-check.stat-card>
@@ -109,8 +104,6 @@
             <x-driver-check.stat-card
                 :label="__('telegram.operators.stats.dm_enabled')"
                 icon="send"
-                tone="text-blue-light-600 dark:text-blue-light-400"
-                chip="bg-blue-light-50 text-blue-light-600 dark:bg-blue-light-500/10 dark:text-blue-light-400"
             >
                 <span x-text="number(stats.dm_enabled)">0</span>
             </x-driver-check.stat-card>
@@ -133,7 +126,7 @@
         {{-- ============================================================
              Rows
 
-             A table from lg up, a card list below it. One layout squeezed
+             A table from xl up, a card list below it. One layout squeezed
              into both widths is what made the columns collide on a phone.
         ============================================================= --}}
         <x-driver-check.surface class="overflow-hidden" x-ref="listTop">
@@ -174,10 +167,10 @@
                 </x-driver-check.field>
             </x-driver-check.filters>
 
-            {{-- Table (lg and up) --}}
-            <div class="hidden lg:block">
+            {{-- Table (xl and up) --}}
+            <div class="hidden xl:block">
                 <div class="overflow-x-auto">
-                    <table class="w-full min-w-[960px] table-fixed text-left">
+                    <table class="w-full min-w-[1040px] table-fixed text-left">
                         <colgroup>
                             @if ($isSales)
                                 <col class="w-[25%]">
@@ -188,10 +181,10 @@
                                 <col class="w-[13%]">
                                 <col class="w-[8%]">
                             @else
-                                <col class="w-[22%]">
-                                <col class="w-[18%]">
+                                <col class="w-[20%]">
+                                <col class="w-[17%]">
                                 <col class="w-[13%]">
-                                <col class="w-[8%]">
+                                <col class="w-[11%]">
                                 <col class="w-[8%]">
                                 <col class="w-[8%]">
                                 <col class="w-[15%]">
@@ -199,8 +192,8 @@
                             @endif
                         </colgroup>
 
-                        <thead class="dc-thead border-b border-gray-200 bg-gray-50/70 dark:border-gray-800 dark:bg-white/[0.02]">
-                            <tr class="text-[10px] uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
+                        <thead class="dc-thead border-b border-gray-200 bg-gray-25 dark:border-gray-800 dark:bg-white/[0.02]">
+                            <tr class="text-[10.5px] uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
                                 <th scope="col" class="px-4 py-2.5 font-semibold">{{ __('telegram.operators.table.operator') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.operators.table.telegram') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.operators.table.dm') }}</th>
@@ -221,13 +214,12 @@
                             <x-driver-check.skeleton-rows :cols="$isSales ? 7 : 8" />
 
                             <template x-for="row in rows" :key="row.id">
-                                <tr class="group align-middle transition hover:bg-gray-50/70 dark:hover:bg-white/[0.02]">
+                                <tr class="group align-middle transition hover:bg-gray-25 dark:hover:bg-white/[0.025]">
                                     {{-- Operator --}}
                                     <td class="px-4 py-3">
                                         <div class="flex items-center gap-3">
                                             <x-driver-check.avatar
                                                 size="sm"
-                                                ::class="avatarClass(row)"
                                                 x-text="initials(row.name)"
                                             />
 
@@ -281,39 +273,35 @@
                                         </div>
                                     </td>
 
-                                    {{-- Delivery, and how we write: language and respect --}}
+                                    {{-- Delivery (dot + label), then how we write: language, respect, address --}}
                                     <td class="px-3 py-3">
-                                        <div class="flex flex-wrap items-center gap-1">
-                                        <x-driver-check.badge ::class="deliveryClass(row)">
+                                        <p class="inline-flex items-center gap-1.5 text-[13px] font-medium text-gray-800 dark:text-gray-100">
                                             <span class="h-1.5 w-1.5 rounded-full" :class="deliveryDot(row)"></span>
                                             <span x-text="deliveryLabel(row)"></span>
-                                        </x-driver-check.badge>
+                                        </p>
+                                        <div class="mt-1 flex flex-wrap items-center gap-1">
                                             <span
-                                                class="rounded-md bg-gray-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-gray-600
-                                                       dark:bg-white/[0.06] dark:text-gray-300"
+                                                class="rounded bg-gray-100 px-1.5 py-px font-mono text-[10px] font-semibold text-gray-600 dark:bg-white/[0.06] dark:text-gray-300"
                                                 :title="translations.form.language"
                                                 x-text="languageOf(row)"
                                             ></span>
                                             <span
                                                 x-show="row.respectful"
                                                 x-cloak
-                                                class="rounded bg-brand-50 px-1.5 py-px text-[10px] font-medium text-brand-700
-                                                       dark:bg-brand-500/10 dark:text-brand-300"
+                                                class="rounded bg-brand-50 px-1.5 py-px text-[10px] font-medium text-brand-700 dark:bg-brand-500/10 dark:text-brand-300"
                                                 x-text="translations.table.respectful"
                                             ></span>
-                    <span
-                        x-show="switchesOff(row).length"
-                        x-cloak
-                        class="rounded bg-warning-50 px-1.5 py-px text-[10px] font-medium text-warning-700
-                               dark:bg-warning-500/10 dark:text-warning-400"
-                        :title="switchesOff(row).join(', ')"
-                        x-text="translations.form.switches_off.replace(':n', switchesOff(row).length)"
-                    ></span>
+                                            <span
+                                                x-show="switchesOff(row).length"
+                                                x-cloak
+                                                class="rounded bg-warning-50 px-1.5 py-px text-[10px] font-medium text-warning-700 dark:bg-warning-500/10 dark:text-warning-400"
+                                                :title="switchesOff(row).join(', ')"
+                                                x-text="translations.form.switches_off.replace(':n', switchesOff(row).length)"
+                                            ></span>
                                             <span
                                                 x-show="addressOf(row)"
                                                 x-cloak
-                                                class="max-w-[9rem] truncate rounded bg-gray-100 px-1.5 py-px text-[10px] font-medium text-gray-600
-                                                       dark:bg-white/[0.06] dark:text-gray-300"
+                                                class="max-w-[9rem] truncate rounded bg-gray-100 px-1.5 py-px text-[10px] font-medium text-gray-600 dark:bg-white/[0.06] dark:text-gray-300"
                                                 :title="translations.form.address_short"
                                                 x-text="addressOf(row)"
                                             ></span>
@@ -389,14 +377,14 @@
                 </div>
             </div>
 
-            {{-- Cards (below lg) --}}
-            <div class="divide-y divide-gray-100 lg:hidden dark:divide-gray-800">
+            {{-- Cards (below xl) --}}
+            <div class="divide-y divide-gray-100 xl:hidden dark:divide-gray-800">
                 <x-driver-check.skeleton-cards />
 
                 <template x-for="row in rows" :key="'card-' + row.id">
-                    <article class="flex flex-col gap-3 p-3.5">
+                    <article class="flex flex-col gap-3 p-4">
                         <div class="flex items-start gap-3">
-                            <x-driver-check.avatar ::class="avatarClass(row)" x-text="initials(row.name)" />
+                            <x-driver-check.avatar x-text="initials(row.name)" />
 
                             <div class="min-w-0 flex-1">
                                 <p class="dc-break text-sm font-semibold text-gray-900 dark:text-white" x-text="row.name"></p>
@@ -407,45 +395,39 @@
                                 ></p>
                             </div>
 
-                            <div class="flex shrink-0 flex-col items-end gap-1">
-                                <x-driver-check.badge ::class="deliveryClass(row)">
-                                    <span class="h-1.5 w-1.5 rounded-full" :class="deliveryDot(row)"></span>
-                                    <span x-text="deliveryLabel(row)"></span>
-                                </x-driver-check.badge>
-
-                                <div class="flex items-center gap-1">
-                                    <span
-                                        class="rounded bg-gray-100 px-1.5 py-px font-mono text-[10px] font-semibold text-gray-600
-                                               dark:bg-white/[0.06] dark:text-gray-300"
-                                        x-text="languageOf(row)"
-                                    ></span>
-                                    <span
-                                        x-show="row.respectful"
-                                        x-cloak
-                                        class="rounded bg-brand-50 px-1.5 py-px text-[10px] font-medium text-brand-700
-                                               dark:bg-brand-500/10 dark:text-brand-300"
-                                        x-text="translations.table.respectful"
-                                    ></span>
-                                            <span
-                                                x-show="switchesOff(row).length"
-                                                x-cloak
-                                                class="rounded bg-warning-50 px-1.5 py-px text-[10px] font-medium text-warning-700
-                                                       dark:bg-warning-500/10 dark:text-warning-400"
-                                                :title="switchesOff(row).join(', ')"
-                                                x-text="translations.form.switches_off.replace(':n', switchesOff(row).length)"
-                                            ></span>
-                                    <span
-                                        x-show="addressOf(row)"
-                                        x-cloak
-                                        class="max-w-[9rem] truncate rounded bg-gray-100 px-1.5 py-px text-[10px] font-medium text-gray-600
-                                               dark:bg-white/[0.06] dark:text-gray-300"
-                                        x-text="addressOf(row)"
-                                    ></span>
-                                </div>
-                            </div>
+                            <p class="inline-flex shrink-0 items-center gap-1.5 pt-0.5 text-[12px] font-medium text-gray-700 dark:text-gray-200">
+                                <span class="h-1.5 w-1.5 rounded-full" :class="deliveryDot(row)"></span>
+                                <span x-text="deliveryLabel(row)"></span>
+                            </p>
                         </div>
 
-                        <dl class="grid grid-cols-2 gap-x-3 gap-y-2.5 rounded-xl bg-gray-50 p-3 dark:bg-white/[0.02]">
+                        <div class="flex flex-wrap items-center gap-1">
+                            <span
+                                class="rounded bg-gray-100 px-1.5 py-px font-mono text-[10px] font-semibold text-gray-600 dark:bg-white/[0.06] dark:text-gray-300"
+                                x-text="languageOf(row)"
+                            ></span>
+                            <span
+                                x-show="row.respectful"
+                                x-cloak
+                                class="rounded bg-brand-50 px-1.5 py-px text-[10px] font-medium text-brand-700 dark:bg-brand-500/10 dark:text-brand-300"
+                                x-text="translations.table.respectful"
+                            ></span>
+                            <span
+                                x-show="switchesOff(row).length"
+                                x-cloak
+                                class="rounded bg-warning-50 px-1.5 py-px text-[10px] font-medium text-warning-700 dark:bg-warning-500/10 dark:text-warning-400"
+                                :title="switchesOff(row).join(', ')"
+                                x-text="translations.form.switches_off.replace(':n', switchesOff(row).length)"
+                            ></span>
+                            <span
+                                x-show="addressOf(row)"
+                                x-cloak
+                                class="max-w-[9rem] truncate rounded bg-gray-100 px-1.5 py-px text-[10px] font-medium text-gray-600 dark:bg-white/[0.06] dark:text-gray-300"
+                                x-text="addressOf(row)"
+                            ></span>
+                        </div>
+
+                        <dl class="grid grid-cols-2 gap-x-3 gap-y-2.5 rounded-lg bg-gray-25 p-3 ring-1 ring-inset ring-gray-100 dark:bg-white/[0.02] dark:ring-gray-800">
                             <x-driver-check.kv :label="__('telegram.operators.table.telegram')" class="col-span-2">
                                 <a
                                     :href="telegramUrl(row.telegram_username)"
@@ -498,7 +480,7 @@
                         <p
                             x-show="row.dm_last_error"
                             x-cloak
-                            class="dc-break rounded-xl bg-error-50 px-3 py-2 text-[11px] leading-snug text-error-600
+                            class="dc-break rounded-lg bg-error-50 px-3 py-2 text-[11px] leading-snug text-error-600
                                    dark:bg-error-500/10 dark:text-error-400"
                         >
                             <span class="font-semibold">{{ __('telegram.operators.errors.dm_last_error') }}:</span>
@@ -534,71 +516,74 @@
     <x-driver-check.modal
         open="formOpen"
         close="closeForm()"
-        size="sm:max-w-lg"
+        size="sm:max-w-xl"
     >
         <x-slot:heading>
             <span x-text="form.id ? @js($page['edit_title']) : @js($page['create'])"></span>
         </x-slot:heading>
 
-        <form id="operator-form" x-on:submit.prevent="save()" class="flex flex-col gap-4">
+        <form id="operator-form" x-on:submit.prevent="save()" class="-mx-4 -my-4 flex flex-col sm:-mx-5">
 
-            {{-- Name --}}
-            <x-driver-check.field
-                :label="__('telegram.operators.form.name')"
-                :hint="$page['name_hint']"
-                for="operator-name"
-            >
-                <x-driver-check.input
-                    id="operator-name"
-                    x-ref="firstField"
-                    x-model="form.name"
-                    required
-                    autocomplete="off"
-                    ::data-invalid="!!(fieldError('name') || fieldError('name_normalized'))"
-                />
+            {{-- Section: who --}}
+            <section class="flex flex-col gap-4 px-4 py-4 sm:px-5">
+                <h3 class="dc-eyebrow">{{ __('telegram.operators.table.operator') }}</h3>
 
-                <x-slot:error>
-                    <p
-                        x-show="form.name"
-                        x-cloak
-                        class="dc-break mt-1.5 rounded-lg bg-gray-50 px-2.5 py-1.5 text-[11px]
-                               text-gray-500 dark:bg-white/[0.03] dark:text-gray-400"
-                    >
-                        {{ __('telegram.operators.form.name_normalized') }}:
-                        <span class="font-mono font-medium text-gray-700 dark:text-gray-200" x-text="normalizedPreview()"></span>
-                    </p>
-
-                    <p
-                        x-show="fieldError('name') || fieldError('name_normalized')"
-                        x-cloak
-                        class="mt-1 text-[11px] font-medium text-error-600 dark:text-error-400"
-                        x-text="fieldError('name') || fieldError('name_normalized')"
-                    ></p>
-                </x-slot:error>
-            </x-driver-check.field>
-
-            {{-- Username --}}
-            <x-driver-check.field
-                :label="__('telegram.operators.form.telegram_username')"
-                :hint="__('telegram.operators.form.telegram_username_hint')"
-                for="operator-username"
-            >
-                <div class="relative">
-                    <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-gray-400">&#64;</span>
-
+                <x-driver-check.field
+                    :label="__('telegram.operators.form.name')"
+                    :hint="$page['name_hint']"
+                    for="operator-name"
+                >
                     <x-driver-check.input
-                        id="operator-username"
-                        x-model="form.telegram_username"
-                        placeholder="username"
+                        id="operator-name"
+                        x-ref="firstField"
+                        x-model="form.name"
+                        required
                         autocomplete="off"
-                        autocapitalize="off"
-                        spellcheck="false"
-                        class="pl-8"
-                        ::data-invalid="!!fieldError('telegram_username')"
+                        ::data-invalid="!!(fieldError('name') || fieldError('name_normalized'))"
                     />
-                </div>
 
-                <x-slot:error>
+                    <x-slot:error>
+                        <p
+                            x-show="form.name"
+                            x-cloak
+                            class="dc-break mt-1.5 rounded-md bg-gray-50 px-2.5 py-1.5 text-[11px]
+                                   text-gray-500 dark:bg-white/[0.03] dark:text-gray-400"
+                        >
+                            {{ __('telegram.operators.form.name_normalized') }}:
+                            <span class="font-mono font-medium text-gray-700 dark:text-gray-200" x-text="normalizedPreview()"></span>
+                        </p>
+
+                        <p
+                            x-show="fieldError('name') || fieldError('name_normalized')"
+                            x-cloak
+                            class="mt-1 text-[11px] font-medium text-error-600 dark:text-error-400"
+                            x-text="fieldError('name') || fieldError('name_normalized')"
+                        ></p>
+                    </x-slot:error>
+                </x-driver-check.field>
+
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <x-driver-check.field
+                        :label="__('telegram.operators.form.telegram_username')"
+                        :hint="__('telegram.operators.form.telegram_username_hint')"
+                        for="operator-username"
+                    >
+                        <div class="relative">
+                            <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-gray-400">&#64;</span>
+
+                            <x-driver-check.input
+                                id="operator-username"
+                                x-model="form.telegram_username"
+                                placeholder="username"
+                                autocomplete="off"
+                                autocapitalize="off"
+                                spellcheck="false"
+                                class="pl-8"
+                                ::data-invalid="!!fieldError('telegram_username')"
+                            />
+                        </div>
+
+                        <x-slot:error>
                     <p
                         x-show="fieldError('telegram_username')"
                         x-cloak
@@ -606,25 +591,24 @@
                         x-text="fieldError('telegram_username')"
                     ></p>
                 </x-slot:error>
-            </x-driver-check.field>
+                    </x-driver-check.field>
 
-            {{-- Telegram id --}}
-            <x-driver-check.field
-                :label="__('telegram.operators.form.telegram_id')"
-                :hint="__('telegram.operators.form.telegram_id_hint')"
-                for="operator-telegram-id"
-            >
-                <x-driver-check.input
-                    id="operator-telegram-id"
-                    type="number"
-                    inputmode="numeric"
-                    min="1"
-                    x-model="form.telegram_id"
-                    placeholder="123456789"
-                    ::data-invalid="!!fieldError('telegram_id')"
-                />
+                    <x-driver-check.field
+                        :label="__('telegram.operators.form.telegram_id')"
+                        :hint="__('telegram.operators.form.telegram_id_hint')"
+                        for="operator-telegram-id"
+                    >
+                        <x-driver-check.input
+                            id="operator-telegram-id"
+                            type="number"
+                            inputmode="numeric"
+                            min="1"
+                            x-model="form.telegram_id"
+                            placeholder="123456789"
+                            ::data-invalid="!!fieldError('telegram_id')"
+                        />
 
-                <x-slot:error>
+                        <x-slot:error>
                     <p
                         x-show="fieldError('telegram_id')"
                         x-cloak
@@ -632,20 +616,21 @@
                         x-text="fieldError('telegram_id')"
                     ></p>
                 </x-slot:error>
-            </x-driver-check.field>
+                    </x-driver-check.field>
+                </div>
 
-            {{-- Operation or Sales --}}
-            <x-driver-check.field
-                :label="__('telegram.operators.form.role')"
-                :hint="__('telegram.operators.form.role_hint')"
-                for="operator-role"
-            >
-                <x-driver-check.select id="operator-role" x-model="form.role">
-                    <option value="operation">{{ __('telegram.operators.roles.operation') }}</option>
-                    <option value="sales">{{ __('telegram.operators.roles.sales') }}</option>
-                </x-driver-check.select>
+                {{-- Operation or Sales --}}
+                <x-driver-check.field
+                    :label="__('telegram.operators.form.role')"
+                    :hint="__('telegram.operators.form.role_hint')"
+                    for="operator-role"
+                >
+                    <x-driver-check.select id="operator-role" x-model="form.role">
+                        <option value="operation">{{ __('telegram.operators.roles.operation') }}</option>
+                        <option value="sales">{{ __('telegram.operators.roles.sales') }}</option>
+                    </x-driver-check.select>
 
-                <x-slot:error>
+                    <x-slot:error>
                     <p
                         x-show="fieldError('role')"
                         x-cloak
@@ -653,10 +638,13 @@
                         x-text="fieldError('role')"
                     ></p>
                 </x-slot:error>
-            </x-driver-check.field>
+                </x-driver-check.field>
+            </section>
 
-            {{-- How penalty comments are written to this person --}}
-            <div class="grid gap-3 sm:grid-cols-2">
+            {{-- Section: how penalty comments are written to this person --}}
+            <section class="flex flex-col gap-4 border-t border-gray-100 px-4 py-4 sm:px-5 dark:border-gray-800">
+                <h3 class="dc-eyebrow">{{ __('telegram.operators.form.language') }}</h3>
+
                 <x-driver-check.field
                     :label="__('telegram.operators.form.language')"
                     :hint="__('telegram.operators.form.language_hint')"
@@ -670,168 +658,175 @@
                     </x-driver-check.select>
 
                     <x-slot:error>
-                        <p
-                            x-show="fieldError('language')"
-                            x-cloak
-                            class="mt-1 text-[11px] font-medium text-error-600 dark:text-error-400"
-                            x-text="fieldError('language')"
-                        ></p>
-                    </x-slot:error>
+                    <p
+                        x-show="fieldError('language')"
+                        x-cloak
+                        class="mt-1 text-[11px] font-medium text-error-600 dark:text-error-400"
+                        x-text="fieldError('language')"
+                    ></p>
+                </x-slot:error>
                 </x-driver-check.field>
 
-                <label
-                    class="dc-tap flex cursor-pointer items-start gap-3 self-start rounded-2xl border p-3 transition sm:mt-5"
-                    :class="form.respectful
-                        ? 'border-brand-500 bg-brand-25 dark:border-brand-500/50 dark:bg-brand-500/[0.07]'
-                        : 'border-gray-200 bg-white hover:bg-gray-50 dark:border-gray-800 dark:bg-transparent dark:hover:bg-white/[0.03]'"
-                >
-                    <input
-                        type="checkbox"
-                        x-model="form.respectful"
-                        class="mt-0.5 h-5 w-5 shrink-0 rounded-md border-gray-300 text-brand-500
-                               focus:ring-brand-500/30 dark:border-gray-600 dark:bg-gray-900"
-                    >
-                    <span class="min-w-0">
-                        <span class="block text-sm font-medium text-gray-900 dark:text-white">
-                            {{ __('telegram.operators.form.respectful') }}
-                        </span>
-                        <span class="mt-0.5 block text-[11px] leading-snug text-gray-500 dark:text-gray-400">
-                            {{ __('telegram.operators.form.respectful_hint') }}
-                        </span>
-                    </span>
-                </label>
-            </div>
-
-            {{-- How to call the person: "Ali aka", "jigar" - {address} in the texts --}}
-            <div>
-                <div class="grid gap-3 sm:grid-cols-2">
-                @foreach (\App\Models\Telegram\OperationUser::LANGUAGES as $language)
-                    <x-driver-check.field
-                        :label="__('telegram.operators.form.address', ['language' => __('telegram.penalty_settings.languages.' . $language)])"
-                        for="operator-address-{{ $language }}"
-                    >
-                        <x-driver-check.input
-                            id="operator-address-{{ $language }}"
-                            x-model="form.address.{{ $language }}"
-                            maxlength="60"
-                            autocomplete="off"
-                            placeholder="{{ __('telegram.operators.form.address_placeholder.' . $language) }}"
-                            ::data-invalid="!!fieldError('address.{{ $language }}')"
-                        />
-
-                        <x-slot:error>
-                            <p
-                                x-show="fieldError('address.{{ $language }}')"
-                                x-cloak
-                                class="mt-1 text-[11px] font-medium text-error-600 dark:text-error-400"
-                                x-text="fieldError('address.{{ $language }}')"
-                            ></p>
-                        </x-slot:error>
-                    </x-driver-check.field>
-                @endforeach
-                </div>
-
-                <p class="mt-1 text-[11px] leading-snug text-gray-400 dark:text-gray-500">
-                    {{ __('telegram.operators.form.address_hint') }}
-                </p>
-            </div>
-
-            {{-- The only switch: copy the report into the operator's private chat --}}
-            <label
-                class="dc-tap flex cursor-pointer items-start gap-3 rounded-2xl border p-3.5 transition"
-                :class="form.dm_enabled
-                    ? 'border-brand-500 bg-brand-25 dark:border-brand-500/50 dark:bg-brand-500/[0.07]'
-                    : 'border-gray-200 bg-white hover:bg-gray-50 dark:border-gray-800 dark:bg-transparent dark:hover:bg-white/[0.03]'"
-            >
-                <input
-                    type="checkbox"
-                    x-model="form.dm_enabled"
-                    class="mt-0.5 h-5 w-5 shrink-0 rounded-md border-gray-300 text-brand-500
-                           focus:ring-brand-500/30 dark:border-gray-600 dark:bg-gray-900"
-                >
-
-                <span class="min-w-0">
-                    <span class="block text-sm font-medium text-gray-900 dark:text-white">
-                        {{ __('telegram.operators.form.dm_enabled') }}
-                    </span>
-                    <span class="mt-0.5 block text-[11px] leading-snug text-gray-500 dark:text-gray-400">
-                        {{ $page['dm_enabled_hint'] }}
-                    </span>
-                </span>
-            </label>
-
-            {{-- What goes to the private chat, one by one (OperationUser::MESSAGE_SWITCHES) --}}
-            <div x-show="form.dm_enabled" x-collapse class="rounded-2xl border border-gray-200 p-3.5 dark:border-gray-800">
-                <p class="text-sm font-medium text-gray-900 dark:text-white">
-                    {{ __('telegram.operators.form.switches') }}
-                </p>
-                <p class="mt-0.5 text-[11px] leading-snug text-gray-500 dark:text-gray-400">
-                    {{ __('telegram.operators.form.switches_hint') }}
-                </p>
-
-                <div class="mt-2.5 flex flex-col gap-1">
-                    @foreach (\App\Models\Telegram\OperationUser::MESSAGE_SWITCHES as $switch)
-                        <label class="dc-tap flex cursor-pointer items-start gap-3 rounded-xl px-2 py-1.5 transition hover:bg-gray-50 dark:hover:bg-white/[0.03]">
-                            <input
-                                type="checkbox"
-                                x-model="form.switches.{{ $switch }}"
-                                class="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-brand-500
-                                       focus:ring-brand-500/30 dark:border-gray-600 dark:bg-gray-900"
+                {{-- How to call the person: "Ali aka", "jigar" - {address} in the texts --}}
+                <div>
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        @foreach (\App\Models\Telegram\OperationUser::LANGUAGES as $language)
+                            <x-driver-check.field
+                                :label="__('telegram.operators.form.address', ['language' => __('telegram.penalty_settings.languages.' . $language)])"
+                                for="operator-address-{{ $language }}"
                             >
+                                <x-driver-check.input
+                                    id="operator-address-{{ $language }}"
+                                    x-model="form.address.{{ $language }}"
+                                    maxlength="60"
+                                    autocomplete="off"
+                                    placeholder="{{ __('telegram.operators.form.address_placeholder.' . $language) }}"
+                                    ::data-invalid="!!fieldError('address.{{ $language }}')"
+                                />
 
-                            <span class="min-w-0">
-                                <span class="block text-[13px] font-medium text-gray-800 dark:text-gray-200">
-                                    {{ __('telegram.operators.form.switch.' . $switch . '.label') }}
-                                </span>
-                                <span class="block text-[11px] leading-snug text-gray-500 dark:text-gray-400">
-                                    {{ __('telegram.operators.form.switch.' . $switch . '.hint') }}
-                                </span>
-                            </span>
-                        </label>
-                    @endforeach
+                                <x-slot:error>
+                                    <p
+                                        x-show="fieldError('address.{{ $language }}')"
+                                        x-cloak
+                                        class="mt-1 text-[11px] font-medium text-error-600 dark:text-error-400"
+                                        x-text="fieldError('address.{{ $language }}')"
+                                    ></p>
+                                </x-slot:error>
+                            </x-driver-check.field>
+                        @endforeach
+                    </div>
+
+                    <p class="mt-1.5 text-[11.5px] leading-snug text-gray-400 dark:text-gray-500">
+                        {{ __('telegram.operators.form.address_hint') }}
+                    </p>
                 </div>
-            </div>
 
-            <p
-                x-show="formError"
-                x-cloak
-                class="dc-break rounded-xl bg-error-50 px-3 py-2.5 text-xs text-error-600
-                       dark:bg-error-500/10 dark:text-error-400"
-                x-text="formError"
-            ></p>
+                {{-- Respectful form of address --}}
+                <div class="dc-surface overflow-hidden rounded-xl">
+                    <label class="dc-tap flex cursor-pointer items-center justify-between gap-4 px-3.5 py-3 transition hover:bg-gray-25 dark:hover:bg-white/[0.025]">
+                        <span class="min-w-0">
+                            <span class="block text-[13px] font-medium text-gray-900 dark:text-white">
+                                {{ __('telegram.operators.form.respectful') }}
+                            </span>
+                            <span class="mt-0.5 block text-[11.5px] leading-snug text-gray-500 dark:text-gray-400">
+                                {{ __('telegram.operators.form.respectful_hint') }}
+                            </span>
+                        </span>
+                        <input type="checkbox" x-model="form.respectful" class="peer sr-only">
+                        <span
+                        class="relative h-5 w-9 shrink-0 rounded-full bg-gray-200 transition-colors
+                               after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white
+                               after:shadow-sm after:transition-transform peer-checked:bg-brand-500 peer-checked:after:translate-x-4
+                               peer-focus-visible:ring-2 peer-focus-visible:ring-brand-500/40 dark:bg-white/[0.14]"
+                    ></span>
+                    </label>
+                </div>
+            </section>
 
-            {{-- Delete: only a row nothing points at yet --}}
+            {{-- Section: the private chat. The master switch, then what goes there one by one
+                 (OperationUser::MESSAGE_SWITCHES) --}}
+            <section class="flex flex-col gap-3 border-t border-gray-100 px-4 py-4 sm:px-5 dark:border-gray-800">
+                <h3 class="dc-eyebrow">{{ __('telegram.operators.form.dm_enabled') }}</h3>
+
+                <div class="dc-surface overflow-hidden rounded-xl">
+                    <label class="dc-tap flex cursor-pointer items-center justify-between gap-4 px-3.5 py-3 transition hover:bg-gray-25 dark:hover:bg-white/[0.025]">
+                        <span class="min-w-0">
+                            <span class="block text-[13px] font-medium text-gray-900 dark:text-white">
+                                {{ __('telegram.operators.form.dm_enabled') }}
+                            </span>
+                            <span class="mt-0.5 block text-[11.5px] leading-snug text-gray-500 dark:text-gray-400">
+                                {{ $page['dm_enabled_hint'] }}
+                            </span>
+                        </span>
+                        <input type="checkbox" x-model="form.dm_enabled" class="peer sr-only">
+                        <span
+                        class="relative h-5 w-9 shrink-0 rounded-full bg-gray-200 transition-colors
+                               after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white
+                               after:shadow-sm after:transition-transform peer-checked:bg-brand-500 peer-checked:after:translate-x-4
+                               peer-focus-visible:ring-2 peer-focus-visible:ring-brand-500/40 dark:bg-white/[0.14]"
+                    ></span>
+                    </label>
+
+                    <div x-show="form.dm_enabled" x-collapse>
+                        <div class="border-t border-gray-100 bg-gray-25 px-3.5 py-2.5 dark:border-gray-800 dark:bg-white/[0.015]">
+                            <p class="text-[12px] font-semibold text-gray-600 dark:text-gray-400">
+                                {{ __('telegram.operators.form.switches') }}
+                            </p>
+                            <p class="mt-0.5 text-[11.5px] leading-snug text-gray-500 dark:text-gray-400">
+                                {{ __('telegram.operators.form.switches_hint') }}
+                            </p>
+                        </div>
+
+                        <div class="divide-y divide-gray-100 border-t border-gray-100 dark:divide-gray-800 dark:border-gray-800">
+                            @foreach (\App\Models\Telegram\OperationUser::MESSAGE_SWITCHES as $switch)
+                                <label class="dc-tap flex cursor-pointer items-center justify-between gap-4 px-3.5 py-2.5 transition hover:bg-gray-25 dark:hover:bg-white/[0.025]">
+                                    <span class="min-w-0">
+                                        <span class="block text-[13px] font-medium text-gray-800 dark:text-gray-200">
+                                            {{ __('telegram.operators.form.switch.' . $switch . '.label') }}
+                                        </span>
+                                        <span class="block text-[11.5px] leading-snug text-gray-500 dark:text-gray-400">
+                                            {{ __('telegram.operators.form.switch.' . $switch . '.hint') }}
+                                        </span>
+                                    </span>
+                                    <input type="checkbox" x-model="form.switches.{{ $switch }}" class="peer sr-only">
+                                    <span
+                        class="relative h-5 w-9 shrink-0 rounded-full bg-gray-200 transition-colors
+                               after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white
+                               after:shadow-sm after:transition-transform peer-checked:bg-brand-500 peer-checked:after:translate-x-4
+                               peer-focus-visible:ring-2 peer-focus-visible:ring-brand-500/40 dark:bg-white/[0.14]"
+                    ></span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {{-- Errors and delete. Delete: only a row nothing points at yet --}}
             <div
-                x-show="form.id && form.deletable"
+                x-show="formError || (form.id && form.deletable)"
                 x-cloak
-                class="flex flex-col gap-2 rounded-2xl border border-gray-200 p-3.5 sm:flex-row sm:items-center sm:justify-between
-                       dark:border-gray-800"
+                class="flex flex-col gap-3 border-t border-gray-100 px-4 py-4 sm:px-5 dark:border-gray-800"
             >
                 <p
-                    class="text-[11px] leading-snug text-gray-500 dark:text-gray-400"
-                    x-text="deleteArmed ? translations.confirm.delete_text : translations.form.delete_hint"
+                    x-show="formError"
+                    x-cloak
+                    class="dc-break rounded-lg bg-error-50 px-3 py-2.5 text-xs text-error-600
+                           dark:bg-error-500/10 dark:text-error-400"
+                    x-text="formError"
                 ></p>
 
-                <div class="flex shrink-0 gap-2">
-                    <x-driver-check.button
-                        size="sm"
-                        variant="ghost"
-                        x-show="deleteArmed"
-                        x-cloak
-                        x-on:click="deleteArmed = false"
-                        ::disabled="saving"
-                    >
-                        {{ __('telegram.operators.confirm.cancel') }}
-                    </x-driver-check.button>
+                <div
+                    x-show="form.id && form.deletable"
+                    x-cloak
+                    class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+                >
+                    <p
+                        class="text-[11.5px] leading-snug text-gray-500 dark:text-gray-400"
+                        x-text="deleteArmed ? translations.confirm.delete_text : translations.form.delete_hint"
+                    ></p>
 
-                    <x-driver-check.button
-                        size="sm"
-                        variant="danger"
-                        x-on:click="remove()"
-                        ::disabled="saving"
-                    >
-                        <span x-text="deleteArmed ? translations.confirm.delete : translations.form.delete"></span>
-                    </x-driver-check.button>
+                    <div class="flex shrink-0 gap-2">
+                        <x-driver-check.button
+                            size="sm"
+                            variant="ghost"
+                            x-show="deleteArmed"
+                            x-cloak
+                            x-on:click="deleteArmed = false"
+                            ::disabled="saving"
+                        >
+                            {{ __('telegram.operators.confirm.cancel') }}
+                        </x-driver-check.button>
+
+                        <x-driver-check.button
+                            size="sm"
+                            variant="danger"
+                            x-on:click="remove()"
+                            ::disabled="saving"
+                        >
+                            <span x-text="deleteArmed ? translations.confirm.delete : translations.form.delete"></span>
+                        </x-driver-check.button>
+                    </div>
                 </div>
             </div>
         </form>

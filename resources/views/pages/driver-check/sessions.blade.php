@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('layouts.driver-check')
 
 @section('title', __('telegram.sessions.title'))
 
@@ -18,13 +18,9 @@
 >
     <x-driver-check.shell>
 
-        {{-- ============================================================
-             Header
-        ============================================================= --}}
+        {{-- Header --}}
         <x-driver-check.page-header
             icon="telegram"
-            tone="blue"
-            :eyebrow="__('telegram.menu.groups.settings')"
             :title="__('telegram.sessions.title')"
             :description="__('telegram.sessions.description')"
         >
@@ -46,29 +42,18 @@
 
         {{-- Why nothing happens instantly --}}
         <div
-            class="flex items-start gap-3 rounded-2xl border border-blue-light-200 bg-blue-light-25 p-3.5 text-[13px]
-                   leading-relaxed text-blue-light-800 sm:p-4 dark:border-blue-light-500/30
-                   dark:bg-blue-light-500/[0.07] dark:text-blue-light-300"
+            class="flex items-start gap-2.5 rounded-2xl border border-gray-200 bg-gray-25 px-3.5 py-2.5 text-[13px] leading-relaxed text-gray-600 dark:border-gray-800 dark:bg-white/[0.02] dark:text-gray-300"
         >
             <x-driver-check.icon name="clock" class="mt-0.5 h-4 w-4 shrink-0" />
             <p>{{ __('telegram.sessions.notice') }}</p>
         </div>
 
-        {{-- ============================================================
-             Counters (click to filter)
-        ============================================================= --}}
+        {{-- Counters (click to filter) --}}
         <section class="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
-            @foreach ([
-                'authorized' => ['icon' => 'check-circle', 'tone' => 'text-success-600 dark:text-success-400', 'chip' => 'bg-success-50 text-success-600 dark:bg-success-500/10 dark:text-success-400'],
-                'pending' => ['icon' => 'clock', 'tone' => 'text-warning-600 dark:text-warning-400', 'chip' => 'bg-warning-50 text-warning-600 dark:bg-warning-500/10 dark:text-warning-400'],
-                'problem' => ['icon' => 'alert', 'tone' => 'text-error-600 dark:text-error-400', 'chip' => 'bg-error-50 text-error-600 dark:bg-error-500/10 dark:text-error-400'],
-                'logged_out' => ['icon' => 'unlink', 'tone' => 'text-gray-900 dark:text-white', 'chip' => 'bg-gray-100 text-gray-600 dark:bg-white/[0.06] dark:text-gray-300'],
-            ] as $key => $tile)
+            @foreach (['authorized' => 'check-circle', 'pending' => 'clock', 'problem' => 'alert', 'logged_out' => 'unlink'] as $key => $icon)
                 <x-driver-check.stat-card
                     :label="__('telegram.sessions.stats.' . $key)"
-                    :icon="$tile['icon']"
-                    :tone="$tile['tone']"
-                    :chip="$tile['chip']"
+                    :icon="$icon"
                     role="button"
                     tabindex="0"
                     class="dc-tap cursor-pointer select-none"
@@ -83,9 +68,7 @@
 
         <x-driver-check.error-alert :title="__('telegram.sessions.errors.title')" />
 
-        {{-- ============================================================
-             Rows
-        ============================================================= --}}
+        {{-- Rows --}}
         <x-driver-check.surface class="overflow-hidden" x-ref="listTop">
             <x-driver-check.filters
                 embedded
@@ -121,7 +104,7 @@
                         </colgroup>
 
                         <thead class="dc-thead border-b border-gray-200 bg-gray-50/70 dark:border-gray-800 dark:bg-white/[0.02]">
-                            <tr class="text-[10px] uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
+                            <tr class="text-[10.5px] uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
                                 <th scope="col" class="px-4 py-2.5 font-semibold">{{ __('telegram.sessions.table.account') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.sessions.table.status') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('telegram.sessions.table.processes') }}</th>
@@ -134,13 +117,12 @@
                             <x-driver-check.skeleton-rows :cols="5" />
 
                             <template x-for="row in rows" :key="row.id">
-                                <tr class="group align-middle transition hover:bg-gray-50/70 dark:hover:bg-white/[0.02]">
+                                <tr class="group align-middle transition-colors hover:bg-gray-25 dark:hover:bg-white/[0.025]">
                                     {{-- Account --}}
                                     <td class="px-4 py-3">
                                         <div class="flex items-center gap-3">
                                             <x-driver-check.avatar
                                                 size="sm"
-                                                ::class="avatarClass(row)"
                                                 x-text="avatarText(row)"
                                             />
 
@@ -155,8 +137,8 @@
                                                     <span
                                                         x-show="row.is_primary"
                                                         x-cloak
-                                                        class="shrink-0 rounded-md bg-brand-50 px-1.5 py-0.5 text-[10px] font-semibold
-                                                               text-brand-600 dark:bg-brand-500/10 dark:text-brand-400"
+                                                        class="shrink-0 rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold
+                                                               text-gray-600 dark:bg-white/[0.07] dark:text-gray-300"
                                                         title="{{ __('telegram.sessions.primary_hint') }}"
                                                     >{{ __('telegram.sessions.primary') }}</span>
                                                 </div>
@@ -177,10 +159,7 @@
 
                                     {{-- Status --}}
                                     <td class="px-3 py-3">
-                                        <x-driver-check.badge ::class="stateClass(row)">
-                                            <span class="h-1.5 w-1.5 rounded-full" :class="stateDot(row)"></span>
-                                            <span x-text="stateLabel(row)"></span>
-                                        </x-driver-check.badge>
+                                        <span class="inline-flex items-center gap-1.5 whitespace-nowrap text-[12.5px] font-medium text-gray-700 dark:text-gray-200"><span class="h-1.5 w-1.5 rounded-full" :class="stateDot(row)"></span><span x-text="stateLabel(row)"></span></span>
 
                                         <p
                                             x-show="row.last_error"
@@ -248,7 +227,7 @@
                 <template x-for="row in rows" :key="'card-' + row.id">
                     <article class="flex flex-col gap-3 p-3.5">
                         <div class="flex items-start gap-3">
-                            <x-driver-check.avatar ::class="avatarClass(row)" x-text="avatarText(row)" />
+                            <x-driver-check.avatar x-text="avatarText(row)" />
 
                             <div class="min-w-0 flex-1">
                                 <p class="dc-break text-sm font-semibold text-gray-900 dark:text-white">
@@ -256,8 +235,8 @@
                                     <span
                                         x-show="row.is_primary"
                                         x-cloak
-                                        class="ml-1 rounded-md bg-brand-50 px-1.5 py-0.5 text-[10px] font-semibold
-                                               text-brand-600 dark:bg-brand-500/10 dark:text-brand-400"
+                                        class="ml-1 rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold
+                                               text-gray-600 dark:bg-white/[0.07] dark:text-gray-300"
                                     >{{ __('telegram.sessions.primary') }}</span>
                                 </p>
                                 <p class="dc-break text-[11px] tabular-nums text-gray-500 dark:text-gray-400">
@@ -268,10 +247,7 @@
                                 </p>
                             </div>
 
-                            <x-driver-check.badge ::class="stateClass(row)">
-                                <span class="h-1.5 w-1.5 rounded-full" :class="stateDot(row)"></span>
-                                <span x-text="stateLabel(row)"></span>
-                            </x-driver-check.badge>
+                            <span class="inline-flex items-center gap-1.5 whitespace-nowrap text-[12.5px] font-medium text-gray-700 dark:text-gray-200"><span class="h-1.5 w-1.5 rounded-full" :class="stateDot(row)"></span><span x-text="stateLabel(row)"></span></span>
                         </div>
 
                         <div x-show="processes(row).length > 0" class="flex flex-wrap gap-1">
@@ -325,9 +301,7 @@
         </x-driver-check.surface>
     </x-driver-check.shell>
 
-    {{-- ================================================================
-         Details
-    ================================================================= --}}
+    {{-- Details --}}
     <x-driver-check.modal open="detailOpen" close="closeDetail()" size="sm:max-w-xl">
         <x-slot:heading>
             <span x-text="detail ? displayName(detail) : ''"></span>
@@ -336,16 +310,13 @@
         <template x-if="detail">
             <div class="flex flex-col gap-4">
                 <div class="flex flex-wrap items-center gap-2">
-                    <x-driver-check.badge ::class="stateClass(detail)">
-                        <span class="h-1.5 w-1.5 rounded-full" :class="stateDot(detail)"></span>
-                        <span x-text="stateLabel(detail)"></span>
-                    </x-driver-check.badge>
+                    <span class="inline-flex items-center gap-1.5 whitespace-nowrap text-[12.5px] font-medium text-gray-700 dark:text-gray-200"><span class="h-1.5 w-1.5 rounded-full" :class="stateDot(detail)"></span><span x-text="stateLabel(detail)"></span></span>
 
                     <span
                         x-show="detail.is_primary"
                         x-cloak
-                        class="rounded-full bg-brand-50 px-2.5 py-1 text-[11px] font-medium text-brand-600
-                               dark:bg-brand-500/10 dark:text-brand-400"
+                        class="rounded-md bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-600
+                               dark:bg-white/[0.07] dark:text-gray-300"
                     >{{ __('telegram.sessions.primary_hint') }}</span>
                 </div>
 
@@ -369,7 +340,7 @@
                     ></p>
                 </div>
 
-                <dl class="grid grid-cols-2 gap-x-3 gap-y-3 rounded-xl bg-gray-50 p-3 dark:bg-white/[0.02]">
+                <dl class="grid grid-cols-2 gap-x-3 gap-y-3 rounded-xl bg-gray-25 p-3 dark:bg-white/[0.02]">
                     <x-driver-check.kv :label="__('telegram.sessions.table.phone')">
                         <span class="tabular-nums" x-text="phone(detail.phone)"></span>
                     </x-driver-check.kv>
@@ -510,8 +481,10 @@
         </template>
 
         <x-slot:footer>
+            {{-- Destructive actions sit apart on the left; safe ones stay at the right. --}}
+            <div class="flex flex-col-reverse gap-2 sm:mr-auto sm:flex-row">
             <template x-if="detail && canDelete(detail)">
-                <x-driver-check.button variant="ghost" x-on:click="askConfirm('delete')" ::disabled="!!detailBusy">
+                <x-driver-check.button variant="ghost" class="!text-error-600 hover:!bg-error-50 dark:!text-error-400 dark:hover:!bg-error-500/10" x-on:click="askConfirm('delete')" ::disabled="!!detailBusy">
                     {{ __('telegram.sessions.actions.delete') }}
                 </x-driver-check.button>
             </template>
@@ -521,6 +494,7 @@
                     {{ __('telegram.sessions.actions.logout') }}
                 </x-driver-check.button>
             </template>
+            </div>
 
             <template x-if="detail && canRestartLogin(detail)">
                 <x-driver-check.button variant="primary" x-on:click="openLogin(detail)">
@@ -547,28 +521,27 @@
         </x-slot:footer>
     </x-driver-check.modal>
 
-    {{-- ================================================================
-         Login wizard: phone -> code -> [2FA password] -> done
-    ================================================================= --}}
+    {{-- Login wizard: phone -> code -> [2FA password] -> done --}}
     <x-driver-check.modal open="loginOpen" close="closeLogin()" size="sm:max-w-md">
         <x-slot:heading>
             <span x-text="login.account ? phone(login.account.phone) : translations.login.title"></span>
         </x-slot:heading>
 
-        {{-- Progress --}}
-        <ol class="mb-4 flex items-center gap-2 text-[11px] font-medium text-gray-400 dark:text-gray-500">
+        {{-- Progress: three numbered steps on one line --}}
+        <ol class="mb-5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
             <template x-for="(step, index) in ['phone', 'code', 'password']" :key="step">
-                <li class="flex flex-1 items-center gap-2">
+                <li class="flex flex-1 items-center gap-2" :class="stepperState(index) === 'current' && 'text-gray-900 dark:text-white'">
                     <span
-                        class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold"
+                        class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[11px] font-bold tabular-nums"
                         :class="{
                             done: 'bg-success-500 text-white',
-                            current: 'bg-brand-500 text-white',
+                            current: 'bg-gray-900 text-white dark:bg-white dark:text-gray-900',
                             todo: 'bg-gray-100 dark:bg-white/[0.06]',
                         }[stepperState(index)]"
                         x-text="index + 1"
                     ></span>
                     <span class="truncate" x-text="translations.login.steps[step]"></span>
+                    <span class="h-px min-w-3 flex-1 bg-gray-200 dark:bg-gray-800" x-show="index < 2"></span>
                 </li>
             </template>
         </ol>
@@ -610,7 +583,7 @@
 
         {{-- Step: waiting for the CLI --}}
         <div x-show="loginWaiting()" x-cloak class="flex flex-col items-center py-6 text-center">
-            <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-light-50 text-blue-light-600 dark:bg-blue-light-500/10 dark:text-blue-light-400">
+            <span class="flex h-12 w-12 items-center justify-center rounded-xl border border-gray-200 text-gray-500 dark:border-gray-800 dark:text-gray-400">
                 <x-driver-check.icon name="refresh" class="h-5 w-5 animate-spin" />
             </span>
 
@@ -718,7 +691,7 @@
 
         {{-- Step: done --}}
         <div x-show="loginStep() === 'done'" x-cloak class="flex flex-col items-center py-6 text-center">
-            <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-success-50 text-success-600 dark:bg-success-500/10 dark:text-success-400">
+            <span class="flex h-12 w-12 items-center justify-center rounded-xl border border-success-500/30 text-success-600 dark:text-success-400">
                 <x-driver-check.icon name="check-circle" class="h-6 w-6" />
             </span>
 
@@ -732,7 +705,7 @@
 
         {{-- Step: failed --}}
         <div x-show="loginStep() === 'failed'" x-cloak class="flex flex-col items-center py-6 text-center">
-            <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-error-50 text-error-600 dark:bg-error-500/10 dark:text-error-400">
+            <span class="flex h-12 w-12 items-center justify-center rounded-xl border border-error-500/30 text-error-600 dark:text-error-400">
                 <x-driver-check.icon name="x-circle" class="h-6 w-6" />
             </span>
 
@@ -792,9 +765,7 @@
         </x-slot:footer>
     </x-driver-check.modal>
 
-    {{-- ================================================================
-         Confirmation: logout / delete
-    ================================================================= --}}
+    {{-- Confirmation: logout / delete --}}
     <x-driver-check.modal open="confirmOpen" close="closeConfirm()" size="sm:max-w-md">
         <x-slot:heading>
             <span x-text="confirmAction === 'delete' ? translations.confirm.delete_title : translations.confirm.logout_title"></span>
