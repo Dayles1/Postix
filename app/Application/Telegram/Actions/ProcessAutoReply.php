@@ -9,7 +9,7 @@ use App\Application\Telegram\Services\AutoReplyMatcher;
 use App\Application\Telegram\Services\AutoReplyRules;
 use App\Application\Telegram\Services\AutoReplyStore;
 use App\Application\Telegram\Services\ClientCheckRules;
-use App\Application\Telegram\Services\ClientCheckRulesStore;
+use App\Application\Telegram\Services\PenaltyAgent;
 use App\Application\Telegram\Services\PenaltyOpening;
 use App\Application\Telegram\Services\PersonalAnswers;
 use App\Models\Telegram\OperationUser;
@@ -47,7 +47,7 @@ final class ProcessAutoReply
         private readonly AutoReplyMatcher $matcher,
         private readonly AutoReplyDelivery $delivery,
         private readonly PersonalAnswers $personal,
-        private readonly ClientCheckRulesStore $checkRules,
+        private readonly PenaltyAgent $agent,
     ) {
     }
 
@@ -138,7 +138,7 @@ final class ProcessAutoReply
          * an agreement to thank for: the penalty keeps the reply, nothing is
          * sent.
          */
-        if ($open && $this->threatened($check, $person)) {
+        if ($open && ! $this->agent->mayAnswer($check, $person)) {
             return null;
         }
 
@@ -282,22 +282,6 @@ final class ProcessAutoReply
         $person?->update(['telegram_id' => $senderId]);
 
         return $person;
-    }
-
-    /**
-     * The penalty's comment was the top level's of an operator's ladder -
-     * the one that says the request goes to someone else.
-     */
-    private function threatened(TelegramClientCheck $check, OperationUser $person): bool
-    {
-        if ($check->comment_level === null || $person->isSales()) {
-            return false;
-        }
-
-        $role = $person->roleOrDefault();
-        $top = $this->checkRules->current()->topLevel($role);
-
-        return $top >= 1 && (int) $check->comment_level >= $top;
     }
 
     private function cooldownKey(OperationUser $person): string
