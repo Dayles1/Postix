@@ -256,6 +256,8 @@ final class ContactSyncService
 
             $ids = $group->users()
                 ->whereDoesntHave('contact')
+                /* Somebody's contact already (read from an account): not added to a second one. */
+                ->whereDoesntHave('accountLinks')
                 ->where('is_bot', false)
                 ->orderBy('telegram_scraped_users.id')
                 ->get();
@@ -649,6 +651,7 @@ final class ContactSyncService
         return TelegramScrapedUser::query()
             ->where('is_bot', false)
             ->whereDoesntHave('contact')
+            ->whereDoesntHave('accountLinks')
             ->whereHas('groups', fn ($q) => $q->whereIn('telegram_scrape_groups.id', $groups->pluck('id')))
             ->exists();
     }

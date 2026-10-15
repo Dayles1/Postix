@@ -207,6 +207,48 @@ final class ContactAccountsTest extends TestCase
         $this->assertSame([51, 52], $names('not_on_account'));
     }
 
+    public function test_somebody_already_held_by_one_account_is_not_collected_for_another(): void
+    {
+        $group = TelegramScrapeGroup::create(['link' => 'one']);
+        $person = $this->person(60);
+        $person->groups()->attach($group->id);
+
+        $service = $this->app->make(\App\Application\Telegram\Services\ContactSyncService::class);
+        $unclaimed = new \ReflectionMethod($service, 'hasUnclaimed');
+        $groups = collect([$group]);
+
+        $this->assertTrue($unclaimed->invoke($service, $groups), 'nobody has them: the sync may take them');
+
+        /* Account 2 was read and holds them - no owner row, only the account's own contact. */
+        DB::table('telegram_account_contact_links')->insert(['telegram_account_id' => 2, 'scraped_user_id' => $person->id, 'synced_at' => now()]);
+
+        $this->assertFalse($unclaimed->invoke($service, $groups), 'held by an account: not for a second one');
+
+        /* Held by two accounts is what a read of both gives; the person is still one row. */
+        DB::table('telegram_account_contact_links')->insert(['telegram_account_id' => 1, 'scraped_user_id' => $person->id, 'synced_at' => now()]);
+
+        $this->assertSame(2, DB::table('telegram_account_contact_links')->where('scraped_user_id', $person->id)->count());
+        $this->assertSame(1, TelegramScrapedUser::query()->where('telegram_user_id', 60)->count());
+    }
+
+    public function test_a_phone_is_stored_in_one_form_whoever_creates_the_row(): void
+    {
+        $messy = ['+998 99 910-62-35', '998999106235', '00998 (99) 910 62 35', '+998999106235'];
+
+        foreach ($messy as $spelling) {
+            $this->assertSame('+998999106235', TelegramAccount::normalizePhone($spelling), $spelling);
+        }
+
+        $account = TelegramAccount::query()->create(['phone' => '+90 505 516-88-68']);
+        $this->assertSame('+905055168868', $account->phone);
+        $this->assertSame('+905055168868', DB::table('telegram_accounts')->where('id', $account->id)->value('phone'));
+
+        /* The phone Telegram shows for somebody found in a group or an account: the same form, or nothing. */
+        $this->assertSame('+16202202267', $this->person(70, ['phone' => '1 (620) 220-22-67'])->phone);
+        $this->assertNull($this->person(71, ['phone' => ''])->phone);
+        $this->assertNull($this->person(72)->phone);
+    }
+
     public function test_the_listener_account_cannot_be_read_or_cleaned_from_the_account(): void
     {
         $response = $this->app->make(ContactAccountsController::class)->import(TelegramAccount::query()->findOrFail(3));

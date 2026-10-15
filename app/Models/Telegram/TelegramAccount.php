@@ -2,6 +2,7 @@
 
 namespace App\Models\Telegram;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -95,15 +96,26 @@ class TelegramAccount extends Model
         return $this->hasMany(TelegramAccountProcess::class);
     }
 
+    /**
+     * One stored form for a phone number, +<country code><number> with
+     * nothing else in it ("+998991062335"): spaces, dashes, brackets and a
+     * leading 00 are dropped, a missing + is added. Whoever creates the row
+     * (the panel, a command, a seeder) gets the same, see the `phone` attribute.
+     */
     public static function normalizePhone(string $phone): string
     {
-        $phone = preg_replace('/[^\d+]/', '', trim($phone));
+        $digits = preg_replace('/\D+/', '', trim($phone));
 
-        if ($phone !== '' && $phone[0] !== '+') {
-            $phone = '+' . $phone;
+        if (str_starts_with($digits, '00')) {
+            $digits = substr($digits, 2);
         }
 
-        return $phone;
+        return $digits === '' ? '' : '+' . $digits;
+    }
+
+    protected function phone(): Attribute
+    {
+        return Attribute::set(fn (?string $value) => $value === null ? null : self::normalizePhone($value));
     }
 
     public static function sessionPathFor(string $phone): string

@@ -268,19 +268,77 @@ export function telegramUrl(value) {
  * Uzbek numbers arrive as a bare +998XXXXXXXXX string; grouping them makes
  * them scannable in a list without changing the value that gets copied.
  */
+/*
+ * One look for every phone number, whatever country it is from:
+ * +998 99 910 62 35, +90 505 516 88 68, +1 620 220 22 67. Stored numbers are
+ * +<digits> (TelegramAccount::normalizePhone); this only groups them.
+ *
+ * country code -> how the rest is split. A number whose length does not fit
+ * its code, or whose code is not listed, is shown as +digits in threes.
+ */
+const PHONE_FORMATS = {
+    998: [2, 3, 2, 2],
+    996: [3, 3, 3],
+    992: [2, 3, 4],
+    993: [2, 6],
+    994: [2, 3, 2, 2],
+    995: [3, 3, 3],
+    380: [2, 3, 2, 2],
+    375: [2, 3, 2, 2],
+    374: [2, 6],
+    373: [2, 3, 3],
+    971: [2, 3, 4],
+    966: [2, 3, 4],
+    90: [3, 3, 2, 2],
+    86: [3, 4, 4],
+    82: [2, 4, 4],
+    81: [2, 4, 4],
+    49: [3, 8],
+    44: [4, 6],
+    33: [1, 2, 2, 2, 2],
+    7: [3, 3, 2, 2],
+    1: [3, 3, 4],
+};
+
 export function formatPhone(value) {
     if (!value) {
         return EM_DASH;
     }
 
-    const raw = String(value).trim();
-    const digits = raw.replace(/\D/g, '');
+    let digits = String(value).replace(/\D/g, '');
 
-    if (digits.length === 12 && digits.startsWith('998')) {
-        return `+${digits.slice(0, 3)} ${digits.slice(3, 5)} ${digits.slice(5, 8)} ${digits.slice(8, 10)} ${digits.slice(10)}`;
+    if (digits.startsWith('00')) {
+        digits = digits.slice(2);
     }
 
-    return raw.startsWith('+') ? raw : `+${digits || raw}`;
+    if (digits === '') {
+        return String(value);
+    }
+
+    for (const length of [3, 2, 1]) {
+        const code = digits.slice(0, length);
+        const pattern = PHONE_FORMATS[code];
+
+        if (!pattern) {
+            continue;
+        }
+
+        const rest = digits.slice(length);
+
+        if (rest.length === pattern.reduce((sum, size) => sum + size, 0)) {
+            const groups = [];
+            let at = 0;
+
+            pattern.forEach((size) => {
+                groups.push(rest.slice(at, at + size));
+                at += size;
+            });
+
+            return `+${code} ${groups.join(' ')}`;
+        }
+    }
+
+    return `+${digits.replace(/(\d{3})(?=\d)/g, '$1 ')}`;
 }
 
 export { EM_DASH };

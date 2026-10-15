@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models\Telegram;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -32,6 +33,15 @@ class TelegramScrapedUser extends Model
             'telegram_user_id' => 'integer',
             'is_bot' => 'boolean',
         ];
+    }
+
+    protected function phone(): Attribute
+    {
+        return Attribute::set(function (?string $value) {
+            $normalised = $value === null ? '' : TelegramAccount::normalizePhone($value);
+
+            return $normalised === '' ? null : $normalised;
+        });
     }
 
     public function groups(): BelongsToMany
