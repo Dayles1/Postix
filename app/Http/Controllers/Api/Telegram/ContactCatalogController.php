@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api\Telegram;
 use App\Http\Controllers\Controller;
 use App\Models\Telegram\TelegramAccount;
 use App\Models\Telegram\TelegramAccountContact;
+use App\Models\Telegram\TelegramAccountContactState;
 use App\Models\Telegram\TelegramScrapedUser;
 use App\Models\Telegram\TelegramScrapeGroup;
 use Illuminate\Http\JsonResponse;
@@ -30,6 +31,7 @@ final class ContactCatalogController extends Controller
             'status' => ['nullable', 'in:added,pending,failed,skipped,' . self::UNASSIGNED],
             'account_id' => ['nullable', 'integer'],
             'group_id' => ['nullable', 'integer'],
+            'presence' => ['nullable', 'in:on_account,not_on_account'],
             'bots' => ['nullable', 'boolean'],
             'sort' => ['nullable', 'in:created_at,added_at,name'],
             'direction' => ['nullable', 'in:asc,desc'],
@@ -39,7 +41,7 @@ final class ContactCatalogController extends Controller
         $direction = ($data['direction'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
 
         $query = TelegramScrapedUser::query()
-            ->with(['groups:id,title,link', 'contact.account:id,phone,username'])
+            ->with(['groups:id,title,link', 'contact.account:id,phone,username', 'accountLinks.account:id,phone'])
             ->when(! $request->boolean('bots'), fn ($q) => $q->where('is_bot', false))
             ->when(filled($data['search'] ?? null), function ($q) use ($data) {
                 $term = trim((string) $data['search']);
@@ -65,6 +67,8 @@ final class ContactCatalogController extends Controller
                 filled($data['account_id'] ?? null),
                 fn ($q) => $q->whereHas('contact', fn ($c) => $c->where('telegram_account_id', (int) $data['account_id'])),
             )
+            ->when(($data['presence'] ?? null) === 'on_account', fn ($q) => $q->whereHas('accountLinks'))
+            ->when(($data['presence'] ?? null) === 'not_on_account', fn ($q) => $q->whereDoesntHave('accountLinks'))
             ->when(
                 filled($data['group_id'] ?? null),
                 fn ($q) => $q->whereHas('groups', fn ($g) => $g->where('telegram_scrape_groups.id', (int) $data['group_id'])),
@@ -81,10 +85,16 @@ final class ContactCatalogController extends Controller
             default => $query->orderBy('created_at', $direction),
         };
 
+        /* Accounts that have been read at least once: only for them "not on the account" is a fact. */
+        $read = TelegramAccountContactState::query()
+            ->where(fn ($q) => $q->whereNotNull('synced_at')->orWhereNotNull('cleared_account_at'))
+            ->pluck('telegram_account_id')
+            ->all();
+
         $page = $query->orderBy('id', $direction)->paginate((int) ($data['per_page'] ?? 20), ['*'], 'page', max(1, $request->integer('page', 1)));
 
         return response()->json([
-            'data' => $page->getCollection()->map(fn (TelegramScrapedUser $user) => $this->row($user))->values(),
+            'data' => $page->getCollection()->map(fn (TelegramScrapedUser $user) => $this->row($user, $read))->values(),
             'meta' => [
                 'current_page' => $page->currentPage(),
                 'last_page' => $page->lastPage(),
@@ -101,9 +111,24 @@ final class ContactCatalogController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function row(TelegramScrapedUser $user): array
+    private function row(TelegramScrapedUser $user, array $read): array
     {
         $contact = $user->contact;
+
+        /*
+         * Where the person is: always in the database (they are a row of it),
+         * and on the account that saved them - yes, no, or not known when that
+         * account was never read.
+         */
+        $owner = $contact !== null && in_array($contact->status, ['added', 'skipped'], true) ? $contact->telegram_account_id : null;
+        $holders = $user->accountLinks->map(fn ($link) => ['id' => $link->telegram_account_id, 'phone' => $link->account?->phone])->values();
+
+        $onAccount = match (true) {
+            $owner === null => null,
+            $holders->contains('id', $owner) => true,
+            in_array($owner, $read, true) => false,
+            default => null,
+        };
 
         return [
             'id' => $user->id,
@@ -116,6 +141,8 @@ final class ContactCatalogController extends Controller
             'groups' => $user->groups
                 ->map(fn ($group) => ['id' => $group->id, 'title' => $group->title ?: $group->link])
                 ->values(),
+            'holders' => $holders,
+            'on_account' => $onAccount,
             'status' => $contact?->status ?? self::UNASSIGNED,
             'error' => $contact?->error,
             'added_at' => $contact?->added_at,

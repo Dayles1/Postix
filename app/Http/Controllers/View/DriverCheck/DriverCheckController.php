@@ -132,6 +132,13 @@ final class DriverCheckController extends Controller
         );
     }
 
+    public function contactAccounts()
+    {
+        return view(
+            'pages.driver-check.contact-accounts'
+        );
+    }
+
     public function queue()
     {
         return view(

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\Telegram\ClientCheckController;
+use App\Http\Controllers\Api\Telegram\ContactAccountsController;
 use App\Http\Controllers\Api\Telegram\ContactCatalogController;
 use App\Http\Controllers\Api\Telegram\ContactSyncController;
 use App\Http\Controllers\Api\Telegram\ContactSyncReportController;
@@ -304,6 +305,11 @@ Route::middleware(['auth', 'role:driverCheck,superadmin'])
             [DriverCheckController::class, 'contactSettings']
         )->name('driver-check.contact-settings');
 
+        Route::get(
+            '/contact-accounts',
+            [DriverCheckController::class, 'contactAccounts']
+        )->name('driver-check.contact-accounts');
+
         /*
          * Telegram sessions
          *
@@ -590,6 +596,12 @@ Route::middleware(['auth', 'role:driverCheck,superadmin'])
                 Route::delete('/settings', [ContactSyncSettingsController::class, 'reset'])->name('api.telegram.contact-sync.settings.reset');
                 Route::get('/contacts', [ContactCatalogController::class, 'index'])->name('api.telegram.contact-sync.contacts');
                 Route::post('/accounts/{account}/enable', 'enableAccount')->name('api.telegram.contact-sync.accounts.enable');
+                Route::get('/accounts', [ContactAccountsController::class, 'index'])->name('api.telegram.contact-sync.accounts.list');
+                Route::post('/accounts/import', [ContactAccountsController::class, 'importAll'])->name('api.telegram.contact-sync.accounts.import-all');
+                Route::post('/accounts/clear-database', [ContactAccountsController::class, 'clearDatabaseAll'])->name('api.telegram.contact-sync.accounts.clear-database-all');
+                Route::post('/accounts/{account}/import', [ContactAccountsController::class, 'import'])->name('api.telegram.contact-sync.accounts.import');
+                Route::post('/accounts/{account}/clear-account', [ContactAccountsController::class, 'clearAccount'])->name('api.telegram.contact-sync.accounts.clear-account');
+                Route::post('/accounts/{account}/clear-database', [ContactAccountsController::class, 'clearDatabase'])->name('api.telegram.contact-sync.accounts.clear-database');
                 Route::post('/groups', 'storeGroup')->name('api.telegram.contact-sync.groups.store');
                 Route::patch('/groups/{group}', 'updateGroup')->name('api.telegram.contact-sync.groups.update');
                 Route::delete('/groups/{group}', 'destroyGroup')->name('api.telegram.contact-sync.groups.destroy');

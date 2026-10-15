@@ -112,56 +112,6 @@
                         </x-driver-check.button>
                     </form>
                 </x-driver-check.surface>
-
-                {{-- Accounts --}}
-                <x-driver-check.surface class="overflow-hidden">
-                    <div class="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
-                        <h2 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('telegram.contact_sync.accounts.title') }}</h2>
-                        <p class="mt-0.5 text-[12px] text-gray-500 dark:text-gray-400">
-                            {{ __('telegram.contact_sync.accounts.hint') }}
-                            <span class="tabular-nums" x-text="status.daily_limit"></span>
-                        </p>
-                    </div>
-
-                    <div class="overflow-x-auto">
-                        <table class="w-full min-w-[640px] text-left text-[13px]">
-                            <thead class="dc-thead border-b border-gray-200 bg-gray-25 text-[10.5px] uppercase tracking-[0.08em] text-gray-500 dark:border-gray-800 dark:bg-white/[0.015] dark:text-gray-400">
-                                <tr>
-                                    <th class="px-4 py-2.5 font-semibold">{{ __('telegram.contact_sync.accounts.account') }}</th>
-                                    <th class="px-3 py-2.5 text-right font-semibold">{{ __('telegram.contact_sync.accounts.contacts') }}</th>
-                                    <th class="px-3 py-2.5 text-right font-semibold">{{ __('telegram.contact_sync.accounts.today') }}</th>
-                                    <th class="px-3 py-2.5 text-right font-semibold">{{ __('telegram.contact_sync.accounts.failed') }}</th>
-                                    <th class="px-3 py-2.5 text-right font-semibold">{{ __('telegram.contact_sync.accounts.skipped') }}</th>
-                                    <th class="px-4 py-2.5 font-semibold">{{ __('telegram.contact_sync.accounts.last_added') }}</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                                <template x-for="account in status.accounts" :key="account.id">
-                                    <tr class="dc-row hover:bg-gray-25 dark:hover:bg-white/[0.025]">
-                                        <td class="px-4 py-2.5">
-                                            <div class="flex items-center gap-2.5">
-                                                <span class="dc-dot shrink-0" :class="account.held ? 'text-error-500' : 'text-success-500'"></span>
-                                                <div class="min-w-0">
-                                                    <span class="font-medium tabular-nums text-gray-900 dark:text-white" x-text="phone(account.phone)"></span>
-                                                    <span x-show="account.is_primary" x-cloak class="ml-1 text-[11px] text-gray-500" x-text="'· ' + t.accounts.primary"></span>
-                                                    <div x-show="account.held" x-cloak class="mt-0.5 flex items-center gap-2 text-[11px] text-error-600 dark:text-error-400">
-                                                        <span class="dc-break" x-text="t.accounts.held + ': ' + (account.held_reason || dash)"></span>
-                                                        <button type="button" class="font-medium underline" x-on:click="enableAccount(account)" :disabled="!!busy" x-text="t.accounts.enable"></button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="px-3 py-2.5 text-right font-semibold tabular-nums text-gray-900 dark:text-white" x-text="number(account.added)"></td>
-                                        <td class="px-3 py-2.5 text-right tabular-nums text-gray-700 dark:text-gray-300" x-text="number(account.today) + ' / ' + status.daily_limit"></td>
-                                        <td class="px-3 py-2.5 text-right tabular-nums text-gray-700 dark:text-gray-300" :class="account.failed > 0 ? '!text-error-600 dark:!text-error-400' : ''" x-text="number(account.failed)"></td>
-                                        <td class="px-3 py-2.5 text-right tabular-nums text-gray-700 dark:text-gray-300" x-text="number(account.skipped)"></td>
-                                        <td class="px-4 py-2.5 text-gray-500 dark:text-gray-400" x-text="account.last_added_at ? relative(account.last_added_at) : ui.never"></td>
-                                    </tr>
-                                </template>
-                            </tbody>
-                        </table>
-                    </div>
-                </x-driver-check.surface>
             </div>
         </template>
     </x-driver-check.shell>

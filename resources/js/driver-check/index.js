@@ -20,6 +20,7 @@ import { contactSyncPage } from './contact-sync';
 import { contactsPage } from './contacts';
 import { contactReportPage } from './contact-report';
 import { contactSettingsPage } from './contact-settings';
+import { contactAccountsPage } from './contact-accounts';
 import { statusType } from './status';
 
 /*
@@ -1221,4 +1222,5 @@ export function registerDriverCheck(Alpine) {
     Alpine.data('dcContacts', contactsPage);
     Alpine.data('dcContactReport', contactReportPage);
     Alpine.data('dcContactSettings', contactSettingsPage);
+    Alpine.data('dcContactAccounts', contactAccountsPage);
 }

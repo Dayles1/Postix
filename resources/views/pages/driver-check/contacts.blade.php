@@ -97,6 +97,14 @@
                     </x-driver-check.select>
                 </x-driver-check.field>
 
+                <x-driver-check.field :label="__('driver_check.contacts.filters.presence')">
+                    <x-driver-check.select x-model="filters.presence" x-on:change="applyFilters()">
+                        <option value="">{{ __('driver_check.contacts.filters.presence_all') }}</option>
+                        <option value="on_account">{{ __('driver_check.contacts.filters.presence_on') }}</option>
+                        <option value="not_on_account">{{ __('driver_check.contacts.filters.presence_off') }}</option>
+                    </x-driver-check.select>
+                </x-driver-check.field>
+
                 <label class="flex cursor-pointer items-center gap-2.5 self-end pb-2 text-[13px] font-medium text-gray-700 dark:text-gray-200">
                     <input type="checkbox" x-model="filters.bots" x-on:change="applyFilters()" class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500">
                     {{ __('driver_check.contacts.filters.bots') }}
@@ -108,12 +116,13 @@
                 <div class="overflow-x-auto">
                     <table class="w-full min-w-[1000px] table-fixed text-left">
                         <colgroup>
-                            <col class="w-[26%]">
-                            <col class="w-[14%]">
                             <col class="w-[22%]">
-                            <col class="w-[14%]">
+                            <col class="w-[12%]">
+                            <col class="w-[17%]">
                             <col class="w-[13%]">
-                            <col class="w-[11%]">
+                            <col class="w-[12%]">
+                            <col class="w-[14%]">
+                            <col class="w-[10%]">
                         </colgroup>
 
                         <thead class="dc-thead border-b border-gray-200 bg-gray-25 dark:border-gray-800 dark:bg-transparent">
@@ -123,12 +132,13 @@
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('driver_check.contacts.table.groups') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('driver_check.contacts.table.account') }}</th>
                                 <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('driver_check.contacts.table.status') }}</th>
+                                <th scope="col" class="px-3 py-2.5 font-semibold">{{ __('driver_check.contacts.where.title') }}</th>
                                 <th scope="col" class="px-4 py-2.5 text-right font-semibold">{{ __('driver_check.contacts.table.saved') }}</th>
                             </tr>
                         </thead>
 
                         <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                            <x-driver-check.skeleton-rows :cols="6" />
+                            <x-driver-check.skeleton-rows :cols="7" />
 
                             <template x-for="row in rows" :key="row.id">
                                 <tr class="dc-row group align-middle transition-colors hover:bg-gray-25 dark:hover:bg-white/[0.025]">
@@ -186,6 +196,25 @@
                                         </x-driver-check.badge>
                                     </td>
 
+                                    {{-- Where it is: in the database always, on the account yes / no / not known --}}
+                                    <td class="px-3 py-3">
+                                        <div class="flex flex-wrap items-center gap-1.5">
+                                            <span class="inline-flex items-center gap-1 rounded-md bg-gray-100 px-1.5 py-0.5 text-[11px] font-semibold text-gray-700 dark:bg-white/[0.07] dark:text-gray-200" title="{{ __('driver_check.contacts.where.database') }}">
+                                                <span class="h-1.5 w-1.5 rounded-full bg-success-500"></span>
+                                                {{ __('driver_check.contacts.where.database') }}
+                                            </span>
+
+                                            <span
+                                                class="inline-flex items-center gap-1 rounded-md bg-gray-100 px-1.5 py-0.5 text-[11px] font-semibold text-gray-700 dark:bg-white/[0.07] dark:text-gray-200"
+                                                :class="whereAccount(row).state === 'no' && '!bg-error-50 !text-error-700 dark:!bg-error-500/10 dark:!text-error-400'"
+                                                :title="whereAccount(row).title + ((row.holders || []).length ? ' (' + row.holders.map((h) => phone(h.phone)).join(', ') + ')' : '')"
+                                            >
+                                                <span class="h-1.5 w-1.5 rounded-full" :class="whereAccount(row).dot"></span>
+                                                <span x-text="whereAccount(row).label"></span>
+                                            </span>
+                                        </div>
+                                    </td>
+
                                     <td class="px-4 py-3 text-right text-[12.5px] tabular-nums text-gray-600 dark:text-gray-300">
                                         <span x-show="row.added_at" :title="date(row.added_at)" x-text="relative(row.added_at)"></span>
                                         <span x-show="!row.added_at" class="text-gray-300 dark:text-gray-600" x-text="dash"></span>
@@ -224,6 +253,13 @@
 
                             <x-driver-check.kv :label="__('driver_check.contacts.table.account')">
                                 <span class="tabular-nums" x-text="row.account ? phone(row.account.phone) : dash"></span>
+                            </x-driver-check.kv>
+
+                            <x-driver-check.kv :label="__('driver_check.contacts.where.title')" class="col-span-2">
+                                <span class="inline-flex flex-wrap items-center gap-1.5">
+                                    <span class="inline-flex items-center gap-1 text-[12px]"><span class="h-1.5 w-1.5 rounded-full bg-success-500"></span>{{ __('driver_check.contacts.where.database') }}</span>
+                                    <span class="inline-flex items-center gap-1 text-[12px]" :title="whereAccount(row).title"><span class="h-1.5 w-1.5 rounded-full" :class="whereAccount(row).dot"></span><span x-text="whereAccount(row).label"></span></span>
+                                </span>
                             </x-driver-check.kv>
 
                             <x-driver-check.kv :label="__('driver_check.contacts.table.saved')">

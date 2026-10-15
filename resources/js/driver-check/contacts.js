@@ -45,6 +45,7 @@ export function contactsPage(config) {
                 status: '',
                 group_id: '',
                 account_id: '',
+                presence: '',
                 bots: false,
                 sort: 'created_at',
                 direction: 'desc',
@@ -102,6 +103,30 @@ export function contactsPage(config) {
             }
 
             return `${names.slice(0, 2).join(', ')} +${names.length - 2}`;
+        },
+
+        /**
+         * The account half of "where the person is": on the account that
+         * saved them, not on it, or not known because it was never read.
+         * (The database half is always yes - they are a row of it.)
+         */
+        whereAccount(row) {
+            const w = t.where;
+
+            if (row.on_account === true) {
+                return { dot: 'bg-success-500', label: w.account, title: `${w.account}: ${w.account_yes}`, state: 'yes' };
+            }
+
+            if (row.on_account === false) {
+                return { dot: 'bg-error-500', label: w.account, title: `${w.account}: ${w.account_no}`, state: 'no' };
+            }
+
+            return {
+                dot: 'bg-gray-300 dark:bg-gray-600',
+                label: w.account,
+                title: row.status === 'unassigned' ? w.no_owner : `${w.account}: ${w.account_unknown}`,
+                state: 'unknown',
+            };
         },
 
         displayName(row) {

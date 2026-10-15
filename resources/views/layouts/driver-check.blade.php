@@ -27,6 +27,7 @@
         '/driver-check/contacts' => 'book',
         '/driver-check/contact-report' => 'chart',
         '/driver-check/contact-settings' => 'sliders-h',
+        '/driver-check/contact-accounts' => 'phone',
     ];
 
     $dcPath = '/' . ltrim(request()->path(), '/');

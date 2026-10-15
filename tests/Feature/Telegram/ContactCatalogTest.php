@@ -34,6 +34,7 @@ final class ContactCatalogTest extends TestCase
         });
 
         (include database_path('migrations/2026_10_14_100000_create_telegram_contact_sync_tables.php'))->up();
+        (include database_path('migrations/2026_10_17_100000_create_telegram_account_contacts_state_tables.php'))->up();
 
         DB::table('telegram_accounts')->insert([
             ['id' => 1, 'phone' => '+998900000001'],

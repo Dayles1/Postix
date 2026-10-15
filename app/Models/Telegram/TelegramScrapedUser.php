@@ -6,6 +6,7 @@ namespace App\Models\Telegram;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
@@ -41,6 +42,14 @@ class TelegramScrapedUser extends Model
             'scraped_user_id',
             'group_id',
         )->withPivot('seen_at');
+    }
+
+    /**
+     * The accounts that have this person in their Telegram contacts.
+     */
+    public function accountLinks(): HasMany
+    {
+        return $this->hasMany(TelegramAccountContactLink::class, 'scraped_user_id');
     }
 
     public function contact(): HasOne

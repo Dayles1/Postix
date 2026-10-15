@@ -191,6 +191,11 @@ class MenuHelper
                         'path' => '/driver-check/contact-sync',
                     ],
                     [
+                        'icon' => 'phone',
+                        'name' => __('driver_check.menu.accounts'),
+                        'path' => '/driver-check/contact-accounts',
+                    ],
+                    [
                         'icon' => 'task',
                         'name' => __('driver_check.menu.contact_settings'),
                         'path' => '/driver-check/contact-settings',

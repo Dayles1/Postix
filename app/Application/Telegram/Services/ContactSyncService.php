@@ -270,6 +270,8 @@ final class ContactSyncService
                 }
 
                 if (isset($existing[$user->telegram_user_id])) {
+                    $this->markOnAccount($account, $user);
+
                     $this->log('skipped', 'Already in contacts', $account->id, $group->id, [
                         'telegram_user_id' => $user->telegram_user_id,
                     ]);
@@ -283,6 +285,7 @@ final class ContactSyncService
                     $this->addContact($api, $user, $nick);
 
                     $this->finishClaim($account, $user, TelegramAccountContact::STATUS_ADDED, null, $nick);
+                    $this->markOnAccount($account, $user);
 
                     $result['added']++;
                     $remaining--;
@@ -604,6 +607,29 @@ final class ContactSyncService
             last_name: (string) $user->last_name,
             add_phone_privacy_exception: false,
         );
+    }
+
+    /**
+     * The account has this person in its Telegram contacts (the accounts
+     * page tells where a contact is and where it is not). An add-on to the
+     * sync: whatever goes wrong here never stops it.
+     */
+    private function markOnAccount(TelegramAccount $account, TelegramScrapedUser $user): void
+    {
+        try {
+            DB::table('telegram_account_contact_links')->upsert(
+                [[
+                    'telegram_account_id' => $account->id,
+                    'scraped_user_id' => $user->id,
+                    'sync_token' => null,
+                    'synced_at' => now(),
+                ]],
+                ['telegram_account_id', 'scraped_user_id'],
+                ['synced_at'],
+            );
+        } catch (Throwable) {
+            // not migrated yet, or a hiccup: the sync goes on
+        }
     }
 
     private function addedToday(TelegramAccount $account): int
