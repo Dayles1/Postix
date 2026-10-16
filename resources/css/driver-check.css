@@ -199,6 +199,12 @@ html.dark {
 
 @layer base {
   html {
+    /*
+     * The room of the vertical scrollbar is always kept: a page that grows
+     * past the screen while it loads would otherwise grow a scrollbar and
+     * push everything 15px to the left, and back.
+     */
+    scrollbar-gutter: stable;
     -webkit-text-size-adjust: 100%;
     scroll-padding-top: calc(var(--dc-bar-h) + var(--dc-sub-h) + 12px);
   }

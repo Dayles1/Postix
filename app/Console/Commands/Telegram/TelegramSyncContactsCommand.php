@@ -7,6 +7,8 @@ namespace App\Console\Commands\Telegram;
 use App\Application\Telegram\Services\ContactSyncService;
 use App\Telegram\TelegramProcessLock;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
+use Revolt\EventLoop;
 use Throwable;
 
 final class TelegramSyncContactsCommand extends Command
@@ -23,6 +25,19 @@ final class TelegramSyncContactsCommand extends Command
 
     public function handle(ContactSyncService $sync): int
     {
+        /*
+         * An exception thrown in a MadelineProto callback ("The endpoint does
+         * not exist!" from its IPC client) would take the whole run down in the
+         * middle of an account. It is logged, and the account's own call fails
+         * or times out on its own.
+         */
+        EventLoop::setErrorHandler(static function (Throwable $e): void {
+            Log::error('Contact sync: an exception in the event loop', [
+                'exception' => $e::class,
+                'message' => $e->getMessage(),
+            ]);
+        });
+
         if (TelegramProcessLock::attempt(self::LOCK_NAME) === TelegramProcessLock::HELD) {
             $this->warn('Another contact sync is already running.');
 

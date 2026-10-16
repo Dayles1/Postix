@@ -249,6 +249,39 @@ final class ContactAccountsTest extends TestCase
         $this->assertNull($this->person(72)->phone);
     }
 
+    public function test_a_dead_session_is_told_from_a_failed_call(): void
+    {
+        $service = $this->app->make(AccountContactsService::class);
+
+        $this->assertSame('AUTH_KEY_UNREGISTERED', $service->accountError(new \RuntimeException('AUTH_KEY_UNREGISTERED')));
+        $this->assertSame('SESSION_REVOKED', $service->accountError(new \RuntimeException('start failed', 0, new \RuntimeException('SESSION_REVOKED'))), 'wrapped, as MadelineProto does');
+        $this->assertNull($service->accountError(new \RuntimeException('FLOOD_WAIT_30')));
+    }
+
+    public function test_a_dead_session_is_written_down_as_revoked_and_nothing_else_is(): void
+    {
+        $dead = new \RuntimeException('start failed', 0, new \RuntimeException('SESSION_REVOKED'));
+
+        $this->assertSame('SESSION_REVOKED', \App\Application\Telegram\Support\DeadSession::code($dead));
+        $this->assertNull(\App\Application\Telegram\Support\DeadSession::code(new \RuntimeException('FLOOD_WAIT_30')));
+        $this->assertNull(\App\Application\Telegram\Support\DeadSession::code(new \RuntimeException('PHONE_NOT_OCCUPIED')));
+
+        DB::table('telegram_accounts')->where('id', 2)->update(['is_authorized' => true]);
+        Schema::table('telegram_accounts', function (Blueprint $table) {
+            $table->string('status')->nullable();
+            $table->timestamp('last_checked_at')->nullable();
+            $table->text('last_error')->nullable();
+        });
+
+        \App\Application\Telegram\Support\DeadSession::retire(2, 'AUTH_KEY_UNREGISTERED');
+        \App\Application\Telegram\Support\DeadSession::retire(null, 'AUTH_KEY_UNREGISTERED');
+
+        $account = DB::table('telegram_accounts')->where('id', 2)->first();
+
+        $this->assertSame([0, 'revoked', 'AUTH_KEY_UNREGISTERED'], [(int) $account->is_authorized, $account->status, $account->last_error]);
+        $this->assertSame(1, (int) DB::table('telegram_accounts')->where('id', 1)->value('is_authorized'), 'the others are untouched');
+    }
+
     public function test_the_listener_account_cannot_be_read_or_cleaned_from_the_account(): void
     {
         $response = $this->app->make(ContactAccountsController::class)->import(TelegramAccount::query()->findOrFail(3));

@@ -15,6 +15,7 @@ use App\Models\Driver\TelegramDriverCheck;
 use App\Models\Telegram\TelegramResolvedPhone;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
+use Revolt\EventLoop;
 use Throwable;
 
 final class ResolveTelegramPhoneCommand extends Command
@@ -44,6 +45,20 @@ final class ResolveTelegramPhoneCommand extends Command
         TelegramAccountProcessService $processService,
     ): int {
         $checkId = (int) $this->argument('checkId');
+
+        /*
+         * An exception thrown in a MadelineProto callback ("The endpoint does
+         * not exist!" from its IPC client) would take the process down in the
+         * middle of a check. It is logged; the call it belonged to fails or
+         * is cancelled, and the cancellation handling below takes over.
+         */
+        EventLoop::setErrorHandler(static function (Throwable $e) use ($checkId): void {
+            Log::error('Phone resolver: an exception in the event loop', [
+                'check_id' => $checkId,
+                'exception' => $e::class,
+                'message' => $e->getMessage(),
+            ]);
+        });
 
         /*
          * ============================================================

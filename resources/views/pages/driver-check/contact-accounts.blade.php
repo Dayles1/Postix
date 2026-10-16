@@ -52,7 +52,12 @@
             <p><span class="font-semibold text-gray-700 dark:text-gray-200">{{ __('driver_check.accounts.in_account') }}</span> — {{ __('driver_check.accounts.legend_account') }}</p>
         </div>
 
-        <p x-show="working" x-cloak class="inline-flex items-center gap-2 text-[12.5px] font-medium text-blue-light-700 dark:text-blue-light-400">
+        {{-- Its place is always there; only its look comes and goes, so nothing below it moves. --}}
+        <p
+            class="inline-flex h-5 items-center gap-2 text-[12.5px] font-medium text-blue-light-700 transition-opacity dark:text-blue-light-400"
+            :class="working ? 'opacity-100' : 'opacity-0'"
+            :aria-hidden="!working"
+        >
             <span class="dc-dot animate-pulse text-blue-light-500"></span>
             {{ __('driver_check.accounts.running_note') }}
         </p>
@@ -66,7 +71,17 @@
                 {{-- Table (lg and up) --}}
                 <div class="hidden lg:block" x-show="accounts.length > 0">
                     <div class="overflow-x-auto">
-                        <table class="w-full min-w-[980px] text-left">
+                        {{-- Fixed layout: a column keeps its width whatever its text says, so a new status or a longer "3 minutes ago" cannot move the others. --}}
+                        <table class="w-full min-w-[1040px] table-fixed text-left">
+                            <colgroup>
+                                <col class="w-[24%]">
+                                <col class="w-[8%]">
+                                <col class="w-[9%]">
+                                <col class="w-[17%]">
+                                <col class="w-[12%]">
+                                <col class="w-[30%]">
+                            </colgroup>
+
                             <thead class="dc-thead border-b border-gray-200 bg-gray-25 dark:border-gray-800 dark:bg-transparent">
                                 <tr class="text-[10.5px] uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
                                     <th class="px-4 py-2.5 font-semibold">{{ __('driver_check.accounts.account') }}</th>
@@ -109,14 +124,14 @@
                                                 <span x-text="agreeLabel(account)"></span>
                                             </x-driver-check.badge>
 
-                                            {{-- Something queued, running or gone wrong on this account --}}
-                                            <p x-show="account.status !== 'idle'" x-cloak class="mt-1 text-[11.5px] font-medium"
+                                            {{-- Something queued, running or gone wrong on this account: always one line high, so the row never grows --}}
+                                            <p class="mt-1 h-4 truncate text-[11.5px] font-medium leading-4"
                                                 :class="account.status === 'failed' ? 'text-error-600 dark:text-error-400' : 'text-blue-light-700 dark:text-blue-light-400'"
-                                                x-text="statusLabel(account)"></p>
-                                            <p x-show="account.error" x-cloak class="dc-break mt-0.5 max-w-[220px] text-[11px] text-error-600 dark:text-error-400" x-text="account.error"></p>
+                                                :title="account.error || ''"
+                                                x-text="account.status === 'idle' ? '' : statusLabel(account) + (account.error ? ': ' + account.error : '')"></p>
                                         </td>
 
-                                        <td class="px-3 py-3 text-[12.5px] text-gray-500 dark:text-gray-400">
+                                        <td class="whitespace-nowrap px-3 py-3 text-[12.5px] tabular-nums text-gray-500 dark:text-gray-400">
                                             <span x-show="account.synced_at" :title="account.synced_at" x-text="relative(account.synced_at)"></span>
                                             <span x-show="!account.synced_at" x-text="t.never"></span>
                                         </td>
@@ -167,7 +182,7 @@
                                 <x-driver-check.kv :label="__('driver_check.accounts.last_sync')"><span class="text-[12px]" x-text="account.synced_at ? relative(account.synced_at) : t.never"></span></x-driver-check.kv>
                             </dl>
 
-                            <p x-show="account.status !== 'idle'" x-cloak class="text-[12px] font-medium" :class="account.status === 'failed' ? 'text-error-600' : 'text-blue-light-700'" x-text="statusLabel(account) + (account.error ? ': ' + account.error : '')"></p>
+                            <p class="h-4 truncate text-[12px] font-medium leading-4" :class="account.status === 'failed' ? 'text-error-600' : 'text-blue-light-700'" :title="account.error || ''" x-text="account.status === 'idle' ? '' : statusLabel(account) + (account.error ? ': ' + account.error : '')"></p>
 
                             <div class="grid grid-cols-2 gap-2">
                                 <x-driver-check.button x-on:click="sync(account)" ::disabled="!canWork(account)" class="col-span-2">{{ __('driver_check.accounts.sync') }}</x-driver-check.button>

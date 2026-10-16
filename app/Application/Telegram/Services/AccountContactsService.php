@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Telegram\Services;
 
+use App\Application\Telegram\Support\DeadSession;
 use App\Enums\Telegram\TelegramAccountProcess as ProcessEnum;
 use App\Models\Telegram\TelegramAccount;
 use App\Models\Telegram\TelegramAccountContactState;
@@ -313,11 +314,27 @@ final class AccountContactsService
 
             return $result;
         } catch (Throwable $e) {
+            $code = $this->accountError($e);
+
             $state->update([
                 'status' => TelegramAccountContactState::FAILED,
                 'action' => null,
-                'last_error' => mb_substr($e instanceof RPCErrorException ? $e->rpc : $e->getMessage(), 0, 500),
+                'last_error' => mb_substr($code ?? ($e instanceof RPCErrorException ? $e->rpc : $e->getMessage()), 0, 500),
             ]);
+
+            /*
+             * A dead session is dead for every process: the same state
+             * telegram:account-check writes, so no pool picks the account up
+             * and the sessions page shows it as revoked, to log in again.
+             */
+            if ($code !== null) {
+                $account->update([
+                    'is_authorized' => false,
+                    'status' => TelegramAccount::STATUS_REVOKED,
+                    'last_checked_at' => now(),
+                    'last_error' => $code,
+                ]);
+            }
 
             throw $e;
         } finally {
@@ -331,6 +348,15 @@ final class AccountContactsService
 
             $this->release($account);
         }
+    }
+
+    /**
+     * The code of a dead-session error anywhere in the chain, or null
+     * (see DeadSession).
+     */
+    public function accountError(Throwable $e): ?string
+    {
+        return DeadSession::code($e);
     }
 
     /**

@@ -3,6 +3,7 @@
 namespace App\Application\Telegram\Services;
 
 use Amp\CancelledException;
+use App\Application\Telegram\Support\DeadSession;
 use App\Application\Telegram\Support\VendorNoticeShield;
 use danog\MadelineProto\API;
 use danog\MadelineProto\RPCErrorException;
@@ -65,6 +66,16 @@ class TelegramContactResolver
                 'error_message' => null,
             ];
         } catch (RPCErrorException $e) {
+            /*
+             * A dead session (AUTH_KEY_UNREGISTERED and the like) is the
+             * account's, not the phone's: it is written down as revoked so
+             * the next attempt takes another account instead of this one
+             * again. The result below is what it always was.
+             */
+            if ($dead = DeadSession::code($e)) {
+                DeadSession::retire($context['account_id'] ?? null, $dead);
+            }
+
             return [
                 'success' => false,
 
