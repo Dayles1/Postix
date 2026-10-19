@@ -147,6 +147,23 @@ final class TelegramDriverCheckChats
     }
 
     /**
+     * The active chats whose numeric id is already known, read without
+     * resolving anything: for a listener that only has to recognise them
+     * (Driver Check resolves, it owns that part).
+     *
+     * @return list<int>
+     */
+    public function knownIds(): array
+    {
+        return TelegramDriverCheckChat::query()
+            ->active()
+            ->whereNotNull('chat_id')
+            ->pluck('chat_id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
+    }
+
+    /**
      * Marks the moment a watched chat last produced a message, which is what
      * tells the panel a group is alive rather than merely configured.
      */

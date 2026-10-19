@@ -154,8 +154,6 @@ final class ContactSyncSettings
      */
     public static function listenerIds(): array
     {
-        $id = config('services.telegram.driver_check_account_id');
-
-        return $id === null || $id === '' ? [] : [(int) $id];
+        return ListenerAccounts::ids();
     }
 }

@@ -9,6 +9,7 @@ use App\Application\Telegram\Services\AutoReplyMatcher;
 use App\Application\Telegram\Services\AutoReplyRules;
 use App\Application\Telegram\Services\AutoReplyStore;
 use App\Application\Telegram\Services\ClientCheckRules;
+use App\Application\Telegram\Services\DutyOwners;
 use App\Application\Telegram\Services\PenaltyAgent;
 use App\Application\Telegram\Services\PenaltyOpening;
 use App\Application\Telegram\Services\PersonalAnswers;
@@ -59,6 +60,7 @@ final class ProcessAutoReply
         int $senderId,
         int $messageId,
         string $text,
+        ?string $listenerKey = null,
     ): ?string {
         $text = trim($text);
 
@@ -75,6 +77,14 @@ final class ProcessAutoReply
         $person = $this->person($telegram, $senderId);
 
         if ($person === null) {
+            return null;
+        }
+
+        /*
+         * Written to the wrong account: a person is answered by the account
+         * that delivers their role's penalties (DutyOwners), no other.
+         */
+        if (app(DutyOwners::class)->penaltyOwner($person->roleOrDefault()) !== $listenerKey) {
             return null;
         }
 
@@ -124,6 +134,15 @@ final class ProcessAutoReply
                 'kind' => $kind !== null ? $rules->name($kind) : null,
             ],
         );
+
+        /*
+         * Something long is a conversation, not an "ok": left to the person
+         * in charge, whatever kind a word in it happens to match. The
+         * penalty has the reply on it already.
+         */
+        if (count(AutoReplyMatcher::words($text)) > (int) config('auto_replies.silent_over_words', 15)) {
+            return null;
+        }
 
         /*
          * Muted on the card - the private chat or the auto replies alone:

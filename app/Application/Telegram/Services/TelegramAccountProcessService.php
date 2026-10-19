@@ -75,6 +75,8 @@ final class TelegramAccountProcessService
                     = $this->primaryAccountId();
 
                 $accounts = TelegramAccount::query()
+                    /* Nor the accounts of the other listeners (CEO, Head Operation ...). */
+                    ->whereNotIn('id', ListenerAccounts::rowIds())
                     ->where(
                         'is_authorized',
                         true,
@@ -424,6 +426,7 @@ final class TelegramAccountProcessService
             = $this->primaryAccountId();
 
         return TelegramAccount::query()
+            ->whereNotIn('id', ListenerAccounts::rowIds())
             ->where(
                 'is_authorized',
                 true,

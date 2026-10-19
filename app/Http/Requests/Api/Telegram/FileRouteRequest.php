@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Api\Telegram;
 
+use App\Application\Telegram\Services\DutyOwners;
+use App\Models\Telegram\TelegramListener;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class FileRouteRequest extends FormRequest
 {
@@ -43,9 +46,33 @@ class FileRouteRequest extends FormRequest
             'keywords' => ['required', 'string', 'max:500'],
             'target_chat_ids' => ['present', 'array', 'max:20'],
             'target_chat_ids.*' => ['regex:/^-?\d{5,20}$/'],
+            /* The account the file goes out from: a listener, Driver Check, or empty to follow "Files from bots". */
+            'listener_key' => [
+                'nullable',
+                'string',
+                Rule::in([DutyOwners::DRIVER_CHECK, ...$this->listenerKeys()]),
+            ],
             'is_active' => ['sometimes', 'boolean'],
             'sort' => ['sometimes', 'integer', 'min:0', 'max:10000'],
         ];
+    }
+
+    /**
+     * The listeners a kind may be given to; none while the table is not there yet.
+     *
+     * @return list<string>
+     */
+    private function listenerKeys(): array
+    {
+        try {
+            return TelegramListener::query()
+                ->where('is_enabled', true)
+                ->whereNotNull('telegram_account_id')
+                ->pluck('key')
+                ->all();
+        } catch (\Throwable) {
+            return [];
+        }
     }
 
     public function messages(): array
@@ -69,6 +96,7 @@ class FileRouteRequest extends FormRequest
                 'intval',
                 $validated['target_chat_ids'],
             ))),
+            'listener_key' => ($validated['listener_key'] ?? '') === '' ? null : $validated['listener_key'],
             'is_active' => (bool) ($validated['is_active'] ?? true),
         ] + (isset($validated['sort']) ? ['sort' => (int) $validated['sort']] : []);
     }

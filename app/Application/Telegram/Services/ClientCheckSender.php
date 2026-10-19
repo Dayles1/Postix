@@ -27,6 +27,7 @@ use Throwable;
  */
 final class ClientCheckSender
 {
+    /* DeveloperAlerts and DutyOwners are in this namespace. */
     private const ERROR_LIMIT = 500;
 
     public function __construct(
@@ -114,7 +115,38 @@ final class ClientCheckSender
 
         $this->recordDelivery($person, $error);
 
+        $this->tellDeveloper($check, $person, 'penalty_forward_failed', $error);
+
         return false;
+    }
+
+    /**
+     * The developer is told which person could not be reached and from
+     * which account: usually somebody with no public username, whose id has
+     * to be saved by hand (write to the account from the group, then put
+     * the id on their card).
+     */
+    private function tellDeveloper(TelegramClientCheck $check, OperationUser $person, string $kind, string $error): void
+    {
+        $owner = app(DutyOwners::class)->penaltyOwner($person->roleOrDefault());
+
+        app(DeveloperAlerts::class)->report(
+            kind: $kind,
+            title: ($kind === 'penalty_forward_failed' ? 'Штраф не доставлен: ' : 'Комментарий к штрафу не отправлен: ') . $person->name,
+            details: $error . "\n\n" . 'Если у человека нет публичного username - сохраните его Telegram ID в карточке человека (операторы / продажники), '
+                . 'предварительно написав ему с этого аккаунта.',
+            context: [
+                'Аккаунт' => $owner ?? 'Driver Check',
+                'Роль' => $person->roleOrDefault(),
+                'Человек (id)' => $person->id,
+                'Username' => $person->telegramUsername() ?? '-',
+                'Telegram ID' => $person->telegram_id ?? '-',
+                'Заявка' => $check->request_number ?? '-',
+                'Попыток' => $check->attempts,
+            ],
+            listenerKey: $owner,
+            about: (string) $person->id,
+        );
     }
 
     /**
@@ -142,8 +174,14 @@ final class ClientCheckSender
     /**
      * Runs on the listener's cron.
      */
-    public function flush(SimpleEventHandler $telegram): void
+    public function flush(SimpleEventHandler $telegram, ?string $key = null): void
     {
+        /*
+         * Only the penalties of the roles this account delivers (DutyOwners:
+         * sales and operators may be written to from different accounts).
+         */
+        $roles = app(DutyOwners::class)->penaltyRoles($key);
+
         /*
          * Switched off: nothing more goes out - no retry, no comment. A
          * forward already delivered stays delivered; the comment it was
@@ -166,18 +204,26 @@ final class ClientCheckSender
          * penalty sent at 18:05. A comment still follows a forward that
          * went out in time, so a pair is never cut in half.
          */
+        if ($roles === []) {
+            return;
+        }
+
         if ($this->escalation->rules()->withinWorkingHours()) {
-            $this->retryForwards($telegram);
+            $this->retryForwards($telegram, $roles);
         }
 
         $this->expireStale();
 
-        $this->sendComments($telegram);
+        $this->sendComments($telegram, $roles);
     }
 
-    private function retryForwards(SimpleEventHandler $telegram): void
+    /**
+     * @param list<string> $roles
+     */
+    private function retryForwards(SimpleEventHandler $telegram, array $roles): void
     {
         $checks = $this->retryable(TelegramClientCheck::REASON_FORWARD_FAILED)
+            ->forRoles($roles)
             ->with('operationUser')
             ->orderBy('id')
             ->limit(20)
@@ -203,9 +249,13 @@ final class ClientCheckSender
             ]);
     }
 
-    private function sendComments(SimpleEventHandler $telegram): void
+    /**
+     * @param list<string> $roles
+     */
+    private function sendComments(SimpleEventHandler $telegram, array $roles): void
     {
         $pending = TelegramClientCheck::query()
+            ->forRoles($roles)
             ->with('operationUser')
             ->whereNotNull('operation_user_id')
             ->whereNotNull('forwarded_at')
@@ -367,6 +417,8 @@ final class ClientCheckSender
                 TelegramClientCheck::REASON_COMMENT_FAILED,
                 $e->getMessage(),
             );
+
+            $this->tellDeveloper($last, $person, 'penalty_comment_failed', $e->getMessage());
         }
     }
 

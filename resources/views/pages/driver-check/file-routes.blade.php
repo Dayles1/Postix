@@ -126,8 +126,14 @@
 
                                     <td
                                         class="px-3 py-3 text-right text-sm tabular-nums text-gray-700 dark:text-gray-300"
-                                        x-text="number(row.sent_count)"
-                                    ></td>
+                                    >
+                                        <span x-text="number(row.sent_count)"></span>
+                                        <p
+                                            class="mt-0.5 truncate text-[11px] font-normal text-gray-500 dark:text-gray-400"
+                                            :title="translations.table.sender + ': ' + senderName(row)"
+                                            x-text="senderName(row)"
+                                        ></p>
+                                    </td>
 
                                     <td class="px-3 py-3">
                                         <p
@@ -172,6 +178,10 @@
                                     class="dc-break tabular-nums"
                                     x-text="row.target_chat_ids.length ? row.target_chat_ids.join(', ') : translations.table.no_targets"
                                 ></span>
+                            </x-driver-check.kv>
+
+                            <x-driver-check.kv :label="__('telegram.file_routes.table.sender')" class="col-span-2">
+                                <span class="dc-break" x-text="senderName(row)"></span>
                             </x-driver-check.kv>
 
                             <x-driver-check.kv :label="__('telegram.file_routes.table.sent')">
@@ -336,6 +346,28 @@
 
                 <x-slot:error>
                     <p x-show="fieldError('target_chat_ids')" x-cloak class="mt-1 text-[11px] font-medium text-error-600 dark:text-error-400" x-text="fieldError('target_chat_ids')"></p>
+                </x-slot:error>
+            </x-driver-check.field>
+
+            <x-driver-check.field
+                :label="__('telegram.file_routes.form.sender')"
+                :hint="__('telegram.file_routes.form.sender_hint')"
+                for="file-route-sender"
+            >
+                <select
+                    id="file-route-sender"
+                    x-model="form.listener_key"
+                    class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-[14px] text-gray-900 outline-none transition
+                           focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                >
+                    <option value="">{{ __('telegram.file_routes.form.sender_default') }}</option>
+                    <template x-for="account in accounts" :key="account.key">
+                        <option :value="account.key" :selected="form.listener_key === account.key" x-text="account.name"></option>
+                    </template>
+                </select>
+
+                <x-slot:error>
+                    <p x-show="fieldError('listener_key')" x-cloak class="mt-1 text-[11px] font-medium text-error-600 dark:text-error-400" x-text="fieldError('listener_key')"></p>
                 </x-slot:error>
             </x-driver-check.field>
 

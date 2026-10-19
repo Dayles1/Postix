@@ -16,7 +16,8 @@ use Illuminate\Support\Str;
  * @property string         $name
  * @property string         $keywords
  * @property list<int>|null $target_chat_ids
- * @property bool           $is_active
+ * @property string|null    $listener_key
+ * @property bool          $is_active
  * @property int            $sort
  */
 class TelegramFileRoute extends Model
@@ -25,6 +26,7 @@ class TelegramFileRoute extends Model
         'name',
         'keywords',
         'target_chat_ids',
+        'listener_key',
         'is_active',
         'sort',
     ];

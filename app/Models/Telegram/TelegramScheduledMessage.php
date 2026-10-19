@@ -1,0 +1,139 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models\Telegram;
+
+use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Model;
+
+/**
+ * A message the listener's account writes into groups at a set time on
+ * set days.
+ *
+ * @property int            $id
+ * @property string         $name
+ * @property string         $text
+ * @property string         $send_at
+ * @property list<int>|null $days
+ * @property list<int>|null $chat_ids
+ * @property bool           $is_active
+ * @property string|null    $last_status
+ */
+class TelegramScheduledMessage extends Model
+{
+    public const STATUS_SENT = 'sent';
+
+    public const STATUS_PARTIAL = 'partial';
+
+    public const STATUS_FAILED = 'failed';
+
+    /**
+     * How long after its time a message may still go out: a listener that
+     * was down at 17:00 catches up at 17:20, not at midnight.
+     */
+    public const CATCH_UP_MINUTES = 120;
+
+    protected $fillable = [
+        'name',
+        'text',
+        'send_at',
+        'days',
+        'chat_ids',
+        'listener_key',
+        'is_active',
+        'last_sent_on',
+        'send_requested_at',
+        'last_run_at',
+        'last_status',
+        'last_error',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'days' => 'array',
+            'chat_ids' => 'array',
+            'is_active' => 'boolean',
+            'last_sent_on' => 'date:Y-m-d',
+            'send_requested_at' => 'datetime',
+            'last_run_at' => 'datetime',
+        ];
+    }
+
+    /**
+     * @return list<int>
+     */
+    public function targets(): array
+    {
+        return array_values(array_unique(array_map(
+            'intval',
+            array_filter(
+                (array) ($this->chat_ids ?? []),
+                static fn (mixed $id): bool => is_numeric($id) && (int) $id !== 0,
+            ),
+        )));
+    }
+
+    /**
+     * ISO weekdays it goes out on; all seven when none were chosen.
+     *
+     * @return list<int>
+     */
+    public function weekdays(): array
+    {
+        $days = array_values(array_unique(array_filter(
+            array_map('intval', (array) ($this->days ?? [])),
+            static fn (int $day): bool => $day >= 1 && $day <= 7,
+        )));
+
+        sort($days);
+
+        return $days === [] ? [1, 2, 3, 4, 5, 6, 7] : $days;
+    }
+
+    public function runsOn(CarbonInterface $day): bool
+    {
+        return in_array($day->dayOfWeekIso, $this->weekdays(), true);
+    }
+
+    /**
+     * Due from its time on, for CATCH_UP_MINUTES, until today's has gone out.
+     */
+    public function isDue(CarbonInterface $now): bool
+    {
+        if (! $this->is_active || $this->targets() === [] || ! $this->runsOn($now)) {
+            return false;
+        }
+
+        if ($this->last_sent_on?->toDateString() === $now->toDateString()) {
+            return false;
+        }
+
+        $at = $now->copy()->setTimeFromTimeString($this->send_at);
+
+        $late = (int) $at->diffInMinutes($now, false);
+
+        return $late >= 0 && $late <= self::CATCH_UP_MINUTES;
+    }
+
+    /**
+     * The next time it goes out, or null while it is off or has no group.
+     */
+    public function nextRunAt(CarbonInterface $now): ?CarbonInterface
+    {
+        if (! $this->is_active || $this->targets() === []) {
+            return null;
+        }
+
+        for ($offset = 0; $offset <= 7; $offset++) {
+            $at = $now->copy()->addDays($offset)->setTimeFromTimeString($this->send_at);
+
+            if ($at->greaterThan($now) && $this->runsOn($at)) {
+                return $at;
+            }
+        }
+
+        return null;
+    }
+}

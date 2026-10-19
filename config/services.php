@@ -99,6 +99,18 @@ return [
          * token. The bot token itself lives in config/telegram.php.
          */
         'bot_webhook_secret' => env('TELEGRAM_BOT_WEBHOOK_SECRET'),
+
+        /*
+         * Where problems are told to the developer (DeveloperAlerts): a bot
+         * and the chat it writes to. Empty - they are only recorded on the
+         * "How it works" page and in the log. The same problem is told once
+         * per window_minutes.
+         */
+        'alerts' => [
+            'bot_token' => env('TELEGRAM_ALERT_BOT_TOKEN'),
+            'chat_id' => env('TELEGRAM_ALERT_CHAT_ID'),
+            'window_minutes' => (int) env('TELEGRAM_ALERT_WINDOW_MINUTES', 30),
+        ],
     ],
 
 ];

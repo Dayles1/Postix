@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Application\Telegram\Actions;
 
+use App\Application\Telegram\Services\DeveloperAlerts;
+use App\Application\Telegram\Services\DutyOwners;
 use App\Models\Telegram\TelegramFileForward;
 use App\Models\Telegram\TelegramFileRoute;
+use App\Models\Telegram\TelegramListener;
 use danog\MadelineProto\SimpleEventHandler;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -29,12 +32,28 @@ final class RouteTelegramFile
         int $messageId,
         string $fileName,
         string $caption,
+        ?string $listenerKey = null,
     ): bool {
         if (! $this->isSource($chatId) || $messageId <= 0) {
             return false;
         }
 
         $route = $this->match($caption . ' ' . $fileName);
+
+        $owners = app(DutyOwners::class);
+
+        /*
+         * Every account in the bot's chat sees the file; the one the route
+         * is set to (DutyOwners) forwards it. A file of no kind is the
+         * general owner's to record.
+         */
+        if ($route === null) {
+            if (! $owners->ownedBy(TelegramListener::DUTY_FILE_ROUTES, $listenerKey)) {
+                return false;
+            }
+        } elseif ($owners->fileOwner($route->listener_key) !== $listenerKey) {
+            return true;
+        }
 
         $context = [
             'chat_id' => $chatId,
@@ -45,6 +64,18 @@ final class RouteTelegramFile
 
         if ($route === null || $route->targets() === []) {
             Log::info('RouteTelegramFile: no route', $context + ['route_id' => $route?->id]);
+
+            /* A file nobody is set to forward: it stays where it is until a kind or a group is added. */
+            app(DeveloperAlerts::class)->report(
+                kind: 'file_unmatched',
+                title: $route === null
+                    ? 'Файл не подошёл ни к одному виду: ' . ($caption !== '' ? $caption : $fileName)
+                    : 'У вида «' . $route->name . '» нет групп - файл не отправлен',
+                details: 'Добавьте вид или группы на странице «Fayllar».',
+                context: ['Файл' => $fileName !== '' ? $fileName : '-', 'Подпись' => $caption !== '' ? $caption : '-'],
+                listenerKey: $listenerKey,
+                about: $route?->id !== null ? 'route:' . $route->id : ($caption . '|' . $fileName),
+            );
 
             TelegramFileForward::query()->firstOrCreate(
                 [
@@ -97,16 +128,22 @@ final class RouteTelegramFile
     /**
      * Another try at the forwards Telegram refused.
      */
-    public function retry(SimpleEventHandler $telegram): void
+    public function retry(SimpleEventHandler $telegram, ?string $listenerKey = null): void
     {
+        $owners = app(DutyOwners::class);
+
         TelegramFileForward::query()
+            ->with('route')
             ->where('status', TelegramFileForward::STATUS_FAILED)
             ->whereNotNull('target_chat_id')
             ->where('attempts', '<', TelegramFileForward::MAX_ATTEMPTS)
             ->where('created_at', '>=', now()->subDay())
             ->orderBy('id')
-            ->limit(20)
+            ->limit(100)
             ->get()
+            /* Only the files this account forwards: a route's own account, or the general owner's. */
+            ->filter(fn (TelegramFileForward $forward): bool => $owners->fileOwner($forward->route?->listener_key) === $listenerKey)
+            ->take(20)
             ->each(fn (TelegramFileForward $forward) => $this->send($telegram, $forward));
     }
 
@@ -160,7 +197,32 @@ final class RouteTelegramFile
                 'target_chat_id' => $forward->target_chat_id,
                 'error' => $e->getMessage(),
             ]);
+
+            $this->tellDeveloper($forward, $e->getMessage());
         }
+    }
+
+    /**
+     * Which file did not reach which group, and from which account.
+     */
+    private function tellDeveloper(TelegramFileForward $forward, string $error): void
+    {
+        $route = $forward->route;
+        $owner = app(DutyOwners::class)->fileOwner($route?->listener_key);
+
+        app(DeveloperAlerts::class)->report(
+            kind: 'file_forward_failed',
+            title: 'Файл не отправлен в группу ' . $forward->target_chat_id . ' (' . ($route?->name ?? '?') . ')',
+            details: $error . "\n\n" . 'Аккаунт должен состоять в группе и видеть исходное сообщение бота.',
+            context: [
+                'Аккаунт' => $owner ?? 'Driver Check',
+                'Вид' => $route?->name ?? '-',
+                'Файл' => $forward->file_name ?? $forward->caption ?? '-',
+                'Попыток' => $forward->attempts,
+            ],
+            listenerKey: $owner,
+            about: ($forward->file_route_id ?? 0) . ':' . $forward->target_chat_id,
+        );
     }
 
     private function limit(string $value, int $length): ?string

@@ -155,6 +155,11 @@ class MenuHelper
                         'name' => __('telegram.menu.items.personal_answers'),
                         'path' => '/driver-check/personal-answers',
                     ],
+                    [
+                        'icon' => 'calendar',
+                        'name' => __('telegram.menu.items.scheduled_messages'),
+                        'path' => '/driver-check/scheduled-messages',
+                    ],
                 ],
             ],
             [
@@ -174,6 +179,16 @@ class MenuHelper
                         'icon' => 'send',
                         'name' => __('telegram.menu.items.file_routes'),
                         'path' => '/driver-check/file-routes',
+                    ],
+                    [
+                        'icon' => 'authentication',
+                        'name' => __('telegram.menu.items.listeners'),
+                        'path' => '/driver-check/listeners',
+                    ],
+                    [
+                        'icon' => 'bot',
+                        'name' => __('telegram.menu.items.system'),
+                        'path' => '/driver-check/system',
                     ],
                 ],
             ],

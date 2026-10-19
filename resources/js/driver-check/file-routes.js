@@ -17,6 +17,7 @@ const emptyForm = {
     name: '',
     keywords: '',
     targets: '',
+    listener_key: '',
     is_active: true,
 };
 
@@ -41,6 +42,9 @@ export function fileRoutesPage(config) {
         recent: [],
 
         sources: [],
+
+        /* The accounts a kind can go out from: [{key, name}] - Driver Check ('_dc') and the listeners. */
+        accounts: [],
 
         formOpen: false,
 
@@ -72,6 +76,7 @@ export function fileRoutesPage(config) {
                 this.rows = Array.isArray(json.routes) ? json.routes : [];
                 this.recent = Array.isArray(json.recent) ? json.recent : [];
                 this.sources = Array.isArray(json.source_chat_ids) ? json.source_chat_ids : [];
+                this.accounts = Array.isArray(json.accounts) ? json.accounts : [];
             } catch (error) {
                 this.error = error?.message || t.errors.load;
             } finally {
@@ -145,6 +150,18 @@ export function fileRoutesPage(config) {
                 .filter(Boolean);
         },
 
+        /** The account that forwards this kind now: its own choice, or the owner of the files. */
+        senderName(row) {
+            const key = row.sender || '_dc';
+
+            return this.accounts.find((account) => account.key === key)?.name || row.sender || 'Driver Check';
+        },
+
+        /** Set on the kind itself, or following "Files from bots". */
+        senderOwn(row) {
+            return !!row.listener_key;
+        },
+
         forwardFile(item) {
             return item.caption || item.file_name || '—';
         },
@@ -181,6 +198,7 @@ export function fileRoutesPage(config) {
                 name: row.name || '',
                 keywords: row.keywords || '',
                 targets: (row.target_chat_ids || []).join('\n'),
+                listener_key: row.listener_key || '',
                 is_active: !!row.is_active,
             };
 
@@ -236,6 +254,7 @@ export function fileRoutesPage(config) {
                             name: this.form.name,
                             keywords: this.form.keywords,
                             target_chat_ids: this.form.targets,
+                            listener_key: this.form.listener_key || null,
                             is_active: this.form.is_active,
                         }),
                     },

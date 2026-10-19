@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models\Telegram;
 
 use App\Enums\Telegram\TelegramClientCheckStatus;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -154,5 +155,30 @@ class TelegramClientCheck extends Model
             OperationUser::class,
             'operation_user_id',
         );
+    }
+
+    /**
+     * Penalties of the people with one of these roles (DutyOwners): the
+     * account that delivers a role's penalties is the only one to touch them.
+     * A row without a role reads as an operator.
+     *
+     * @param list<string> $roles
+     */
+    public function scopeForRoles(Builder $query, array $roles): Builder
+    {
+        /* Every role: nothing is split, and the penalties are not narrowed down at all (as before roles existed). */
+        if (array_diff(OperationUser::ROLES, $roles) === []) {
+            return $query;
+        }
+
+        return $query->whereHas('operationUser', function (Builder $person) use ($roles): void {
+            $person->where(function (Builder $role) use ($roles): void {
+                $role->whereIn('role', $roles);
+
+                if (in_array(OperationUser::ROLE_OPERATION, $roles, true)) {
+                    $role->orWhereNull('role');
+                }
+            });
+        });
     }
 }

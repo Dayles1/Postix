@@ -8,6 +8,8 @@ use App\Application\Telegram\Services\ClientCheckEscalation;
 use App\Application\Telegram\Services\ClientCheckRules;
 use App\Application\Telegram\Services\ClientCheckSender;
 use App\Application\Telegram\Services\CrmSalesTurn;
+use App\Application\Telegram\Services\DeveloperAlerts;
+use App\Application\Telegram\Services\DutyOwners;
 use App\Application\Telegram\Services\TelegramPenaltyMessageParser;
 use App\Enums\Telegram\TelegramClientCheckStatus;
 use App\Models\Telegram\OperationUser;
@@ -46,6 +48,7 @@ final class ProcessClientCheckMessage
         int $messageId,
         string $text,
         array $raw = [],
+        ?string $listenerKey = null,
     ): ?TelegramClientCheck {
         $parsed = $this->parser->parse($text);
 
@@ -215,6 +218,27 @@ final class ProcessClientCheckMessage
                 'reason' => TelegramClientCheck::REASON_RESPONSIBLE_UNREACHABLE,
             ]);
 
+            /*
+             * Nobody to write to: only the developer can fix it (a username or
+             * an id on the card). A person with an address whose private chat
+             * is switched off is muted on purpose and is not reported.
+             */
+            if (! $person->hasTelegramPeer()) {
+                app(DeveloperAlerts::class)->report(
+                    kind: 'penalty_unreachable',
+                    title: 'Штраф некому отправить: у ' . $person->name . ' нет username и Telegram ID',
+                    details: 'Сохраните Telegram ID или username в карточке человека. Если username нет - напишите ему с аккаунта, '
+                        . 'который отправляет штрафы, и сохраните ID.',
+                    context: [
+                        'Роль' => $person->roleOrDefault(),
+                        'Человек (id)' => $person->id,
+                        'Заявка' => $check->request_number ?? '-',
+                    ],
+                    listenerKey: app(DutyOwners::class)->penaltyOwner($person->roleOrDefault()),
+                    about: (string) $person->id,
+                );
+            }
+
             Log::info(
                 'Client check skipped',
                 [
@@ -241,6 +265,31 @@ final class ProcessClientCheckMessage
                 'check_id' => $check->id,
                 'operation_user_id' => $person->id,
                 'reason' => TelegramClientCheck::REASON_PERSON_PENALTIES_OFF,
+            ]);
+
+            return $check;
+        }
+
+        /*
+         * Another listener delivers the penalties (Listeners -> Who does
+         * what): the penalty is left as a forward that did not go out yet,
+         * which that listener's own tick picks up within seconds - the same
+         * way it takes a forward Telegram refused.
+         */
+        $owner = app(DutyOwners::class)->penaltyOwner($person->roleOrDefault());
+
+        /* $listenerKey: the account that took the penalty in (null is Driver Check). */
+        if ($owner !== $listenerKey) {
+            $check->update([
+                'status' => TelegramClientCheckStatus::Failed,
+                'reason' => TelegramClientCheck::REASON_FORWARD_FAILED,
+                'error' => $owner === null ? 'Handed over to Driver Check' : 'Handed over to the listener «' . $owner . '»',
+            ]);
+
+            Log::info('Client check: handed over', [
+                'check_id' => $check->id,
+                'role' => $person->roleOrDefault(),
+                'listener' => $owner,
             ]);
 
             return $check;

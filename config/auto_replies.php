@@ -125,6 +125,15 @@ return [
         'max' => 2,
     ],
 
+    /*
+     * A message of more words than this is never answered, whatever kind
+     * it looks like ("Клиент пока не ответил, он в Китае... что мне
+     * написать?"): it is a conversation for the person in charge. It is
+     * still kept on the penalty it replies to. Not in the panel: it holds
+     * over every kind's own max_words.
+     */
+    'silent_over_words' => 15,
+
     'defaults' => [
 
         'enabled' => true,

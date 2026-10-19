@@ -147,15 +147,13 @@ class TelegramAccount extends Model
     }
 
     /**
-     * The listener account (TELEGRAM_DRIVER_CHECK_ACCOUNT_ID).
+     * A listener account: Driver Check's (TELEGRAM_DRIVER_CHECK_ACCOUNT_ID)
+     * or one of the enabled listeners of telegram_listeners. Its session
+     * belongs to that listener's process.
      */
     public function isPrimary(): bool
     {
-        $primaryId = config('services.telegram.driver_check_account_id');
-
-        return $primaryId !== null
-            && $primaryId !== ''
-            && (int) $primaryId === (int) $this->id;
+        return \App\Application\Telegram\Services\ListenerAccounts::has((int) $this->id);
     }
 
     public function isInFlight(): bool

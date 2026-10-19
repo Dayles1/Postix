@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\Telegram;
 
+use App\Application\Telegram\Services\DutyOwners;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\Telegram\FileRouteRequest;
 use App\Models\Telegram\TelegramFileForward;
 use App\Models\Telegram\TelegramFileRoute;
+use App\Models\Telegram\TelegramListener;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -51,7 +53,35 @@ final class FileRouteController extends Controller
                 'created_at' => $forward->created_at,
             ])->all(),
             'source_chat_ids' => array_values((array) config('file_routes.source_chat_ids', [])),
+            'accounts' => $this->accounts(),
         ]);
+    }
+
+    /**
+     * The accounts a kind of file can go out from: Driver Check and the
+     * listeners that are on and have an account. The empty choice follows
+     * the owner of the files (Listeners -> Who does what).
+     *
+     * @return list<array{key: string, name: string}>
+     */
+    private function accounts(): array
+    {
+        $accounts = [['key' => DutyOwners::DRIVER_CHECK, 'name' => 'Driver Check']];
+
+        try {
+            TelegramListener::query()
+                ->where('is_enabled', true)
+                ->whereNotNull('telegram_account_id')
+                ->orderBy('name')
+                ->get(['key', 'name'])
+                ->each(function (TelegramListener $listener) use (&$accounts): void {
+                    $accounts[] = ['key' => $listener->key, 'name' => $listener->name];
+                });
+        } catch (\Throwable) {
+            /* The table is not there yet (migration pending): Driver Check alone. */
+        }
+
+        return $accounts;
     }
 
     public function store(FileRouteRequest $request): JsonResponse
@@ -92,6 +122,9 @@ final class FileRouteController extends Controller
             'name' => $route->name,
             'keywords' => $route->keywords,
             'target_chat_ids' => $route->targets(),
+            'listener_key' => $route->listener_key,
+            /* Who forwards it right now: a listener key, null for Driver Check. */
+            'sender' => app(DutyOwners::class)->fileOwner($route->listener_key),
             'is_active' => (bool) $route->is_active,
             'sort' => $route->sort,
             'sent_count' => (int) ($route->sent_count ?? 0),

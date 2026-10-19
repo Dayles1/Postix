@@ -15,9 +15,12 @@ use App\Application\Telegram\Actions\RouteTelegramFile;
 use App\Application\Telegram\Actions\TelegramDriverCheckStarter;
 use App\Application\Telegram\Services\AutoReplyTelegramGifs;
 use App\Application\Telegram\Services\ClientCheckSender;
+use App\Application\Telegram\Services\DutyOwners;
+use App\Application\Telegram\Services\ScheduledMessageSender;
 use App\Application\Telegram\Services\TelegramDriverCheckChats;
 use App\Application\Telegram\Services\TelegramDriverCheckRecorder;
 use App\Application\Telegram\Services\TelegramMessageTypeDetector;
+use App\Models\Telegram\TelegramListener;
 use App\Enums\Drivers\TelegramDriverMessageType;
 use danog\MadelineProto\EventHandler\Attributes\Cron;
 use danog\MadelineProto\EventHandler\Attributes\Handler;
@@ -134,7 +137,10 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
                  * writing to us - "+", "ok" after a penalty - is answered
                  * from the auto replies file. Strangers are not.
                  */
-                if ((int) $chatId > 0) {
+                if (
+                    (int) $chatId > 0
+                    && app(DutyOwners::class)->ownsPenalties(null)
+                ) {
                     app(
                         ProcessAutoReply::class,
                     )->execute(
@@ -158,6 +164,7 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
              */
             if (
                 $message->media instanceof Document
+                && app(DutyOwners::class)->ownsFiles(null)
                 && app(
                     RouteTelegramFile::class,
                 )->execute(
@@ -217,6 +224,11 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
              * its own table and flow and never reaches the recorder below.
              */
             if ($type === TelegramDriverMessageType::PENALTY) {
+                /* Another listener reads the penalties (Listeners -> Who does what): left to it. */
+                if (! app(DutyOwners::class)->ownedBy(TelegramListener::DUTY_PENALTY_INTAKE, null)) {
+                    return;
+                }
+
                 app(
                     ProcessClientCheckMessage::class,
                 )->execute(
@@ -407,6 +419,11 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
             return;
         }
 
+        /* Other listeners are set to deliver all the penalties (Listeners -> Who does what). */
+        if (! app(DutyOwners::class)->ownsPenalties(null)) {
+            return;
+        }
+
         try {
             app(
                 ClientCheckSender::class,
@@ -451,6 +468,10 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
             return;
         }
 
+        if (! app(DutyOwners::class)->ownsFiles(null)) {
+            return;
+        }
+
         try {
             app(
                 RouteTelegramFile::class,
@@ -467,6 +488,32 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
     }
 
     /**
+     * The scheduled messages (Driver check -> Scheduled messages): those
+     * whose time has come, and those "Send now" was pressed for.
+     */
+    #[Cron(period: 5.0)]
+    public function sendScheduledMessages(): void
+    {
+        if ($this->targetChatIds === null || $this->restartRequested) {
+            return;
+        }
+
+        try {
+            app(
+                ScheduledMessageSender::class,
+            )->flush($this);
+        } catch (Throwable $e) {
+            Log::error(
+                'TelegramDriverCheckHandler: scheduled messages failed',
+                [
+                    'error' => $e->getMessage(),
+                    'exception' => $e::class,
+                ],
+            );
+        }
+    }
+
+    /**
      * The auto replies page looking for a GIF in Telegram: only this
      * process owns the session, so the panel leaves the search here.
      */
@@ -474,6 +521,11 @@ final class TelegramDriverCheckHandler extends SimpleEventHandler
     public function answerGifSearches(): void
     {
         if ($this->restartRequested) {
+            return;
+        }
+
+        /* The GIFs are searched with the account that answers the replies. */
+        if (! app(DutyOwners::class)->ownsPenalties(null)) {
             return;
         }
 

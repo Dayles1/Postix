@@ -14,6 +14,10 @@ use App\Http\Controllers\Api\Telegram\DriverCheckExportController;
 use App\Http\Controllers\Api\Telegram\DriverCheckQueueController;
 use App\Http\Controllers\Api\Telegram\DriverCheckWatchdogController;
 use App\Http\Controllers\Api\Telegram\FileRouteController;
+use App\Http\Controllers\Api\Telegram\ListenerController;
+use App\Http\Controllers\Api\Telegram\ListenerProcessController;
+use App\Http\Controllers\Api\Telegram\SystemController;
+use App\Http\Controllers\Api\Telegram\ScheduledMessageController;
 use App\Http\Controllers\Api\Telegram\OperationUserController;
 use App\Http\Controllers\Api\Telegram\PersonalAnswerController;
 use App\Http\Controllers\Api\Telegram\OperatorController;
@@ -264,6 +268,31 @@ Route::middleware(['auth', 'role:driverCheck,superadmin'])
             '/file-routes',
             [DriverCheckController::class, 'fileRoutes']
         )->name('driver-check.file-routes');
+
+        /*
+         * Scheduled messages: what the listener's account writes into
+         * groups, and when.
+         */
+        Route::get(
+            '/scheduled-messages',
+            [DriverCheckController::class, 'scheduledMessages']
+        )->name('driver-check.scheduled-messages');
+
+        /*
+         * Listeners: the extra accounts running their own event loop.
+         */
+        Route::get(
+            '/listeners',
+            [DriverCheckController::class, 'listeners']
+        )->name('driver-check.listeners');
+
+        /*
+         * How it works: every independent logic, who does it now, the problems.
+         */
+        Route::get(
+            '/system',
+            [DriverCheckController::class, 'system']
+        )->name('driver-check.system');
 
         /*
          * Monitoring: the listener under its watchdog, and the queue
@@ -566,6 +595,54 @@ Route::middleware(['auth', 'role:driverCheck,superadmin'])
             '/file-routes/{fileRoute}',
             [FileRouteController::class, 'destroy']
         )->name('api.telegram.file-routes.destroy');
+
+        /*
+         * Scheduled messages (management CRUD)
+         */
+        Route::get('/scheduled-messages', [ScheduledMessageController::class, 'index'])
+            ->name('api.telegram.scheduled-messages.index');
+
+        Route::post('/scheduled-messages', [ScheduledMessageController::class, 'store'])
+            ->name('api.telegram.scheduled-messages.store');
+
+        Route::put('/scheduled-messages/{scheduledMessage}', [ScheduledMessageController::class, 'update'])
+            ->name('api.telegram.scheduled-messages.update');
+
+        Route::delete('/scheduled-messages/{scheduledMessage}', [ScheduledMessageController::class, 'destroy'])
+            ->name('api.telegram.scheduled-messages.destroy');
+
+        Route::post('/scheduled-messages/{scheduledMessage}/send', [ScheduledMessageController::class, 'send'])
+            ->name('api.telegram.scheduled-messages.send');
+
+        /*
+         * Listeners: the accounts running their own event loop (CEO, Head Operation ...)
+         */
+        Route::get('/listeners', [ListenerController::class, 'index'])
+            ->name('api.telegram.listeners.index');
+
+        Route::get('/system', [SystemController::class, 'index'])
+            ->name('api.telegram.system');
+
+        Route::post('/listener-processes/start', [ListenerProcessController::class, 'start'])
+            ->name('api.telegram.listener-processes.start');
+
+        Route::post('/listener-processes/restart', [ListenerProcessController::class, 'restart'])
+            ->name('api.telegram.listener-processes.restart');
+
+        Route::post('/listener-processes/stop', [ListenerProcessController::class, 'stop'])
+            ->name('api.telegram.listener-processes.stop');
+
+        Route::put('/listener-duties', [ListenerController::class, 'updateOwners'])
+            ->name('api.telegram.listeners.owners');
+
+        Route::post('/listeners', [ListenerController::class, 'store'])
+            ->name('api.telegram.listeners.store');
+
+        Route::put('/listeners/{listener}', [ListenerController::class, 'update'])
+            ->name('api.telegram.listeners.update');
+
+        Route::delete('/listeners/{listener}', [ListenerController::class, 'destroy'])
+            ->name('api.telegram.listeners.destroy');
 
         /*
          * Watchdog

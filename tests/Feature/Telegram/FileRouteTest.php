@@ -71,6 +71,17 @@ class FileRouteTest extends TestCase
         Schema::dropIfExists('telegram_file_routes');
 
         (require base_path('database/migrations/2026_10_12_110000_create_telegram_file_routes_tables.php'))->up();
+        (require base_path('database/migrations/2026_10_19_100000_add_listener_key_to_telegram_file_routes.php'))->up();
+
+        /* Who forwards a file is asked of the listeners (DutyOwners). */
+        Schema::dropIfExists('telegram_listeners');
+        Schema::dropIfExists('telegram_accounts');
+        Schema::create('telegram_accounts', function (\Illuminate\Database\Schema\Blueprint $table): void {
+            $table->id();
+            $table->timestamps();
+        });
+        \Illuminate\Support\Facades\DB::table('telegram_accounts')->insert(['id' => 10]);
+        (require base_path('database/migrations/2026_10_17_130000_create_telegram_listeners_table.php'))->up();
 
         config()->set('file_routes.source_chat_ids', [self::BOT]);
 
@@ -313,5 +324,37 @@ class FileRouteTest extends TestCase
             'name' => 'Checker',
             'role_id' => $role->id,
         ]));
+    }
+
+    public function test_a_kind_set_to_another_account_is_forwarded_by_that_account_only(): void
+    {
+        \App\Models\Telegram\TelegramListener::query()->create([
+            'key' => 'head_china',
+            'name' => 'Head China',
+            'telegram_account_id' => 10,
+            'is_enabled' => true,
+            'duties' => [],
+        ]);
+
+        TelegramFileRoute::query()->where('name', 'Zitic')->update(['listener_key' => 'head_china']);
+
+        /* Driver Check sees the file too and leaves it: the kind is head_china's. */
+        $this->assertTrue($this->route(40, 'Zitic — 2026-10-09'));
+        $this->assertSame([], $this->messages->targets());
+
+        $this->assertTrue(app(RouteTelegramFile::class)->execute(
+            telegram: $this->telegram,
+            chatId: self::BOT,
+            messageId: 40,
+            fileName: 'report.xlsx',
+            caption: 'Zitic — 2026-10-09',
+            listenerKey: 'head_china',
+        ));
+
+        $this->assertSame([self::ZITIC_GROUP], $this->messages->targets());
+
+        /* The other kinds stay with Driver Check. */
+        $this->assertTrue($this->route(41, 'Declarant (Benyakoni) — 2026-10-09'));
+        $this->assertSame([self::ZITIC_GROUP, self::BENYAKONI_GROUP], $this->messages->targets());
     }
 }

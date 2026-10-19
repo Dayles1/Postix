@@ -18,6 +18,8 @@
         '/driver-check/penalties/settings' => 'sliders-h',
         '/driver-check/auto-replies' => 'bot',
         '/driver-check/personal-answers' => 'message',
+        '/driver-check/scheduled-messages' => 'clock',
+        '/driver-check/listeners' => 'bot',
         '/driver-check/chats' => 'send',
         '/driver-check/file-routes' => 'route',
         '/driver-check/sessions' => 'key',

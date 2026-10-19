@@ -9,6 +9,7 @@ use App\Application\Telegram\Services\AutoReplyRules;
 use App\Application\Telegram\Services\AutoReplyStore;
 use App\Application\Telegram\Services\ClientCheckEscalation;
 use App\Application\Telegram\Services\ClientCheckRules;
+use App\Application\Telegram\Services\DutyOwners;
 use App\Application\Telegram\Services\PersonalAnswers;
 use App\Models\Telegram\OperationUser;
 use App\Models\Telegram\TelegramClientCheck;
@@ -73,12 +74,16 @@ final class NudgeSilentClientChecks
     ) {
     }
 
-    public function execute(SimpleEventHandler $telegram): void
+    public function execute(SimpleEventHandler $telegram, ?string $key = null): void
     {
         $rules = $this->store->current();
 
+        /* Only the roles this account writes to (DutyOwners). */
+        $roles = app(DutyOwners::class)->penaltyRoles($key);
+
         if (
-            ! $rules->enabled
+            $roles === []
+            || ! $rules->enabled
             || ! $rules->silence['enabled']
             || ! TelegramSetting::clientChecksEnabled()
             || ! $this->escalation->rules()->withinWorkingHours()
@@ -93,6 +98,7 @@ final class NudgeSilentClientChecks
          * would follow.
          */
         $checks = TelegramClientCheck::query()
+            ->forRoles($roles)
             ->with('operationUser')
             ->whereNotNull('operation_user_id')
             ->whereNotNull('comment')

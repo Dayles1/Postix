@@ -305,6 +305,20 @@ class ClientCheckTest extends TestCase
         Schema::dropIfExists('telegram_settings');
         Schema::dropIfExists('telegram_client_checks');
         Schema::dropIfExists('operation_users');
+        Schema::dropIfExists('telegram_alerts');
+        Schema::dropIfExists('telegram_listeners');
+
+        (require base_path('database/migrations/2026_10_19_110000_create_telegram_alerts_table.php'))->up();
+
+        Schema::create('telegram_listeners', function (Blueprint $table): void {
+            $table->id();
+            $table->string('key', 32)->unique();
+            $table->string('name');
+            $table->unsignedBigInteger('telegram_account_id')->nullable();
+            $table->boolean('is_enabled')->default(true);
+            $table->json('duties')->nullable();
+            $table->timestamps();
+        });
 
         Schema::create('telegram_settings', function (Blueprint $table): void {
             $table->id();
@@ -2582,5 +2596,121 @@ class ClientCheckTest extends TestCase
 
         Http::assertSentCount(3);
         $this->assertSame('T2', Cache::get('crm_api_token'));
+    }
+
+    /*
+     * ------------------------------------------------------------------
+     * Penalties by role, by account (DutyOwners) and the developer alerts
+     * ------------------------------------------------------------------
+     */
+
+    private function listenerFor(string $key): void
+    {
+        \App\Models\Telegram\TelegramListener::query()->create([
+            'key' => $key,
+            'name' => strtoupper($key),
+            'telegram_account_id' => 10,
+            'is_enabled' => true,
+            'duties' => [],
+        ]);
+    }
+
+    private function forwards(): array
+    {
+        return array_values(array_filter($this->messages->calls, fn (array $call): bool => $call[0] === 'forward'));
+    }
+
+    public function test_a_penalty_of_a_role_given_to_another_account_is_handed_over_and_that_account_sends_it(): void
+    {
+        $this->listenerFor('head_operation');
+        app(\App\Application\Telegram\Services\DutyOwners::class)->saveRoles(['operation' => 'head_operation']);
+
+        $this->person();
+
+        $check = $this->penalty();
+
+        $this->assertSame(TelegramClientCheckStatus::Failed, $check->status);
+        $this->assertSame(TelegramClientCheck::REASON_FORWARD_FAILED, $check->reason);
+        $this->assertStringContainsString('head_operation', (string) $check->error);
+        $this->assertSame([], $this->forwards(), 'Driver Check does not write to an operator of another account');
+
+        /* Driver Check's own tick leaves it alone ... */
+        app(ClientCheckSender::class)->flush($this->telegram);
+        $this->assertSame([], $this->forwards());
+
+        /* ... the account it was given to sends it. */
+        app(ClientCheckSender::class)->flush($this->telegram, 'head_operation');
+        $this->assertCount(1, $this->forwards());
+        $this->assertSame(TelegramClientCheckStatus::Forwarded, $check->refresh()->status);
+    }
+
+    public function test_the_roles_not_given_away_stay_with_driver_check(): void
+    {
+        $this->listenerFor('head_sales');
+        app(\App\Application\Telegram\Services\DutyOwners::class)->saveRoles(['sales' => 'head_sales']);
+
+        $this->person();
+
+        $check = $this->penalty();
+
+        $this->assertSame(TelegramClientCheckStatus::Forwarded, $check->status, 'an operator is still Driver Checks');
+        $this->assertCount(1, $this->forwards());
+    }
+
+    public function test_a_penalty_taken_in_by_another_account_is_handed_to_the_one_that_sends_it(): void
+    {
+        $this->listenerFor('ceo');
+
+        $this->person();
+
+        /* The role is Driver Check's, but "ceo" read the group. */
+        $check = app(ProcessClientCheckMessage::class)->execute(
+            telegram: $this->telegram,
+            chatId: self::BOT_CHAT_ID,
+            messageId: ++$this->messageId,
+            text: self::OPERATION,
+            listenerKey: 'ceo',
+        );
+
+        $this->assertSame(TelegramClientCheckStatus::Failed, $check->status);
+        $this->assertSame('Handed over to Driver Check', $check->error);
+        $this->assertSame([], $this->forwards());
+
+        app(ClientCheckSender::class)->flush($this->telegram);
+
+        $this->assertCount(1, $this->forwards());
+    }
+
+    public function test_the_developer_is_told_when_a_penalty_cannot_be_delivered(): void
+    {
+        $this->person();
+
+        $this->messages->forwardFailsFor = ['@afzal', 555];
+
+        $check = $this->penalty();
+
+        $this->assertSame(TelegramClientCheckStatus::Failed, $check->status);
+
+        $alert = \App\Models\Telegram\TelegramAlert::query()->firstOrFail();
+
+        $this->assertSame('penalty_forward_failed', $alert->kind);
+        $this->assertStringContainsString('PULATOV', $alert->title);
+        $this->assertStringContainsString('USERNAME_INVALID', (string) $alert->details);
+
+        /* The same person failing again is the same problem. */
+        $this->penalty(request: 'TLS04835');
+
+        $this->assertSame(1, \App\Models\Telegram\TelegramAlert::query()->count());
+        $this->assertSame(2, $alert->refresh()->occurrences);
+    }
+
+    public function test_the_developer_is_told_about_a_person_nobody_can_write_to(): void
+    {
+        $this->penalty(text: self::SALES);
+
+        $alert = \App\Models\Telegram\TelegramAlert::query()->firstOrFail();
+
+        $this->assertSame('penalty_unreachable', $alert->kind);
+        $this->assertStringContainsString('BELYAKOVA', $alert->title);
     }
 }

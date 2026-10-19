@@ -90,6 +90,27 @@ final class DriverCheckController extends Controller
         );
     }
 
+    public function listeners()
+    {
+        return view(
+            'pages.driver-check.listeners'
+        );
+    }
+
+    public function system()
+    {
+        return view(
+            'pages.driver-check.system'
+        );
+    }
+
+    public function scheduledMessages()
+    {
+        return view(
+            'pages.driver-check.scheduled-messages'
+        );
+    }
+
     public function sessions()
     {
         return view(
