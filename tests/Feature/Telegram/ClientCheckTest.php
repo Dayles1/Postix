@@ -63,8 +63,15 @@ final class FakeClientCheckMessages
         return true;
     }
 
+    /** The account does not have the group the penalty was posted in (another account than Driver Check delivers). */
+    public bool $sourceUnknown = false;
+
     public function forwardMessages(array $params): array
     {
+        if ($this->sourceUnknown) {
+            throw new RuntimeException(\danog\MadelineProto\Lang::$lang['uz']['peer_not_in_db']);
+        }
+
         if (in_array($params['to_peer'], $this->forwardFailsFor, true)) {
             throw new RuntimeException('USERNAME_INVALID: ' . $params['to_peer']);
         }
@@ -2712,5 +2719,40 @@ class ClientCheckTest extends TestCase
 
         $this->assertSame('penalty_unreachable', $alert->kind);
         $this->assertStringContainsString('BELYAKOVA', $alert->title);
+    }
+
+    public function test_an_account_that_does_not_see_the_group_sends_the_penalty_as_a_copy(): void
+    {
+        $this->person();
+
+        $this->messages->sourceUnknown = true;
+
+        $check = $this->penalty();
+
+        $this->assertSame(TelegramClientCheckStatus::Forwarded, $check->status);
+        $this->assertSame('@afzal', $check->peer);
+        $this->assertSame('copy', $check->metrics['delivery']);
+        $this->assertSame([], $this->forwards());
+
+        $sent = array_values(array_filter($this->messages->calls, fn (array $c): bool => $c[0] === 'send' && $c[1]['message'] === $check->message_text));
+
+        $this->assertCount(1, $sent, 'the bot\'s own words, as a message');
+        $this->assertSame('@afzal', $sent[0][1]['peer']);
+        $this->assertSame(0, \App\Models\Telegram\TelegramAlert::query()->count(), 'delivered: nothing to tell the developer');
+    }
+
+    public function test_another_failure_is_not_turned_into_a_copy(): void
+    {
+        $this->person();
+
+        $this->messages->forwardFailsFor = ['@afzal', 555];
+
+        $check = $this->penalty();
+
+        $this->assertSame(TelegramClientCheckStatus::Failed, $check->status);
+
+        $sent = array_filter($this->messages->calls, fn (array $c): bool => $c[0] === 'send' && ($c[1]['message'] ?? null) === $check->message_text);
+
+        $this->assertSame([], $sent, 'no such username is not the group\'s fault');
     }
 }

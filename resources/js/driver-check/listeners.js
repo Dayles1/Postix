@@ -42,21 +42,11 @@ export function listenersPage(config) {
 
         duties: [],
 
-        presetKeys: [],
-
         /* Who does what: { duties: [{duty, owner, saved}], options: [{key, name, running}] } */
         owners: { duties: [], options: [] },
 
         /* The select values: '' is Driver Check. */
         ownerForm: {},
-
-        /* The one watchdog that runs everything: { running, pid, queue_worker_alive, command } */
-        processes: { running: false, pid: null, queue_worker_alive: true, command: '' },
-
-        /* Which button is waiting for its answer: 'start' | 'restart' | 'stop' | a listener key. */
-        busy: null,
-
-        processError: null,
 
         /* Penalties by role: { sales: '', operation: '_dc' } - '' follows "Penalties", '_dc' is Driver Check. */
         roleForm: {},
@@ -105,13 +95,8 @@ export function listenersPage(config) {
                 this.rows = Array.isArray(json.listeners) ? json.listeners : [];
                 this.accounts = Array.isArray(json.accounts) ? json.accounts : [];
                 this.duties = Array.isArray(json.duties) ? json.duties : [];
-                this.presetKeys = Array.isArray(json.preset_keys) ? json.preset_keys : [];
 
                 this.applyOwners(json.owners);
-
-                if (json.processes) {
-                    this.processes = json.processes;
-                }
             } catch (error) {
                 this.error = error?.message || t.errors.load;
             } finally {
@@ -240,42 +225,6 @@ export function listenersPage(config) {
                 this.ownersError = error?.message || t.errors.save;
             } finally {
                 this.savingOwners = false;
-            }
-        },
-
-        /*
-        |----------------------------------------------------------------
-        | Processes: one watchdog for all of them
-        |----------------------------------------------------------------
-        */
-
-        /** Start the watchdog / restart one listener or all / stop everything. */
-        async control(action, key = null) {
-            if (this.busy) {
-                return;
-            }
-
-            this.busy = key || action;
-            this.processError = null;
-
-            try {
-                const json = await this.request(`${this.endpoints.processes}/${action}`, {
-                    method: 'POST',
-                    body: JSON.stringify(key ? { key } : {}),
-                });
-
-                if (json.status) {
-                    this.processes = json.status;
-                }
-
-                this.notify(json.message || t.processes.messages.done);
-
-                /* The processes come and go within seconds of the request. */
-                setTimeout(() => this.load(true), 4000);
-            } catch (error) {
-                this.processError = error?.message || t.errors.save;
-            } finally {
-                this.busy = null;
             }
         },
 
@@ -415,14 +364,6 @@ export function listenersPage(config) {
             this.formOpen = false;
         },
 
-        usePreset(key) {
-            this.form.key = key;
-
-            if (!this.form.name) {
-                this.form.name = t.presets[key] || key;
-            }
-        },
-
         /** Accounts a listener can take: free ones, and this row's own. */
         freeAccounts() {
             return this.accounts.filter(
@@ -530,16 +471,6 @@ export function listenersPage(config) {
                 this.confirmError = error?.message || t.errors.delete;
             } finally {
                 this.deleting = false;
-            }
-        },
-
-        async copyCommand(row) {
-            try {
-                await navigator.clipboard.writeText(row.command);
-
-                this.notify(t.messages.copied);
-            } catch (_) {
-                this.notify(row.command, false);
             }
         },
 

@@ -68,13 +68,6 @@ class TelegramListener extends Model
         self::DUTY_FILE_ROUTES,
     ];
 
-    /**
-     * Suggested keys for the panel; any other [a-z0-9_] name works.
-     *
-     * @var list<string>
-     */
-    public const PRESET_KEYS = ['ceo', 'head_operation', 'head_sales', 'head_china', 'head_europe'];
-
     protected $fillable = [
         'key',
         'name',

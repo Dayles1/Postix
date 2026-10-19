@@ -34,6 +34,15 @@ final class TelegramListenersWatchdogCommand extends Command
 {
     public const LOCK_NAME = 'listeners-watchdog-all';
 
+    /** Where the last exit of each process is kept for the panel: this + the key. */
+    public const LAST_EXIT_CACHE = 'listeners-watchdog:last-exit:';
+
+    /** Where the last start attempt of each process is kept for the panel: this + the key. */
+    public const LAST_START_CACHE = 'listeners-watchdog:last-start:';
+
+    /** How long it is kept, seconds. */
+    private const LAST_EXIT_TTL = 3600;
+
     /** A listener that dies faster than this did not really run. */
     private const FAST_FAILURE_SECONDS = 60;
 
@@ -67,6 +76,9 @@ final class TelegramListenersWatchdogCommand extends Command
 
     /** @var array<string, int> */
     private array $failures = [];
+
+    /** @var array<string, string> the end of what each child printed, for the panel when it dies */
+    private array $tails = [];
 
     /** @var array<string, true> asked to restart from the panel: their exit is not a crash */
     private array $restarting = [];
@@ -172,6 +184,10 @@ final class TelegramListenersWatchdogCommand extends Command
         $this->startedAt[$key] = microtime(true);
 
         $this->info("Started {$key}, pid " . $process->getPid());
+
+        Log::info('Listeners watchdog: started', ['key' => $key, 'pid' => $process->getPid(), 'command' => implode(' ', $command)]);
+
+        $this->remember(self::LAST_START_CACHE . $key, ['at' => now()->toIso8601String(), 'pid' => $process->getPid()]);
     }
 
     /**
@@ -184,6 +200,9 @@ final class TelegramListenersWatchdogCommand extends Command
             /* isRunning() pumps the pipes; the buffers are dropped so days of output are not kept. */
             $running = $process->isRunning();
 
+            /* What it printed, kept short: the reason it gives when it refuses to start. */
+            $this->tails[$key] = mb_substr(($this->tails[$key] ?? '') . $process->getIncrementalOutput() . $process->getIncrementalErrorOutput(), -600);
+
             $process->clearOutput();
             $process->clearErrorOutput();
 
@@ -195,6 +214,8 @@ final class TelegramListenersWatchdogCommand extends Command
             $seconds = microtime(true) - ($this->startedAt[$key] ?? microtime(true));
 
             unset($this->children[$key], $this->startedAt[$key]);
+
+            $this->rememberExit($key, $exit);
 
             /* Restarted from the panel: not a crash, back in a moment, nothing counted. */
             if (isset($this->restarting[$key])) {
@@ -284,6 +305,11 @@ final class TelegramListenersWatchdogCommand extends Command
             $key = (string) ($request['key'] ?? ListenersControl::ALL);
 
             foreach ($key === ListenersControl::ALL ? array_keys($this->children) : [$key] as $child) {
+                /* "All" is the listeners: Driver Check is restarted by its own signal, never by terminating its watchdog. */
+                if ($key === ListenersControl::ALL && $child === 'driver-check') {
+                    continue;
+                }
+
                 if (! isset($this->children[$child]) || ! $this->children[$child]->isRunning()) {
                     continue;
                 }
@@ -295,6 +321,48 @@ final class TelegramListenersWatchdogCommand extends Command
                 /* The process unwinds its event loop and saves its session; the loop above starts it again. */
                 $this->children[$child]->signal(SIGTERM);
             }
+        }
+    }
+
+    /**
+     * A process that ended other than on purpose: what it printed, for the panel
+     * to show next to the account ("Session path not found ...").
+     */
+    private function rememberExit(string $key, ?int $exit): void
+    {
+        $message = trim((string) preg_replace('/\e\[[0-9;]*m/', '', $this->tails[$key] ?? ''));
+
+        unset($this->tails[$key]);
+
+        if ($exit === self::SUCCESS) {
+            return;
+        }
+
+        /* In the log whatever the code: a process that refuses to start used to leave no trace at all. */
+        Log::warning('Listeners watchdog: a process ended', [
+            'key' => $key,
+            'exit_code' => $exit,
+            'said' => mb_substr($message, -300),
+        ]);
+
+        $this->remember(self::LAST_EXIT_CACHE . $key, [
+            'message' => mb_substr($message, -300),
+            'exit' => $exit,
+            'at' => now()->toIso8601String(),
+        ]);
+    }
+
+    /**
+     * What the panel shows next to an account.
+     *
+     * @param array<string, mixed> $value
+     */
+    private function remember(string $key, array $value): void
+    {
+        try {
+            \Illuminate\Support\Facades\Cache::put($key, $value, self::LAST_EXIT_TTL);
+        } catch (Throwable) {
+            /* The panel just shows nothing. */
         }
     }
 

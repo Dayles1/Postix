@@ -570,7 +570,7 @@ class ListenerTest extends TestCase
         $this->assertSame([], $control->after(2));
     }
 
-    public function test_start_all_queues_the_watchdog_and_the_other_buttons_need_it_running(): void
+    public function test_start_all_goes_through_the_queue_worker_never_from_the_web_process(): void
     {
         $this->signIn();
 
@@ -578,9 +578,19 @@ class ListenerTest extends TestCase
 
         $this->listener('ceo', self::CEO);
 
+        $spawned = false;
+
+        $this->partialMock(\App\Application\Telegram\Services\ListenersControl::class, function ($mock) use (&$spawned): void {
+            $mock->shouldReceive('running')->andReturn(false);
+            $mock->shouldReceive('spawnWatchdog')->andReturnUsing(function () use (&$spawned): void {
+                $spawned = true;
+            });
+        });
+
         $this->postJson('/api/telegram/listener-processes/start')->assertOk();
 
         \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\Telegram\StartListenersWatchdogJob::class);
+        $this->assertFalse($spawned, 'a process spawned here would belong to the web user, not to the one that owns the sessions');
 
         /* Not running: nothing to restart or stop, and the panel is told so. */
         $this->postJson('/api/telegram/listener-processes/restart')->assertStatus(409);
@@ -615,13 +625,89 @@ class ListenerTest extends TestCase
         $this->assertSame(['ceo', '*'], array_slice(array_column($requests, 'key'), 0, 2));
     }
 
-    public function test_the_listeners_page_carries_the_state_of_the_watchdog(): void
+    public function test_the_monitoring_page_lists_the_watchdog_and_every_session(): void
     {
         $this->signIn();
 
-        $this->getJson('/api/telegram/listeners')
+        $this->listener('ceo', self::CEO);
+        $this->listener('head_china', self::HEAD, enabled: false);
+
+        $this->getJson('/api/telegram/listener-processes')
             ->assertOk()
-            ->assertJsonPath('processes.running', false)
-            ->assertJsonStructure(['processes' => ['running', 'pid', 'queue_worker_alive', 'command']]);
+            ->assertJsonPath('status.running', false)
+            ->assertJsonStructure(['status' => ['running', 'pid', 'queue_worker_alive', 'command']])
+            /* Driver Check is the first row, the same kind of thing as the rest. */
+            ->assertJsonCount(3, 'listeners')
+            ->assertJsonPath('listeners.0.key', 'driver-check')
+            ->assertJsonPath('listeners.0.is_driver_check', true)
+            ->assertJsonPath('listeners.1.key', 'ceo')
+            ->assertJsonPath('listeners.1.running', false)
+            ->assertJsonPath('listeners.2.is_enabled', false)
+            /* No session file on this server for the account: said, so it is clear why it does not start. */
+            ->assertJsonPath('listeners.0.blocker', 'no_session')
+            ->assertJsonPath('listeners.1.blocker', 'no_session');
+    }
+
+    public function test_a_listener_that_died_with_a_reason_shows_it_and_one_without_an_account_says_so(): void
+    {
+        $this->signIn();
+
+        $this->listener('ceo', self::CEO);
+        $this->listener('head_china', self::HEAD);
+
+        \Illuminate\Support\Facades\DB::table('telegram_accounts')->where('id', self::HEAD)->update(['is_authorized' => false]);
+
+        \Illuminate\Support\Facades\Cache::put(
+            \App\Console\Commands\Telegram\TelegramListenersWatchdogCommand::LAST_EXIT_CACHE . 'ceo',
+            ['message' => 'Session path not found: x', 'exit' => 2, 'at' => now()->toIso8601String()],
+            60,
+        );
+
+        $rows = collect($this->getJson('/api/telegram/listener-processes')->assertOk()->json('listeners'))->keyBy('key');
+
+        $this->assertSame('Session path not found: x', $rows['ceo']['last_exit']['message']);
+        $this->assertSame(2, $rows['ceo']['last_exit']['exit']);
+        $this->assertNull($rows['ceo']['last_start'], 'the watchdog never started it: the page says so');
+        $this->assertSame('not_authorized', $rows['head_china']['blocker']);
+        $this->assertNull($rows['head_china']['last_exit']);
+
+        \Illuminate\Support\Facades\Cache::put(
+            \App\Console\Commands\Telegram\TelegramListenersWatchdogCommand::LAST_START_CACHE . 'head_china',
+            ['at' => now()->toIso8601String(), 'pid' => 123],
+            60,
+        );
+
+        $china = collect($this->getJson('/api/telegram/listener-processes')->json('listeners'))->firstWhere('key', 'head_china');
+
+        $this->assertNotNull($china['last_start']);
+    }
+
+    public function test_driver_check_is_restarted_by_the_same_buttons_when_it_has_a_watchdog(): void
+    {
+        $this->signIn();
+
+        /* Nothing keeps it alive: there is nobody to restart it, and the panel says so. */
+        $this->postJson('/api/telegram/listener-processes/restart', ['key' => 'driver-check'])
+            ->assertStatus(409)
+            ->assertJsonStructure(['message', 'status' => ['running', 'can_control', 'driver_check_supervised']]);
+    }
+
+    public function test_the_page_sees_a_held_lock_by_reading_it_only(): void
+    {
+        $name = 'test-held-' . bin2hex(random_bytes(3));
+
+        $this->assertFalse(\App\Telegram\TelegramProcessLock::isHeld($name), 'no file, nobody runs');
+
+        $this->assertSame(\App\Telegram\TelegramProcessLock::ACQUIRED, \App\Telegram\TelegramProcessLock::attempt($name));
+
+        try {
+            $this->assertTrue(\App\Telegram\TelegramProcessLock::isHeld($name), 'the owner holds it: running');
+        } finally {
+            \App\Telegram\TelegramProcessLock::release($name);
+        }
+
+        $this->assertFalse(\App\Telegram\TelegramProcessLock::isHeld($name), 'released: not running');
+
+        @unlink(\App\Telegram\TelegramProcessLock::path($name));
     }
 }

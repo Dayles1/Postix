@@ -73,6 +73,7 @@ return [
             'drivers' => 'Drivers',
             'resolved_phones' => 'Telegram numbers',
             'penalties' => 'CRM penalties',
+            'people' => 'Everyone (people)',
             'operators' => 'Operators',
             'sales' => 'Sales',
             'penalty_settings' => 'Penalty settings',
@@ -84,7 +85,7 @@ return [
             'system' => 'How it works',
             'listeners' => 'Listeners',
             'sessions' => 'Telegram sessions',
-            'watchdog' => 'Watchdog',
+            'watchdog' => 'Processes',
             'contact_sync' => 'Group contacts',
             'queue' => 'Queue',
         ],
@@ -269,6 +270,7 @@ return [
         ],
 
         'tabs' => [
+            'all' => 'All',
             'operation' => 'Operators',
             'sales' => 'Sales',
         ],
@@ -917,7 +919,7 @@ return [
     'listeners' => [
         'title' => 'Listeners',
         'description' => 'The accounts that run a process of their own next to Driver Check: CEO, Head Operation and others. Each has its own set of duties.',
-        'notice' => 'One account, one process: only it may hold the Telegram session, so these accounts are not used for phone checks, mailings or the contact sync. The supervisor starts the process with php artisan telegram:listener-watchdog <key>; a listener switched on here is picked up by it on its own.',
+        'notice' => 'One account, one process: only it may hold the Telegram session, so these accounts are not used for number checks, mailings and contact sync. You choose the name and the key yourself. All the accounts are started with one button on the "Processes" page; a listener switched on here is picked up by itself.',
         'owners' => [
             'title' => 'Who does what',
             'description' => 'Each duty is done by one account. Driver Check does everything by default; pick another account and the duty moves to it within a few seconds.',
@@ -974,8 +976,43 @@ return [
             'restart_one' => 'Restart',
             'hint' => 'One watchdog starts and watches every enabled listener and Driver Check. A listener you switch on below is picked up by itself within seconds. "Stop all" stops everything this watchdog started.',
             'no_worker' => 'The queue worker is not running, so "Start all" will not work. Start the watchdog on the server once:',
+            'moved' => 'Starting, restarting and stopping all the sessions is on the "Processes" page.',
+            'moved_link' => 'Open',
+            'manage' => 'Set up listeners and accounts',
+            'none' => 'No listeners yet.',
+            'accounts_running' => ':running of :total running',
+            'no_account' => 'No account chosen',
+            'driver_check_details' => 'Driver Check: details',
+            'open_sessions' => 'Open sessions',
+            'watchdog_up' => 'Watchdog is running',
+            'watchdog_down' => 'Watchdog is not running',
+            'last_error' => 'Last start error',
+            'summary' => [
+                'loading' => ['title' => 'Loading…', 'hint' => ''],
+                'empty' => ['title' => 'No accounts switched on', 'hint' => 'Switch a listener on on the Listeners page or start Driver Check.'],
+                'all' => ['title' => 'Every account is running', 'hint' => ':running of :total running.'],
+                'partial' => ['title' => 'Not every account is running', 'hint' => ':running of :total running. The reason is shown on the account below.'],
+                'none' => ['title' => 'Nothing is running', 'hint' => '0 of :total running. Press "Start all".'],
+            ],
+            'blockers' => [
+                'no_account' => 'The listener has no account chosen.',
+                'not_authorized' => 'The account is not authorized: log in to it on the sessions page.',
+                'no_session' => 'The server has no session file for this account: authorize it again on the sessions page.',
+            ],
+            'confirm' => [
+                'stop_title' => 'Stop everything?',
+                'stop_text' => 'All Telegram processes will be stopped, Driver Check included: messages from the groups will not be processed until you press "Start all".',
+                'restart_title' => 'Restart all?',
+                'restart_text' => 'Every account restarts: message processing breaks for a few seconds.',
+                'confirm' => 'Confirm',
+            ],
+            'exit_code' => 'the process ended with code :code and no message',
+            'tried' => 'The watchdog started this account :when but the process is not running and left no error. Run it by hand on the server: php artisan telegram:listener <key> - the reason shows there.',
+            'never_tried' => 'The watchdog has not tried to start this account yet. It is most likely running an old version of the code: press "Stop all", then "Start all".',
+            'start_timeout' => 'The start did not happen within 20 seconds. It goes through the queue: check that a queue worker (queue:work or queue:listen) is running the telegram queue, and look at storage/logs/listeners-watchdog.log.',
             'messages' => [
                 'done' => 'Done',
+                'started' => 'Started, everything comes up in a few seconds',
                 'start_queued' => 'Start queued, everything comes up in a few seconds',
                 'already_running' => 'The watchdog is already running',
                 'restart_requested' => 'Restart requested, the processes come back within seconds',
@@ -991,11 +1028,10 @@ return [
             'duties' => 'Duties',
             'seen' => 'Last activity',
             'edit' => 'Edit',
-            'copy_command' => 'Copy the start command',
             'no_account' => 'No account chosen',
             'no_duties' => 'Does nothing',
             'never' => 'Not yet',
-            'run_hint' => 'Not running. Start it in the supervisor:',
+            'run_hint' => 'Not running. Start it with the "Start all" button on the "Processes" page.',
         ],
         'state' => [
             'running' => 'Running',
@@ -1008,13 +1044,6 @@ return [
         ],
         'duty_hints' => [
             'scheduled_messages' => 'Writes the messages that have this account chosen into their groups',
-        ],
-        'presets' => [
-            'ceo' => 'CEO',
-            'head_operation' => 'Head Operation',
-            'head_sales' => 'Head Sales',
-            'head_china' => 'Head China',
-            'head_europe' => 'Head Europe',
         ],
         'form' => [
             'create_title' => 'New listener',
@@ -1032,6 +1061,17 @@ return [
             'cancel' => 'Cancel',
             'saving' => 'Saving...',
             'delete' => 'Delete',
+            'all' => [
+                'title' => 'Everyone',
+                'description' => 'Operators and sales managers together: everybody the reports and penalties are written to in private.',
+                'create' => 'Add a person',
+                'edit_title' => 'Edit the person',
+                'total' => 'People in total',
+                'name_hint' => 'As in the bot message ("Пользователь:" or "Ответственный:")',
+                'dm_enabled_hint' => 'Reports and penalties are sent to the person in a private message',
+                'empty_title' => 'No people yet',
+                'empty_description' => 'People are created from the bot messages by themselves. You can add them by hand too.',
+            ],
         ],
         'confirm' => [
             'delete_title' => 'Delete the listener?',
@@ -1517,9 +1557,9 @@ return [
 
     'watchdog' => [
 
-        'title' => 'Watchdog',
+        'title' => 'Processes',
 
-        'description' => 'The driver check listener under its watchdog: whether it runs, on which account, and what it did last.',
+        'description' => 'All Telegram processes: the sessions of every listener under one watchdog, and the Driver Check listener - whether each is up, on which account and what it did last.',
 
         'actions' => [
             'start' => 'Start',

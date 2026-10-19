@@ -9,10 +9,12 @@ use App\Models\Telegram\OperationUser;
 use App\Models\Telegram\TelegramClientCheck;
 use App\Models\Telegram\TelegramSetting;
 use Amp\Sync\LocalKeyedMutex;
+use danog\MadelineProto\Lang;
 use danog\MadelineProto\SimpleEventHandler;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
 use Throwable;
 
 /**
@@ -78,12 +80,7 @@ final class ClientCheckSender
                  */
                 $this->opening->before($telegram, $peer, $check, $person);
 
-                $telegram->messages->forwardMessages([
-                    'from_peer' => $check->telegram_chat_id,
-                    'id' => [$check->telegram_message_id],
-                    'random_id' => [random_int(PHP_INT_MIN, PHP_INT_MAX)],
-                    'to_peer' => $peer,
-                ]);
+                $copied = $this->forwardOrCopy($telegram, $check, $peer);
 
                 $check->update([
                     'status' => TelegramClientCheckStatus::Forwarded,
@@ -91,6 +88,7 @@ final class ClientCheckSender
                     'error' => null,
                     'peer' => (string) $peer,
                     'forwarded_at' => now(),
+                    'metrics' => $copied ? [...(array) $check->metrics, 'delivery' => 'copy'] : $check->metrics,
                 ]);
 
                 $this->recordDelivery($person, null);
@@ -134,7 +132,7 @@ final class ClientCheckSender
             kind: $kind,
             title: ($kind === 'penalty_forward_failed' ? 'Штраф не доставлен: ' : 'Комментарий к штрафу не отправлен: ') . $person->name,
             details: $error . "\n\n" . 'Если у человека нет публичного username - сохраните его Telegram ID в карточке человека (операторы / продажники), '
-                . 'предварительно написав ему с этого аккаунта.',
+                . 'предварительно написав ему с этого аккаунта. Если в ошибке «нет в базе» (peer database) - аккаунт-отправитель не состоит в группе, откуда приходит штраф.',
             context: [
                 'Аккаунт' => $owner ?? 'Driver Check',
                 'Роль' => $person->roleOrDefault(),
@@ -147,6 +145,77 @@ final class ClientCheckSender
             listenerKey: $owner,
             about: (string) $person->id,
         );
+    }
+
+    /**
+     * The penalty goes to the person as a forward of the bot's message.
+     *
+     * An account that is not in the group the penalty was posted in (another
+     * account than Driver Check delivers it, for the role it is assigned) has
+     * no such group in its peer database and cannot forward from it: the
+     * forward fails with "this peer is not present in the internal peer
+     * database", for the person's username and id alike. The text is then
+     * sent as a message instead - the same words, without the "forwarded
+     * from" header - so the person gets it whichever account writes.
+     *
+     * Any other failure (no such username, privacy) is not helped by that and
+     * stays what it was.
+     *
+     * @return bool true when it went as a copy
+     */
+    private function forwardOrCopy(SimpleEventHandler $telegram, TelegramClientCheck $check, int|string $peer): bool
+    {
+        try {
+            $telegram->messages->forwardMessages([
+                'from_peer' => $check->telegram_chat_id,
+                'id' => [$check->telegram_message_id],
+                'random_id' => [random_int(PHP_INT_MIN, PHP_INT_MAX)],
+                'to_peer' => $peer,
+            ]);
+
+            return false;
+        } catch (Throwable $forward) {
+            $text = trim((string) $check->message_text);
+
+            if ($text === '' || ! $this->isUnknownPeer($forward)) {
+                throw $forward;
+            }
+
+            try {
+                $telegram->messages->sendMessage([
+                    'peer' => $peer,
+                    'message' => $text,
+                    'no_webpage' => true,
+                ]);
+            } catch (Throwable $copy) {
+                throw new RuntimeException($forward->getMessage() . ' (copy: ' . $copy->getMessage() . ')', 0, $copy);
+            }
+
+            Log::info('Client check sent as a copy: the account does not see the group', [
+                'check_id' => $check->id,
+                'peer' => (string) $peer,
+                'from_chat' => $check->telegram_chat_id,
+            ]);
+
+            return true;
+        }
+    }
+
+    /**
+     * MadelineProto's "this peer is not present in the internal peer
+     * database", in whichever language it was raised.
+     */
+    private function isUnknownPeer(Throwable $e): bool
+    {
+        $known = array_filter(array_column(Lang::$lang, 'peer_not_in_db'));
+
+        foreach ($known as $text) {
+            if (str_contains($e->getMessage(), $text)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

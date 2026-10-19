@@ -36,9 +36,7 @@ final class ListenerController extends Controller
             'listeners' => $listeners->map(fn (TelegramListener $l): array => $this->row($l, $owners))->all(),
             'accounts' => $this->accounts($listeners),
             'duties' => TelegramListener::DUTIES,
-            'preset_keys' => TelegramListener::PRESET_KEYS,
             'owners' => $this->ownersPayload($listeners),
-            'processes' => app(\App\Application\Telegram\Services\ListenersControl::class)->status(),
         ]);
     }
 
@@ -191,7 +189,7 @@ final class ListenerController extends Controller
                 $options[] = [
                     'key' => $listener->key,
                     'name' => $listener->name,
-                    'running' => TelegramProcessLock::isHeldByOtherProcess($listener->lockName()),
+                    'running' => TelegramProcessLock::isHeld($listener->lockName()),
                 ];
             }
         }
@@ -271,9 +269,10 @@ final class ListenerController extends Controller
                 ? $this->ownedDuties($l)
                 : [],
             /* The process holds its lock while the event loop runs. */
-            'running' => TelegramProcessLock::isHeldByOtherProcess($l->lockName()),
-            'supervised' => TelegramProcessLock::isHeldByOtherProcess($l->watchdogLockName()),
-            'command' => 'php artisan telegram:listener-watchdog ' . $l->key,
+            'running' => TelegramProcessLock::isHeld($l->lockName()),
+            /* Someone will start it: the common watchdog, or one kept for this listener alone. */
+            'supervised' => app(\App\Application\Telegram\Services\ListenersControl::class)->running()
+                || TelegramProcessLock::isHeld($l->watchdogLockName()),
         ];
     }
 

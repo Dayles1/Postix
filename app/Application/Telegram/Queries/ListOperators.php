@@ -17,6 +17,9 @@ use Illuminate\Pagination\LengthAwarePaginator;
  */
 final class ListOperators
 {
+    /** The "role" of the page that lists everyone. */
+    public const ALL = 'all';
+
     /**
      * @param array<string, mixed> $filters
      */
@@ -137,14 +140,17 @@ final class ListOperators
 
         /*
          * Operators and sales managers are two lists on two pages; one
-         * without a role would mix them, so it never goes out unfiltered.
+         * without a role would mix them, so it never goes out unfiltered -
+         * unless the page asked for everyone on purpose (role "all").
          */
-        $query->where(
-            'role',
-            OperationUser::isRole($filters['role'] ?? null)
-                ? $filters['role']
-                : OperationUser::ROLE_OPERATION,
-        );
+        if (($filters['role'] ?? null) !== self::ALL) {
+            $query->where(
+                'role',
+                OperationUser::isRole($filters['role'] ?? null)
+                    ? $filters['role']
+                    : OperationUser::ROLE_OPERATION,
+            );
+        }
 
         /*
          * "Linked" means the operator can actually be reached: a username or

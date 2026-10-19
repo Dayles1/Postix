@@ -354,6 +354,29 @@ class PeoplePanelTest extends TestCase
             ->assertJsonValidationErrors('roles.operation.levels');
     }
 
+    public function test_the_page_of_everyone_lists_operators_and_sales_together(): void
+    {
+        $this->person('ALPHA OPERATOR');
+        $this->person('BETA OPERATOR');
+        $this->person('BELYAKOVA ANNA', OperationUser::ROLE_SALES);
+
+        /* Without a role the list is still the operators' only: the two pages stay as they were. */
+        $this->getJson('/api/telegram/operators')->assertJsonCount(2, 'data');
+        $this->getJson('/api/telegram/operators?role=sales')->assertJsonCount(1, 'data');
+
+        $all = $this->getJson('/api/telegram/operators?role=all')
+            ->assertOk()
+            ->assertJsonCount(3, 'data')
+            ->assertJsonPath('stats.total', 3)
+            ->assertJsonPath('stats.roles.operation', 2)
+            ->assertJsonPath('stats.roles.sales', 1)
+            ->json('data');
+
+        $this->assertEqualsCanonicalizing(['operation', 'operation', 'sales'], array_column($all, 'role'));
+
+        $this->getJson('/api/telegram/operators?role=nobody')->assertUnprocessable();
+    }
+
     /*
     |--------------------------------------------------------------------------
     | How a person is written to

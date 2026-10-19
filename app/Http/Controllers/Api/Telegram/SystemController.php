@@ -39,11 +39,11 @@ final class SystemController extends Controller
         }
 
         $names = ['' => 'Driver Check'];
-        $running = ['' => TelegramProcessLock::isHeldByOtherProcess(TelegramDriverCheckCommand::LOCK_NAME)];
+        $running = ['' => TelegramProcessLock::isHeld(TelegramDriverCheckCommand::LOCK_NAME)];
 
         foreach ($listeners as $listener) {
             $names[$listener->key] = $listener->name;
-            $running[$listener->key] = TelegramProcessLock::isHeldByOtherProcess($listener->lockName());
+            $running[$listener->key] = TelegramProcessLock::isHeld($listener->lockName());
         }
 
         $account = fn (?string $key): array => [

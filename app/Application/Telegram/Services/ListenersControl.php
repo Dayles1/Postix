@@ -82,12 +82,52 @@ class ListenersControl
      */
     public function running(): bool
     {
-        return TelegramProcessLock::isHeldByOtherProcess(TelegramListenersWatchdogCommand::LOCK_NAME);
+        return TelegramProcessLock::isHeld(TelegramListenersWatchdogCommand::LOCK_NAME);
     }
 
     public function pid(): ?int
     {
         return $this->running() ? TelegramProcessLock::holderPid(TelegramListenersWatchdogCommand::LOCK_NAME) : null;
+    }
+
+    /**
+     * Starts the watchdog in the background, detached from this process.
+     * Called by StartListenersWatchdogJob in the queue worker: the user the
+     * sessions and the lock files belong to. Not from a web request - a process
+     * spawned there would be PHP-FPM's user's.
+     *
+     * @throws \Throwable when the process cannot be spawned (proc_open disabled, ...)
+     */
+    public function spawnWatchdog(): void
+    {
+        if ($this->running()) {
+            return;
+        }
+
+        $command = sprintf(
+            'cd %s && nohup %s %s telegram:listeners-watchdog --with-driver-check >> %s 2>&1 &',
+            escapeshellarg(base_path()),
+            escapeshellarg($this->phpBinary()),
+            escapeshellarg(base_path('artisan')),
+            escapeshellarg(storage_path('logs/listeners-watchdog.log')),
+        );
+
+        \Symfony\Component\Process\Process::fromShellCommandline($command)->setTimeout(10)->run();
+
+        \Illuminate\Support\Facades\Log::info('Listeners watchdog start command executed', ['command' => $command]);
+    }
+
+    /**
+     * The php that runs artisan. Under PHP-FPM PHP_BINARY is php-fpm itself,
+     * which cannot run a command: the CLI one is looked for then.
+     */
+    private function phpBinary(): string
+    {
+        if (PHP_SAPI === 'cli') {
+            return PHP_BINARY;
+        }
+
+        return (new \Symfony\Component\Process\PhpExecutableFinder())->find() ?: (string) config('runtime.php_binary', 'php');
     }
 
     /**

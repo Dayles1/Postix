@@ -126,6 +126,11 @@ class MenuHelper
                 'title' => __('driver_check.sections.people'),
                 'items' => [
                     [
+                        'icon' => 'user-profile',
+                        'name' => __('telegram.menu.items.people'),
+                        'path' => '/driver-check/people',
+                    ],
+                    [
                         'icon' => 'operators',
                         'name' => __('telegram.menu.items.operators'),
                         'path' => '/driver-check/operators',

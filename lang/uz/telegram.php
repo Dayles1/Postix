@@ -73,6 +73,7 @@ return [
             'drivers' => 'Haydovchilar',
             'resolved_phones' => 'Telegram raqamlari',
             'penalties' => 'CRM jarimalari',
+            'people' => 'Hammasi (odamlar)',
             'operators' => 'Operatorlar',
             'sales' => 'Sales',
             'penalty_settings' => 'Jarima sozlamalari',
@@ -84,7 +85,7 @@ return [
             'system' => 'Qanday ishlaydi',
             'listeners' => 'Listenerlar',
             'sessions' => 'Telegram sessiyalari',
-            'watchdog' => 'Watchdog',
+            'watchdog' => 'Jarayonlar',
             'contact_sync' => 'Guruh kontaktlari',
             'queue' => 'Navbat',
         ],
@@ -251,6 +252,7 @@ return [
         ],
 
         'tabs' => [
+            'all' => 'Hammasi',
             'operation' => 'Operatorlar',
             'sales' => 'Sales',
         ],
@@ -277,6 +279,17 @@ return [
                 'dm_enabled_hint' => 'CRM jarimalari lichkaga izoh bilan birga yuboriladi',
                 'empty_title' => 'Hozircha sales yo\'q',
                 'empty_description' => 'Sales CRM jarimalaridan avtomatik yaratiladi. Telegramini darrov kiritish uchun qo\'lda ham qo\'shsa bo\'ladi.',
+            ],
+            'all' => [
+                'title' => 'Hammasi',
+                'description' => 'Operatorlar va sales-menejerlar birga: hisobotlar va jarimalar shaxsiy xabarda yuboriladigan hamma odamlar.',
+                'create' => 'Odam qo\'shish',
+                'edit_title' => 'Odamni tahrirlash',
+                'total' => 'Jami odamlar',
+                'name_hint' => 'Bot xabaridagi ism bilan bir xil bo\'lishi kerak («Пользователь:» yoki «Ответственный:»)',
+                'dm_enabled_hint' => 'Hisobotlar va jarimalar odamga shaxsiy xabar bilan yuboriladi',
+                'empty_title' => 'Hozircha odamlar yo\'q',
+                'empty_description' => 'Odamlar bot xabarlaridan avtomatik yaratiladi. Qo\'lda ham qo\'shish mumkin.',
             ],
         ],
         'confirm' => [
@@ -905,7 +918,7 @@ return [
     'listeners' => [
         'title' => 'Listenerlar',
         'description' => 'Driver Check yonida o\'z jarayoni bor akkauntlar: CEO, Head Operation va boshqalar. Har birining o\'z vazifalari bor.',
-        'notice' => 'Bitta akkaunt — bitta jarayon: Telegram sessiyasini faqat u ushlab turadi, shuning uchun bu akkauntlar raqam tekshirish, rassilka va kontaktlarni sinxronlashda ishlatilmaydi. Jarayonni supervisor php artisan telegram:listener-watchdog <kalit> buyrug\'i bilan ishga tushiradi; shu yerda yoqilgan listenerni u o\'zi oladi.',
+        'notice' => 'Bitta akkaunt — bitta jarayon: Telegram sessiyasini faqat u ushlab turadi, shuning uchun bu akkauntlar raqam tekshirish, tarqatma va kontaktlarni sinxronlash uchun ishlatilmaydi. Nom va kalitni o\'zingiz yozasiz. Barcha akkauntlar «Jarayonlar» sahifasidagi bitta tugma bilan ishga tushiriladi; bu yerda yoqilgan listener o\'zi qo\'shiladi.',
         'owners' => [
             'title' => 'Kim nima qiladi',
             'description' => 'Har bir vazifani bitta akkaunt bajaradi. Odatda hammasini Driver Check qiladi; boshqa akkauntni tanlang, vazifa bir necha soniyada unga o\'tadi.',
@@ -962,8 +975,43 @@ return [
             'restart_one' => 'Qayta yoqish',
             'hint' => 'Bitta watchdog barcha yoqilgan listenerlarni va Driver Checkni ishga tushiradi va kuzatadi. Pastda yoqilgan yangi listener bir necha soniyada o\'zi qo\'shiladi. «Hammasini to\'xtatish» shu watchdog ishga tushirgan hammasini to\'xtatadi.',
             'no_worker' => 'Navbat (queue worker) ishlamayapti, shuning uchun «Hammasini ishga tushirish» ishlamaydi. Watchdogni serverda bir marta ishga tushiring:',
+            'moved' => 'Barcha sessiyalarni ishga tushirish, qayta yoqish va to\'xtatish «Jarayonlar» sahifasida.',
+            'moved_link' => 'Ochish',
+            'manage' => 'Listenerlar va akkauntlarni sozlash',
+            'none' => 'Hozircha listenerlar yo\'q.',
+            'accounts_running' => ':total tadan :running tasi ishlayapti',
+            'no_account' => 'Akkaunt tanlanmagan',
+            'driver_check_details' => 'Driver Check: tafsilotlar',
+            'open_sessions' => 'Sessiyalarni ochish',
+            'watchdog_up' => 'Watchdog ishlayapti',
+            'watchdog_down' => 'Watchdog ishga tushmagan',
+            'last_error' => 'Oxirgi ishga tushirish xatosi',
+            'summary' => [
+                'loading' => ['title' => 'Yuklanmoqda…', 'hint' => ''],
+                'empty' => ['title' => 'Yoqilgan akkauntlar yo\'q', 'hint' => '«Listenerlar» sahifasida listenerni yoqing yoki Driver Checkni ishga tushiring.'],
+                'all' => ['title' => 'Barcha akkauntlar ishlayapti', 'hint' => ':total tadan :running tasi ishlayapti.'],
+                'partial' => ['title' => 'Hamma akkaunt ishlamayapti', 'hint' => ':total tadan :running tasi ishlayapti. Sababi pastda akkaunt yonida ko\'rsatilgan.'],
+                'none' => ['title' => 'Hech narsa ishlamayapti', 'hint' => ':total tadan 0 tasi ishlayapti. «Hammasini ishga tushirish»ni bosing.'],
+            ],
+            'blockers' => [
+                'no_account' => 'Listenerga akkaunt tanlanmagan.',
+                'not_authorized' => 'Akkaunt avtorizatsiya qilinmagan: sessiyalar sahifasida unga kiring.',
+                'no_session' => 'Serverda bu akkauntning sessiya fayli yo\'q: sessiyalar sahifasida qayta avtorizatsiya qiling.',
+            ],
+            'confirm' => [
+                'stop_title' => 'Hammasi to\'xtatilsinmi?',
+                'stop_text' => 'Telegramning barcha jarayonlari, shu jumladan Driver Check ham to\'xtatiladi: «Hammasini ishga tushirish»ni bosmaguningizcha guruh xabarlari qayta ishlanmaydi.',
+                'restart_title' => 'Hammasi qayta yoqilsinmi?',
+                'restart_text' => 'Barcha akkauntlar qayta yoqiladi: bir necha soniya xabarlar qayta ishlanmaydi.',
+                'confirm' => 'Tasdiqlash',
+            ],
+            'exit_code' => 'jarayon :code kodi bilan xabarsiz tugadi',
+            'tried' => 'Watchdog bu akkauntni :when ishga tushirgan, lekin jarayon ishlamayapti va xato qoldirmagan. Serverda qo\'lda ishga tushiring: php artisan telegram:listener <kalit> - sababi shu yerda ko\'rinadi.',
+            'never_tried' => 'Watchdog bu akkauntni hali ishga tushirishga urinmagan. Ehtimol u kodning eski versiyasida ishlayapti: «Hammasini to\'xtatish», keyin «Hammasini ishga tushirish»ni bosing.',
+            'start_timeout' => 'Ishga tushirish 20 soniyada bajarilmadi. U navbat orqali ketadi: serverda telegram navbatini qayta ishlaydigan queue (queue:work yoki queue:listen) ishlayotganini tekshiring va storage/logs/listeners-watchdog.log ni ko\'ring.',
             'messages' => [
                 'done' => 'Tayyor',
+                'started' => 'Ishga tushirildi, bir necha soniyada hammasi ko\'tariladi',
                 'start_queued' => 'Ishga tushirish navbatga qo\'yildi, bir necha soniyada hammasi ko\'tariladi',
                 'already_running' => 'Umumiy watchdog allaqachon ishlayapti',
                 'restart_requested' => 'Qayta yoqish so\'raldi, jarayonlar bir necha soniyada qaytadi',
@@ -979,11 +1027,10 @@ return [
             'duties' => 'Vazifalar',
             'seen' => 'Oxirgi faollik',
             'edit' => 'O\'zgartirish',
-            'copy_command' => 'Ishga tushirish buyrug\'ini nusxalash',
             'no_account' => 'Akkaunt tanlanmagan',
             'no_duties' => 'Hech narsa qilmaydi',
             'never' => 'Hali bo\'lmagan',
-            'run_hint' => 'Ishlamayapti. Supervisorda ishga tushirish:',
+            'run_hint' => 'Ishga tushmagan. «Jarayonlar» sahifasida «Hammasini ishga tushirish» tugmasi bilan ishga tushiring.',
         ],
         'state' => [
             'running' => 'Ishlayapti',
@@ -996,13 +1043,6 @@ return [
         ],
         'duty_hints' => [
             'scheduled_messages' => 'Shu akkaunt tanlangan xabarlarni guruhlarga yozadi',
-        ],
-        'presets' => [
-            'ceo' => 'CEO',
-            'head_operation' => 'Head Operation',
-            'head_sales' => 'Head Sales',
-            'head_china' => 'Head China',
-            'head_europe' => 'Head Europe',
         ],
         'form' => [
             'create_title' => 'Yangi listener',
@@ -1505,9 +1545,9 @@ return [
 
     'watchdog' => [
 
-        'title' => 'Watchdog',
+        'title' => 'Jarayonlar',
 
-        'description' => 'Haydovchilarni tekshirish listeneri watchdog nazoratida: ishlayaptimi, qaysi akkauntda va oxirgi marta nima qildi.',
+        'description' => 'Telegramning barcha jarayonlari: bitta watchdog ostidagi barcha listener sessiyalari va Driver Check listeneri - ishlayaptimi, qaysi akkauntda va oxirgi nima qilgani.',
 
         'actions' => [
             'start' => 'Ishga tushirish',

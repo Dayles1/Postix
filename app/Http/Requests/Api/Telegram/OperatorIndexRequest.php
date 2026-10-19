@@ -21,7 +21,8 @@ class OperatorIndexRequest extends FormRequest
             'search' => ['nullable', 'string', 'max:255'],
             'dm_enabled' => ['nullable', 'boolean'],
             'linked' => ['nullable', 'boolean'],
-            'role' => ['nullable', 'string', Rule::in(OperationUser::ROLES)],
+            /* "all": the whole list, operators and sales managers together. */
+            'role' => ['nullable', 'string', Rule::in([...OperationUser::ROLES, 'all'])],
             'sort' => [
                 'nullable',
                 'string',

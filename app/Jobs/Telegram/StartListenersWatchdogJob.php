@@ -29,22 +29,8 @@ class StartListenersWatchdogJob implements ShouldQueue
 
     public function handle(ListenersControl $control): void
     {
-        if ($control->running()) {
-            return;
-        }
-
-        $command = sprintf(
-            'cd %s && nohup %s %s telegram:listeners-watchdog --with-driver-check >> %s 2>&1 &',
-            escapeshellarg(base_path()),
-            escapeshellarg(PHP_BINARY),
-            escapeshellarg(base_path('artisan')),
-            escapeshellarg(storage_path('logs/listeners-watchdog.log')),
-        );
-
         try {
-            Process::fromShellCommandline($command)->setTimeout(10)->run();
-
-            Log::info('Listeners watchdog start command executed', ['command' => $command]);
+            $control->spawnWatchdog();
         } catch (Throwable $e) {
             Log::critical('Failed to start the listeners watchdog', [
                 'error' => $e->getMessage(),

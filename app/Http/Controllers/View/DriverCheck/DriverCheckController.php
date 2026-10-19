@@ -40,6 +40,17 @@ final class DriverCheckController extends Controller
     /**
      * Same page as operators(), fixed to the other role.
      */
+    /**
+     * Operators and sales managers in one list.
+     */
+    public function people()
+    {
+        return view(
+            'pages.driver-check.operators',
+            ['role' => 'all'],
+        );
+    }
+
     public function sales()
     {
         return view(

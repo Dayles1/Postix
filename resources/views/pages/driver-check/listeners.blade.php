@@ -11,7 +11,6 @@
             store: @js(route('api.telegram.listeners.store')),
             base: @js(url('/api/telegram/listeners')),
             owners: @js(route('api.telegram.listeners.owners')),
-            processes: @js(url('/api/telegram/listener-processes')),
         },
         translations: @js(__('telegram.listeners')),
         ui: @js(__('telegram.ui')),
@@ -50,53 +49,10 @@
 
         <x-driver-check.error-alert :title="__('telegram.listeners.errors.title')" />
 
-        {{-- Processes: one watchdog runs them all --}}
-        <x-driver-check.surface class="p-4">
-            <div class="flex flex-col gap-3">
-                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div class="min-w-0">
-                        <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('telegram.listeners.processes.title') }}</p>
-                        <p class="mt-0.5 flex items-center gap-1.5 text-[12.5px] text-gray-600 dark:text-gray-300">
-                            <span class="h-1.5 w-1.5 rounded-full" :class="processes.running ? 'bg-success-500' : 'bg-error-500'"></span>
-                            <span x-text="processes.running ? translations.processes.running : translations.processes.stopped"></span>
-                            <span x-show="processes.running && processes.pid" class="text-gray-500" x-text="'· pid ' + processes.pid"></span>
-                        </p>
-                    </div>
-
-                    <div class="flex flex-wrap gap-2">
-                        <x-driver-check.button variant="primary" x-on:click="control('start')" ::disabled="!!busy || processes.running">
-                            <span x-text="busy === 'start' ? translations.form.saving : translations.processes.start"></span>
-                        </x-driver-check.button>
-
-                        <x-driver-check.button x-on:click="control('restart')" ::disabled="!!busy || !processes.running">
-                            <span x-text="busy === 'restart' ? translations.form.saving : translations.processes.restart_all"></span>
-                        </x-driver-check.button>
-
-                        <x-driver-check.button variant="danger" x-on:click="control('stop')" ::disabled="!!busy || !processes.running">
-                            <span x-text="busy === 'stop' ? translations.form.saving : translations.processes.stop"></span>
-                        </x-driver-check.button>
-                    </div>
-                </div>
-
-                <p class="text-[12px] leading-relaxed text-gray-500 dark:text-gray-400">{{ __('telegram.listeners.processes.hint') }}</p>
-
-                <p
-                    x-show="!processes.running && !processes.queue_worker_alive"
-                    x-cloak
-                    class="rounded-xl bg-warning-50 px-3 py-2 text-[12px] text-warning-700 dark:bg-warning-500/10 dark:text-warning-400"
-                >
-                    {{ __('telegram.listeners.processes.no_worker') }}
-                    <code class="ml-1 font-mono text-[11.5px]" x-text="processes.command"></code>
-                </p>
-
-                <p
-                    x-show="processError"
-                    x-cloak
-                    class="dc-break rounded-xl bg-error-50 px-3 py-2.5 text-xs text-error-600 dark:bg-error-500/10 dark:text-error-400"
-                    x-text="processError"
-                ></p>
-            </div>
-        </x-driver-check.surface>
+        <p class="text-[12.5px] text-gray-600 dark:text-gray-300">
+            {{ __('telegram.listeners.processes.moved') }}
+            <a href="{{ url('/driver-check/watchdog') }}" class="font-medium text-brand-600 hover:underline dark:text-brand-400">{{ __('telegram.listeners.processes.moved_link') }}</a>
+        </p>
 
         {{-- Who does what --}}
         <x-driver-check.surface class="p-4">
@@ -279,7 +235,7 @@
                             class="dc-break rounded-xl bg-gray-25 px-3 py-2 text-[12px] text-gray-600 dark:bg-white/[0.03] dark:text-gray-300"
                         >
                             <span x-text="translations.table.run_hint"></span>
-                            <code class="ml-1 font-mono text-[11.5px]" x-text="row.command"></code>
+                            <a href="{{ url('/driver-check/watchdog') }}" class="ml-1 font-medium text-brand-600 hover:underline dark:text-brand-400">{{ __('telegram.listeners.processes.moved_link') }}</a>
                         </div>
 
                         <div class="flex flex-wrap gap-2">
@@ -287,18 +243,6 @@
                                 {{ __('telegram.listeners.table.edit') }}
                             </x-driver-check.button>
 
-                            <x-driver-check.button
-                                x-show="row.is_enabled && processes.running"
-                                x-cloak
-                                x-on:click="control('restart', row.key)"
-                                ::disabled="!!busy"
-                            >
-                                <span x-text="busy === row.key ? translations.form.saving : translations.processes.restart_one"></span>
-                            </x-driver-check.button>
-
-                            <x-driver-check.button x-on:click="copyCommand(row)">
-                                {{ __('telegram.listeners.table.copy_command') }}
-                            </x-driver-check.button>
                         </div>
                     </article>
                 </x-driver-check.surface>
@@ -335,7 +279,7 @@
                         x-model="form.key"
                         autocomplete="off"
                         spellcheck="false"
-                        placeholder="ceo"
+                        placeholder="china_head"
                         ::data-invalid="!!fieldError('key')"
                     />
 
@@ -344,17 +288,6 @@
                     </x-slot:error>
                 </x-driver-check.field>
 
-                <div class="mt-2 flex flex-wrap gap-1.5">
-                    <template x-for="key in presetKeys" :key="key">
-                        <button
-                            type="button"
-                            x-on:click="usePreset(key)"
-                            class="dc-tap rounded-lg border border-gray-200 px-2.5 py-1 text-[12px] font-medium text-gray-700 hover:bg-gray-50
-                                   dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]"
-                            x-text="translations.presets[key] || key"
-                        ></button>
-                    </template>
-                </div>
             </div>
 
             <x-driver-check.field :label="__('telegram.listeners.form.name')" for="listener-name">

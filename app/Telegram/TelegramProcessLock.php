@@ -172,6 +172,44 @@ final class TelegramProcessLock
     }
 
     /**
+     * The same question for a page that only looks: read access is enough.
+     *
+     * PHP-FPM usually runs as another user than the process that created the
+     * lock file, and isHeldByOtherProcess() opens it for writing - refused for
+     * that user, which then reads as "not running". A shared lock is refused
+     * exactly while the owner holds its exclusive one, and a file that cannot
+     * even be read is "not running" here too, as for the watchdog page.
+     */
+    public static function isHeld(string $name): bool
+    {
+        try {
+            $path = self::path($name);
+
+            if (!is_file($path)) {
+                return false;
+            }
+
+            $handle = @fopen($path, 'r');
+
+            if ($handle === false) {
+                return false;
+            }
+
+            $free = flock($handle, LOCK_SH | LOCK_NB);
+
+            if ($free) {
+                flock($handle, LOCK_UN);
+            }
+
+            fclose($handle);
+
+            return !$free;
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    /**
      * PID currently recorded in the lock file, for diagnostics only.
      */
     public static function holderPid(string $name): ?int

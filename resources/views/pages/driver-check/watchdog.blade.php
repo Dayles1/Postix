@@ -5,23 +5,19 @@
 @section('content')
 
 <div
-    x-data="dcWatchdog({
+    x-data="dcListenerProcesses({
         endpoints: {
-            show: @js(route('api.telegram.watchdog.show')),
-            start: @js(route('api.telegram.watchdog.start')),
-            restart: @js(route('api.telegram.watchdog.restart-listener')),
-            stop: @js(route('api.telegram.watchdog.stop')),
+            index: @js(url('/api/telegram/listener-processes')),
+            base: @js(url('/api/telegram/listener-processes')),
         },
-        sessionsUrl: @js(route('driver-check.sessions')),
-        queueUrl: @js(route('driver-check.queue')),
-        translations: @js(__('telegram.watchdog')),
-        ui: @js(__('telegram.ui')),
+        translations: @js(__('telegram.listeners.processes')),
+        states: @js(__('telegram.listeners.state')),
     })"
 >
     <x-driver-check.shell>
 
         {{-- ============================================================
-             Header
+             Header: the buttons act on every account, Driver Check included
         ============================================================= --}}
         <x-driver-check.page-header
             :title="__('telegram.watchdog.title')"
@@ -39,25 +35,126 @@
                     <x-driver-check.icon name="refresh" class="h-4 w-4" ::class="loading && 'animate-spin'" />
                 </x-driver-check.button>
 
-                <x-driver-check.button variant="danger" x-on:click="askConfirm('stop')" ::disabled="!!busy || !canStop()">
+                <x-driver-check.button variant="danger" x-on:click="askConfirm('stop')" ::disabled="!!busy || !status.can_control">
                     <x-driver-check.icon name="stop" class="h-4 w-4" />
-                    {{ __('telegram.watchdog.actions.stop') }}
+                    {{ __('telegram.listeners.processes.stop') }}
                 </x-driver-check.button>
 
-                <x-driver-check.button x-on:click="askConfirm('restart')" ::disabled="!!busy || !canRestart()" :title="__('telegram.watchdog.actions.restart')">
+                <x-driver-check.button x-on:click="askConfirm('restart')" ::disabled="!!busy || !status.can_control">
                     <x-driver-check.icon name="refresh" class="h-4 w-4" />
-                    {{ __('telegram.watchdog.actions.restart_short') }}
+                    {{ __('telegram.listeners.processes.restart_all') }}
                 </x-driver-check.button>
 
-                <x-driver-check.button variant="primary" x-on:click="start()" ::disabled="!!busy">
+                <x-driver-check.button variant="primary" x-on:click="control('start')" ::disabled="!!busy || status.running">
                     <x-driver-check.icon name="refresh" class="h-4 w-4 animate-spin" x-show="busy === 'start'" x-cloak />
                     <x-driver-check.icon name="play" class="h-4 w-4" x-show="busy !== 'start'" />
-                    {{ __('telegram.watchdog.actions.start') }}
+                    {{ __('telegram.listeners.processes.start') }}
                 </x-driver-check.button>
             </x-slot:actions>
         </x-driver-check.page-header>
 
+        {{-- ============================================================
+             Overall state: the one loud thing on the page
+        ============================================================= --}}
+        <section class="flex items-center gap-4 rounded-2xl border px-4 py-4 sm:px-5 sm:py-5" :class="bannerClass()">
+            <span class="dc-dot shrink-0 !h-3 !w-3" :class="bannerDot()"></span>
+
+            <div class="min-w-0 flex-1">
+                <p class="text-lg font-semibold leading-6" x-text="summaryTitle()"></p>
+                <p class="mt-0.5 text-[13px] leading-relaxed opacity-90" x-text="summaryHint()"></p>
+            </div>
+
+            <p class="hidden shrink-0 text-[11px] opacity-70 sm:block" x-text="status.running ? t.watchdog_up + (status.pid ? ' · pid ' + status.pid : '') : t.watchdog_down"></p>
+        </section>
+
+
+        <p
+            x-show="error"
+            x-cloak
+            class="dc-break rounded-xl bg-error-50 px-3 py-2.5 text-xs text-error-600 dark:bg-error-500/10 dark:text-error-400"
+            x-text="error"
+        ></p>
+
+        {{-- ============================================================
+             Every account: Driver Check and the listeners in one list
+        ============================================================= --}}
+        <x-driver-check.surface class="overflow-hidden">
+            <ul class="divide-y divide-gray-100 dark:divide-gray-800">
+                <template x-for="row in rows" :key="row.key">
+                    <li class="flex flex-col gap-2 px-4 py-3.5 sm:flex-row sm:items-center sm:gap-3">
+                        <div class="flex min-w-0 flex-1 items-start gap-3">
+                            <span class="dc-dot mt-1.5 shrink-0" :class="dotClass(row)"></span>
+
+                            <div class="min-w-0 flex-1">
+                                <p class="dc-break text-sm font-semibold text-gray-900 dark:text-white" x-text="row.name"></p>
+                                <p class="mt-0.5 text-[12px] tabular-nums text-gray-500 dark:text-gray-400">
+                                    <span x-show="!row.is_driver_check" class="font-mono" x-text="row.key + ' · '"></span><span x-text="row.account || t.no_account"></span>
+                                </p>
+
+                                <p
+                                    x-show="reason(row)"
+                                    x-cloak
+                                    class="dc-break mt-1 text-[12px] leading-relaxed text-error-600 dark:text-error-400"
+                                >
+                                    <span x-text="reason(row)"></span>
+                                    <a x-show="row.blocker" href="{{ route('driver-check.sessions') }}" class="ml-1 font-medium underline">{{ __('telegram.listeners.processes.open_sessions') }}</a>
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="flex shrink-0 items-center gap-2 pl-[19px] sm:pl-0">
+                            <x-driver-check.badge class="w-28 justify-center" ::class="badgeClass(row)">
+                                <span x-text="states[stateOf(row)]"></span>
+                            </x-driver-check.badge>
+
+                            <x-driver-check.button
+                                x-show="row.is_enabled && row.can_restart"
+                                x-cloak
+                                size="sm"
+                                x-on:click="control('restart', row.key)"
+                                ::disabled="!!busy"
+                            >
+                                <x-driver-check.icon name="refresh" class="h-4 w-4" ::class="busy === row.key && 'animate-spin'" />
+                                <span x-text="t.restart_one"></span>
+                            </x-driver-check.button>
+                        </div>
+                    </li>
+                </template>
+
+                <li x-show="loaded && rows.length === 0" x-cloak class="px-4 py-6 text-center text-[13px] text-gray-500" x-text="t.none"></li>
+            </ul>
+
+            <div class="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 px-4 py-3 dark:border-gray-800">
+                <p class="text-[12px] leading-relaxed text-gray-500 dark:text-gray-400">{{ __('telegram.listeners.processes.hint') }}</p>
+
+                <a
+                    href="{{ url('/driver-check/listeners') }}"
+                    class="text-[13px] font-medium text-brand-600 hover:underline dark:text-brand-400"
+                >{{ __('telegram.listeners.processes.manage') }}</a>
+            </div>
+        </x-driver-check.surface>
+
+        {{-- ============================================================
+             Driver Check's own details: the part that was the whole page
+        ============================================================= --}}
+        <div
+            class="flex flex-col gap-5"
+            x-data="dcWatchdog({
+                endpoints: {
+                    show: @js(route('api.telegram.watchdog.show')),
+                    start: @js(route('api.telegram.watchdog.start')),
+                    restart: @js(route('api.telegram.watchdog.restart-listener')),
+                    stop: @js(route('api.telegram.watchdog.stop')),
+                },
+                sessionsUrl: @js(route('driver-check.sessions')),
+                queueUrl: @js(route('driver-check.queue')),
+                translations: @js(__('telegram.watchdog')),
+                ui: @js(__('telegram.ui')),
+            })"
+        >
         <x-driver-check.error-alert :title="__('telegram.watchdog.errors.title')" />
+
+        <h2 class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{{ __('telegram.listeners.processes.driver_check_details') }}</h2>
 
         {{-- First load --}}
         <div x-show="!status && loading" class="flex flex-col gap-5">
@@ -313,10 +410,11 @@
                 </template>
             </div>
         </template>
+        </div>
     </x-driver-check.shell>
 
     {{-- ================================================================
-         Confirmation: restart / stop
+         Confirmation: restart / stop of everything
     ================================================================= --}}
     <x-driver-check.modal open="confirmOpen" close="closeConfirm()" size="sm:max-w-md">
         <x-slot:heading>
@@ -342,7 +440,7 @@
 
             <x-driver-check.button variant="danger" x-on:click="confirm()" ::disabled="!!busy">
                 <x-driver-check.icon name="refresh" class="h-4 w-4 animate-spin" x-show="!!busy" x-cloak />
-                {{ __('telegram.watchdog.confirm.confirm') }}
+                {{ __('telegram.listeners.processes.confirm.confirm') }}
             </x-driver-check.button>
         </x-slot:footer>
     </x-driver-check.modal>

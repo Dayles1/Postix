@@ -18,6 +18,7 @@ import { fileRoutesPage } from './file-routes';
 import { scheduledMessagesPage } from './scheduled-messages';
 import { listenersPage } from './listeners';
 import { systemPage } from './system';
+import { listenerProcessesBlock } from './processes';
 import { queuePage, watchdogPage } from './monitoring';
 import { contactSyncPage } from './contact-sync';
 import { contactsPage } from './contacts';
@@ -40,7 +41,10 @@ function operatorsPage(config) {
      * Fixed by the page: /driver-check/operators lists operators,
      * /driver-check/sales lists sales managers. Never a filter.
      */
-    const role = config.role === 'sales' ? 'sales' : 'operation';
+    const role = ['sales', 'all'].includes(config.role) ? config.role : 'operation';
+
+    /* A person added on the page of everyone starts as an operator; the form can change it. */
+    const newRole = role === 'all' ? 'operation' : role;
 
     /* OperationUser::MESSAGE_SWITCHES: what goes to their private chat, all on by default. */
     const switchKeys = Object.keys(t.form.switch || {});
@@ -53,7 +57,7 @@ function operatorsPage(config) {
         telegram_username: '',
         telegram_id: '',
         dm_enabled: true,
-        role,
+        role: newRole,
         /* '' = as the role says (Russian for sales, Uzbek for operators). */
         language: '',
         respectful: false,
@@ -91,6 +95,8 @@ function operatorsPage(config) {
                     dm_enabled: Number(json.stats?.dm_enabled ?? 0),
                     failing: Number(json.stats?.failing ?? 0),
                     roles: {
+                        /* The tab of everyone counts both lists. */
+                        all: Number(json.stats?.roles?.operation ?? 0) + Number(json.stats?.roles?.sales ?? 0),
                         operation: Number(json.stats?.roles?.operation ?? 0),
                         sales: Number(json.stats?.roles?.sales ?? 0),
                     },
@@ -102,7 +108,7 @@ function operatorsPage(config) {
 
         csrf: document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
 
-        stats: { total: 0, linked: 0, dm_enabled: 0, failing: 0, roles: { operation: 0, sales: 0 } },
+        stats: { total: 0, linked: 0, dm_enabled: 0, failing: 0, roles: { all: 0, operation: 0, sales: 0 } },
 
         formOpen: false,
 
@@ -354,7 +360,7 @@ function operatorsPage(config) {
                  * say where it went rather than let it vanish.
                  */
                 this.notify(
-                    this.form.role !== role
+                    role !== 'all' && this.form.role !== role
                         ? t.messages.moved.replace(':role', t.tabs[this.form.role] ?? this.form.role)
                         : (editing ? t.messages.updated : t.messages.created),
                 );
@@ -1217,6 +1223,7 @@ export function registerDriverCheck(Alpine) {
     Alpine.data('dcScheduledMessages', scheduledMessagesPage);
     Alpine.data('dcListeners', listenersPage);
     Alpine.data('dcSystem', systemPage);
+    Alpine.data('dcListenerProcesses', listenerProcessesBlock);
     Alpine.data('dcSessions', sessionsPage);
     Alpine.data('dcPenalties', penaltiesPage);
     Alpine.data('dcPenaltySettings', penaltySettingsPage);

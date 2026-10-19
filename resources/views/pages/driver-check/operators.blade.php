@@ -8,6 +8,8 @@
 @php
     $page = __("telegram.operators.pages.{$role}");
     $isSales = $role === \App\Models\Telegram\OperationUser::ROLE_SALES;
+    /* "all": operators and sales managers in one list, a role badge on every row. */
+    $isAll = $role === 'all';
 @endphp
 
 @section('title', $page['title'])
@@ -60,9 +62,13 @@
             class="dc-chips inline-flex w-full gap-0.5 self-start rounded-lg bg-gray-100 p-0.5 sm:w-auto dark:bg-white/[0.06]"
             aria-label="{{ __('telegram.operators.form.role') }}"
         >
-            @foreach (\App\Models\Telegram\OperationUser::ROLES as $tab)
+            @foreach (['all', ...\App\Models\Telegram\OperationUser::ROLES] as $tab)
                 <a
-                    href="{{ $tab === \App\Models\Telegram\OperationUser::ROLE_SALES ? route('driver-check.sales') : route('driver-check.operators') }}"
+                    href="{{ match ($tab) {
+                        'all' => route('driver-check.people'),
+                        \App\Models\Telegram\OperationUser::ROLE_SALES => route('driver-check.sales'),
+                        default => route('driver-check.operators'),
+                    } }}"
                     @if ($tab === $role) aria-current="page" @endif
                     class="dc-tap inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-md px-4 text-[13px] font-medium
                            transition sm:h-8 sm:flex-none
@@ -229,6 +235,12 @@
                                                     :title="row.name"
                                                     x-text="row.name"
                                                 ></p>
+                                                @if ($isAll)
+                                                    <span
+                                                        class="mt-0.5 inline-block rounded bg-gray-100 px-1.5 py-px text-[10.5px] font-medium text-gray-600 dark:bg-white/[0.08] dark:text-gray-300"
+                                                        x-text="translations.tabs[row.role] || row.role"
+                                                    ></span>
+                                                @endif
                                                 <p
                                                     class="truncate text-[11px] text-gray-400 dark:text-gray-500"
                                                     x-show="row.name_normalized !== String(row.name || '').trim().replace(/\s+/g, ' ').toUpperCase()"
@@ -388,6 +400,12 @@
 
                             <div class="min-w-0 flex-1">
                                 <p class="dc-break text-sm font-semibold text-gray-900 dark:text-white" x-text="row.name"></p>
+                                @if ($isAll)
+                                    <span
+                                        class="inline-block rounded bg-gray-100 px-1.5 py-px text-[10.5px] font-medium text-gray-600 dark:bg-white/[0.08] dark:text-gray-300"
+                                        x-text="translations.tabs[row.role] || row.role"
+                                    ></span>
+                                @endif
                                 <p
                                     x-show="row.name_normalized !== String(row.name || '').trim().replace(/\s+/g, ' ').toUpperCase()"
                                     class="dc-break text-[11px] text-gray-400 dark:text-gray-500"

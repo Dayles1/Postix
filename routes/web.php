@@ -218,6 +218,14 @@ Route::middleware(['auth', 'role:driverCheck,superadmin'])
         )->name('driver-check.sales');
 
         /*
+         * Everyone at once: operators and sales managers in one list.
+         */
+        Route::get(
+            '/people',
+            [DriverCheckController::class, 'people']
+        )->name('driver-check.people');
+
+        /*
          * CRM penalties (client checks): what was forwarded to whom, and
          * whether it arrived.
          */
@@ -622,6 +630,9 @@ Route::middleware(['auth', 'role:driverCheck,superadmin'])
 
         Route::get('/system', [SystemController::class, 'index'])
             ->name('api.telegram.system');
+
+        Route::get('/listener-processes', [ListenerProcessController::class, 'index'])
+            ->name('api.telegram.listener-processes.index');
 
         Route::post('/listener-processes/start', [ListenerProcessController::class, 'start'])
             ->name('api.telegram.listener-processes.start');
