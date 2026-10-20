@@ -259,6 +259,14 @@ final class ClientCheckEscalation
         $address = $person->addressFor($language);
 
         /*
+         * Called by the address in every message reads like a bot: only
+         * `address_chance` percent of the texts have it.
+         */
+        if ($address !== null && random_int(1, 100) > (int) config('auto_replies.address_chance', 20)) {
+            $address = null;
+        }
+
+        /*
          * Uzbek goes out in Cyrillic (UzbekScript). Only what is Uzbek is
          * converted - the template, the address, the durations - never the
          * request number, the CRM status or the person's name.
@@ -275,7 +283,8 @@ final class ClientCheckEscalation
             : self::duration($seconds, $language);
 
         /*
-         * Nobody wrote how to call this person: the address goes, with the
+         * Nobody wrote how to call this person (or this text goes without
+         * it - `address_chance` above): the address goes, with the
          * comma that led to it or followed it - "Rahmat, {address}!" reads
          * "Rahmat!", "{address}, narx bering" reads "narx bering".
          */

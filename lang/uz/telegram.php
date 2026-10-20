@@ -191,7 +191,7 @@ return [
                 ],
                 'auto_replies_enabled' => [
                     'label' => 'Avto-javoblar',
-                    'hint' => 'Uning xabarlariga javob: «+», «ok», salom.',
+                    'hint' => 'Uning xabarlariga javob: +, «ok», salom.',
                 ],
             ],
             'role' => 'Rol',
@@ -637,7 +637,7 @@ return [
 
     'auto_replies' => [
         'title' => 'Avto-javoblar',
-        'description' => 'Operator yoki sales bot akkauntiga shaxsiy chatda yozsa, unga nima deb javob beriladi: «+», «ok», «hop» -> «Rahmat, Ali aka». Hammasi bitta JSON faylda saqlanadi va keyingi xabardan boshlab ishlaydi.',
+        'description' => 'Operator yoki sales bot akkauntiga shaxsiy chatda yozsa, unga nima deb javob beriladi: +, «ok», «hop» -> «Rahmat, Ali aka». Hammasi bitta JSON faylda saqlanadi va keyingi xabardan boshlab ishlaydi.',
         'sections' => [
             'kinds' => 'Nima yozishadi, nima javob beramiz',
             'kinds_hint' => 'Turlar yuqoridan pastga tekshiriladi: kalit so\'zi xabarda bo\'lgan birinchi tur ishlaydi. Javob odamning tilida va ohangida, kartochkasiga qarab yuboriladi.',

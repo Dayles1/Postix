@@ -90,6 +90,14 @@ return [
      */
     'uz_script' => env('AUTO_REPLIES_UZ_SCRIPT', 'cyrillic'),
 
+    /*
+     * How often a text calls the person by the card's address ("Пулатов,
+     * нарх керак"), in percent: the rest leave it out with its comma, as
+     * when none is written. Every text the bot writes - replies,
+     * greetings, nudges, penalty comments. 20 - one message in five.
+     */
+    'address_chance' => (int) env('AUTO_REPLIES_ADDRESS_CHANCE', 20),
+
     'path' => env('AUTO_REPLIES_PATH', storage_path('app/telegram/auto-replies.json')),
 
     /*
@@ -346,7 +354,7 @@ return [
                         'Куряпсизми, {address}?',
                         '{address}, жарималар тупланиб колди',
                         'Буларга жавоб керак, {address}',
-                        'Хеч булмаса «+» ёзиб куйинг',
+                        'Хеч булмаса + ёзиб куйинг',
                         '{address}, жавоб йук-ку',
                         'Жавобсиз колмасин, {address}',
                         'Бир огиз жавоб ёзинг, {address}',
@@ -368,7 +376,7 @@ return [
                         '{address}, илтимос, жавоб ёзиб куйсангиз',
                         'Жарималар тупланиб колди, {address}, илтимос',
                         'Кечирасиз, {address}, жавоб кутяпман',
-                        'Илтимос, «+» булса хам ёзиб куйинг',
+                        'Илтимос, + булса хам ёзиб куйинг',
                         '{address}, вактингиз булса, караб беринг',
                         'Илтимос, {address}, статусларни янгилаб беринг',
                     ],
@@ -379,7 +387,7 @@ return [
                         'Ответьте, пожалуйста, {address}',
                         '{address}, ответ будет?',
                         'Штрафы копятся, {address}',
-                        'Хотя бы «+» напишите',
+                        'Хотя бы + напишите',
                         '{address}, видите сообщения?',
                         'Я не просто так пишу, {address}',
                         'Нужен ответ, {address}',
@@ -394,7 +402,7 @@ return [
                         'Жду вашего ответа, {address}',
                         'Извините, {address}, жду ответа',
                         '{address}, будьте добры, отпишитесь',
-                        'Пожалуйста, хотя бы «+», {address}',
+                        'Пожалуйста, хотя бы +, {address}',
                         'Штрафы накопились, {address}, посмотрите, пожалуйста',
                         '{address}, когда будет минутка, ответьте',
                         'Очень жду ответа, {address}',
