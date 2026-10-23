@@ -23,6 +23,9 @@ use function Amp\delay;
  * Once a day per person, the same mark ProcessAutoReply keeps for their
  * greeting: someone who greeted us first today is not greeted again, and
  * their "Va alaykum assalom" to ours is not greeted back.
+ *
+ * Not every day: auto_replies.send_chance.opening - a day without it starts
+ * with the penalty, and stays so.
  */
 final class PenaltyOpening
 {
@@ -61,6 +64,7 @@ final class PenaltyOpening
             ! $rules->opening['enabled']
             || ! $person->allows('greet_first_enabled')
             || Cache::has(self::greetedKey($person))
+            || Cache::has($this->quietKey($person))
         ) {
             return;
         }
@@ -88,6 +92,17 @@ final class PenaltyOpening
         }
 
         try {
+            /*
+             * Decided once for the day: the rest of the burst, and the
+             * penalties after it, find the mark. Their own greeting is
+             * still greeted back (greetedKey is left alone).
+             */
+            if (! AutoReplyRules::speaks('opening')) {
+                Cache::put($this->quietKey($person), true, now()->endOfDay());
+
+                return;
+            }
+
             $choices = $this->personal->merge(
                 $rules->choices(
                     'opening',
@@ -160,6 +175,11 @@ final class PenaltyOpening
     private function pendingKey(OperationUser $person): string
     {
         return 'client-checks:opening:' . $person->id;
+    }
+
+    private function quietKey(OperationUser $person): string
+    {
+        return 'client-checks:opening-quiet:' . $person->id;
     }
 
     private function waitFor(OperationUser $person): void

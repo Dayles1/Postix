@@ -15,11 +15,13 @@ use Illuminate\Console\Command;
  * variants taken from real chats - added to what was saved in the panel,
  * which otherwise keeps its own copy and never sees them.
  *
- * Added after what is there, never twice; nothing is removed or replaced.
- * Matched by name (auto reply kinds, greetings) and by `from` (penalty
- * levels); the nudge, the opening and the follow-up are one each. A text
- * removed in the panel and still shipped comes back - there is no history
- * to tell it from a new one.
+ * Added after what is there, never twice. Matched by name (auto reply
+ * kinds, greetings) and by `from` (penalty levels); the nudge, the opening
+ * and the follow-up are one each. A text removed in the panel and still
+ * shipped comes back - there is no history to tell it from a new one.
+ *
+ * The one thing taken out: auto reply texts no longer shipped
+ * (auto_replies.retired), from every answer list of the saved copy.
  */
 final class MergeDefaultPhrasesCommand extends Command
 {
@@ -29,14 +31,24 @@ final class MergeDefaultPhrasesCommand extends Command
 
     private int $added = 0;
 
+    private int $removed = 0;
+
+    /**
+     * @var list<string>
+     */
+    private array $retired = [];
+
     public function handle(AutoReplyStore $autoReplies, ClientCheckRulesStore $penalties): int
     {
         $this->added = 0;
+        $this->removed = 0;
+        $this->retired = array_values(array_map('strval', (array) config('auto_replies.retired', [])));
 
         $this->autoReplies($autoReplies);
         $this->penalties($penalties);
 
         $this->info("Added: {$this->added}");
+        $this->info("Removed: {$this->removed}");
 
         return self::SUCCESS;
     }
@@ -53,6 +65,8 @@ final class MergeDefaultPhrasesCommand extends Command
         $defaults = $store->defaults()->toArray();
 
         foreach ($rules['replies'] as &$reply) {
+            $reply['answers'] = $this->retire($reply['answers']);
+
             $default = collect($defaults['replies'])->firstWhere('name', $reply['name']);
 
             if ($default !== null) {
@@ -63,6 +77,8 @@ final class MergeDefaultPhrasesCommand extends Command
         unset($reply);
 
         foreach ($rules['greetings']['list'] as &$greeting) {
+            $greeting['answers'] = $this->retire($greeting['answers']);
+
             $default = collect($defaults['greetings']['list'])->firstWhere('name', $greeting['name']);
 
             if ($default !== null) {
@@ -75,7 +91,7 @@ final class MergeDefaultPhrasesCommand extends Command
         $rules['greetings']['fillers'] = $this->list($rules['greetings']['fillers'], $defaults['greetings']['fillers'], AutoReplyRules::MAX_FILLERS);
 
         foreach ([['silence', 'answers'], ['opening', 'answers'], ['follow_up', 'answers'], ['follow_up', 'answers_many']] as [$owner, $field]) {
-            $rules[$owner][$field] = $this->sets($rules[$owner][$field], $defaults[$owner][$field], AutoReplyRules::MAX_ANSWERS);
+            $rules[$owner][$field] = $this->sets($this->retire($rules[$owner][$field]), $defaults[$owner][$field], AutoReplyRules::MAX_ANSWERS);
         }
 
         $store->save(AutoReplyRules::fromArray($rules));
@@ -105,6 +121,27 @@ final class MergeDefaultPhrasesCommand extends Command
         unset($ladder);
 
         $store->save(ClientCheckRules::fromArray($rules));
+    }
+
+    /**
+     * The saved answers without the retired texts.
+     *
+     * @param array<string, array<string, list<string>>> $sets
+     * @return array<string, array<string, list<string>>>
+     */
+    private function retire(array $sets): array
+    {
+        foreach ($sets as $language => $tones) {
+            foreach ($tones as $tone => $texts) {
+                $kept = array_values(array_diff($texts, $this->retired));
+
+                $this->removed += count($texts) - count($kept);
+
+                $sets[$language][$tone] = $kept;
+            }
+        }
+
+        return $sets;
     }
 
     /**

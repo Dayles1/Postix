@@ -380,6 +380,7 @@ return [
             'role_disabled' => 'Delivery is off for this role',
             'level_off' => 'This role gets nothing at this level',
             'forward_only' => 'Forward only: no comment at this level',
+            'quiet' => 'Forward only: this time without "this one too"',
         ],
         'levels' => [
             '0' => 'Calm',

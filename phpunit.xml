@@ -32,5 +32,10 @@
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
         <env name="TELEGRAM_BOT_TOKEN" value=""/>
+        <env name="AUTO_REPLIES_ADDRESS_CHANCE" value="100"/>
+        <env name="AUTO_REPLIES_REPLY_CHANCE" value="100"/>
+        <env name="AUTO_REPLIES_GREETING_CHANCE" value="100"/>
+        <env name="AUTO_REPLIES_OPENING_CHANCE" value="100"/>
+        <env name="AUTO_REPLIES_FOLLOW_UP_CHANCE" value="100"/>
     </php>
 </phpunit>

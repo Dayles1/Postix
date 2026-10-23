@@ -1645,6 +1645,86 @@ class ClientCheckTest extends TestCase
         $this->assertStringStartsWith('U1 ', $this->comments()[1]);
     }
 
+    /*
+     * ------------------------------------------------------------------
+     * Not every time: auto_replies.send_chance
+     * ------------------------------------------------------------------
+     */
+
+    public function test_a_plus_is_let_pass_when_the_reply_chance_says_so(): void
+    {
+        config(['auto_replies.send_chance.reply' => 0]);
+        $this->person();
+        $check = $this->penaltySent();
+
+        $this->assertNull($this->reply('+'));
+        $this->assertSame([], $this->messages->kinds());
+        $this->assertSame('+', $check->refresh()->reply_text);
+        $this->assertNull($check->reply_answered_at);
+    }
+
+    public function test_a_greeting_let_pass_is_not_greeted_back_later_that_day(): void
+    {
+        config(['auto_replies.send_chance.greeting' => 0]);
+        $this->person(attributes: ['address' => ['uz' => 'Afzal aka']]);
+
+        $this->assertNull($this->reply('Assalomu alaykum aka'));
+
+        config(['auto_replies.send_chance.greeting' => 100]);
+        Carbon::setTestNow(now()->addMinutes(11));
+        $this->assertNull($this->reply('Salom'));
+        $this->assertSame([], $this->messages->kinds());
+    }
+
+    public function test_a_day_without_our_greeting_stays_without_it(): void
+    {
+        config(['auto_replies.send_chance.opening' => 0]);
+        $this->openingOn();
+        $this->person(attributes: ['address' => ['uz' => 'Afzal aka']]);
+
+        $this->penalty(repeat: 1);
+        $this->assertSame(['forward'], $this->messages->kinds());
+
+        /* Decided for the day: the next penalty does not greet either. */
+        config(['auto_replies.send_chance.opening' => 100]);
+        $this->messages->calls = [];
+        Carbon::setTestNow(now()->addMinutes(30));
+        $this->penalty(repeat: 1, request: 'TLS00001');
+        $this->assertSame(['forward'], $this->messages->kinds());
+
+        /* Their own greeting is still greeted back. */
+        $this->messages->calls = [];
+        $this->assertSame('Va alaykum assalom, Afzal aka!', $this->reply('Assalomu alaykum'));
+
+        /* The next day, greeted first again. */
+        $this->messages->calls = [];
+        Carbon::setTestNow(now()->addDay());
+        $this->penalty(repeat: 1, request: 'TLS00002');
+        $this->assertSame(['send', 'forward'], $this->messages->kinds());
+    }
+
+    public function test_this_one_too_is_sometimes_the_bare_forward(): void
+    {
+        config(['auto_replies.send_chance.follow_up' => 0]);
+        $this->followUpOn();
+        $this->person();
+
+        $this->penalty(repeat: 1);
+        $this->flushAfterQuiet();
+
+        Carbon::setTestNow(now()->addMinutes(10));
+        $second = $this->penalty(repeat: 1, request: 'TLS00001');
+        $this->flushAfterQuiet();
+
+        $this->assertCount(1, $this->comments());
+        $this->assertStringStartsWith('U1 ', $this->comments()[0]);
+
+        $second->refresh();
+        $this->assertSame(TelegramClientCheckStatus::Sent, $second->status);
+        $this->assertSame(TelegramClientCheck::REASON_QUIET, $second->reason);
+        $this->assertNull($second->comment);
+    }
+
     public function test_a_greeting_before_a_question_is_not_answered(): void
     {
         $this->person();
@@ -1868,7 +1948,7 @@ class ClientCheckTest extends TestCase
 
         $store = app(AutoReplyStore::class);
         $saved = $store->defaults()->toArray();
-        $saved['replies'][0]['answers'] = ['ru' => ['plain' => ['Моё спасибо']]];
+        $saved['replies'][0]['answers'] = ['ru' => ['plain' => ['Моё спасибо', 'Сэнк ю!']]];
         $saved['replies'][0]['keywords'] = ['+'];
         $store->save(AutoReplyRules::fromArray($saved));
 
@@ -1880,8 +1960,9 @@ class ClientCheckTest extends TestCase
         $this->artisan('telegram:merge-defaults')->assertSuccessful();
 
         $reply = $store->current()->replies[0];
-        $this->assertSame(['Моё спасибо', 'Отлично, спасибо!'], array_slice($reply['answers']['ru']['plain'], 0, 2));
-        $this->assertContains('Сэнк ю!', $reply['answers']['ru']['plain']);
+        $this->assertSame(['Моё спасибо', 'Спасибо, {address}'], array_slice($reply['answers']['ru']['plain'], 0, 2));
+        /* No longer shipped (auto_replies.retired): taken out of the saved copy. */
+        $this->assertNotContains('Сэнк ю!', $reply['answers']['ru']['plain']);
         $this->assertContains('обрабатываю', $reply['keywords']);
 
         $sales = $penalties->current()->ladders['sales'][0]['phrases']['ru']['plain'];

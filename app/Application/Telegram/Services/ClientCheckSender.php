@@ -416,6 +416,20 @@ final class ClientCheckSender
             $followUp = $this->followUp->comment($batch, $person);
 
             /*
+             * Not "это тоже" this time: the forward was the whole message.
+             */
+            if ($followUp === false) {
+                TelegramClientCheck::query()->whereIn('id', $ids)->update([
+                    'status' => TelegramClientCheckStatus::Sent,
+                    'reason' => TelegramClientCheck::REASON_QUIET,
+                    'error' => null,
+                    'sent_at' => now(),
+                ]);
+
+                return;
+            }
+
+            /*
              * The person's own answer for this level, when it comes up -
              * a voice with their name, say - otherwise the shared phrase.
              */

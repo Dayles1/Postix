@@ -82,6 +82,12 @@ class TelegramClientCheck extends Model
     public const REASON_FORWARD_ONLY = 'forward_only';
 
     /**
+     * Forwarded without "это тоже": this time it went in silence
+     * (auto_replies.send_chance.follow_up).
+     */
+    public const REASON_QUIET = 'quiet';
+
+    /**
      * Came in outside the working hours (09:00-18:00 by default): ignored.
      */
     public const REASON_OUTSIDE_HOURS = 'outside_hours';

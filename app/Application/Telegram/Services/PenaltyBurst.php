@@ -87,6 +87,21 @@ final class PenaltyBurst
         }
 
         /*
+         * Not "это тоже" every time (auto_replies.send_chance.follow_up):
+         * the forward alone, and nothing left for flush() to say.
+         */
+        if (! AutoReplyRules::speaks('follow_up')) {
+            $check->update([
+                'status' => TelegramClientCheckStatus::Sent,
+                'reason' => TelegramClientCheck::REASON_QUIET,
+                'error' => null,
+                'sent_at' => now(),
+            ]);
+
+            return true;
+        }
+
+        /*
          * A moment, "typing…" - and the bot's next penalty of this person
          * may be recorded meanwhile: is this one the last of the burst?
          */

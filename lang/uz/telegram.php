@@ -379,6 +379,7 @@ return [
             'role_disabled' => 'Bu rol uchun yuborish o\'chirilgan',
             'level_off' => 'Bu darajada bu rolga hech narsa yuborilmaydi',
             'forward_only' => 'Faqat forward: bu darajada izoh kerak emas',
+            'quiet' => 'Faqat forward: bu safar «bu ham»siz',
         ],
         'levels' => [
             '0' => 'Xotirjam',

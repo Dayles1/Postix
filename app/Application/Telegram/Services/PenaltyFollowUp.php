@@ -26,12 +26,13 @@ final class PenaltyFollowUp
     }
 
     /**
-     * The follow-up for this batch, stored on the penalty it speaks for,
-     * or null when the full comment should go.
+     * The follow-up for this batch, stored on the penalty it speaks for;
+     * null when the full comment should go, false when nothing is said
+     * this time (auto_replies.send_chance.follow_up).
      *
      * @param Collection<int, TelegramClientCheck> $batch oldest first
      */
-    public function comment(Collection $batch, OperationUser $person): ?string
+    public function comment(Collection $batch, OperationUser $person): string|false|null
     {
         $followUp = $this->store->current()->followUp;
 
@@ -64,6 +65,10 @@ final class PenaltyFollowUp
          */
         if ($previous === null || (int) $previous->comment_level !== $level) {
             return null;
+        }
+
+        if (! AutoReplyRules::speaks('follow_up')) {
+            return false;
         }
 
         $texts = $this->store->current()->followUpAnswers(

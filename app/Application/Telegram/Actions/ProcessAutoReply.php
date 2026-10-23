@@ -181,6 +181,21 @@ final class ProcessAutoReply
 
         $hello = $greet ? $this->hello($rules, (int) $greeting['index'], $language, $tone, $person) : null;
 
+        /*
+         * Not every "+" is thanked, not every greeting greeted back
+         * (auto_replies.send_chance). A greeting let pass is not answered
+         * later that day either.
+         */
+        if ($hello !== null && ! AutoReplyRules::speaks('greeting')) {
+            $hello = null;
+
+            Cache::put($this->greetedKey($person), true, now()->endOfDay());
+        }
+
+        if ($choices['items'] !== [] && ! AutoReplyRules::speaks('reply')) {
+            $choices['items'] = [];
+        }
+
         if ($choices['items'] === [] && $hello === null) {
             return null;
         }

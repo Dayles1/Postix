@@ -38,6 +38,17 @@ final readonly class AutoReplyRules
     public const PLACEHOLDERS = ['address', 'name', 'request'];
 
     /**
+     * Whether this time it is written at all: auto_replies.send_chance
+     * (reply, greeting, opening, follow_up), percent; the rest is silence.
+     */
+    public static function speaks(string $what): bool
+    {
+        $chance = (int) config("auto_replies.send_chance.{$what}", 100);
+
+        return $chance >= 100 || ($chance > 0 && random_int(1, 100) <= $chance);
+    }
+
+    /**
      * @param list<array{
      *     id: string,
      *     name: string|null,
