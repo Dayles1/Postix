@@ -17,8 +17,7 @@ final class TelegramDriverCheckReporter
     public function __construct(
         private readonly TelegramOperatorNotifier $operatorNotifier,
         private readonly DriverCheckBot $bot,
-    ) {
-    }
+    ) {}
 
     /**
      * Brings an already posted report in line with the check.
@@ -108,13 +107,13 @@ final class TelegramDriverCheckReporter
          */
         $result = VendorNoticeShield::guard(
             'messages.sendMessage',
-            static fn (): mixed => $telegram->messages->sendMessage([
+            static fn(): mixed => $telegram->messages->sendMessage([
                 'peer' => $check->telegram_chat_id,
 
                 'reply_to' => [
                     '_' => 'inputReplyToMessage',
                     'reply_to_msg_id'
-                        => $check->report_reply_to_message_id
+                    => $check->report_reply_to_message_id
                         ?? $check->telegram_message_id,
                 ],
 
@@ -140,7 +139,7 @@ final class TelegramDriverCheckReporter
         try {
             VendorNoticeShield::guard(
                 'messages.editMessage',
-                static fn (): mixed => $telegram->messages->editMessage([
+                static fn(): mixed => $telegram->messages->editMessage([
                     'peer' => $check->telegram_chat_id,
                     'id' => $messageId,
                     'message' => $message,
@@ -246,29 +245,31 @@ final class TelegramDriverCheckReporter
              * so an unreachable operator never blocks the group report or
              * leaves the check unreported.
              */
-            $this->operatorNotifier->notify(
-                telegram: $telegram,
-                check: $check,
-                report: $message,
-            );
+            if ($check->status?->value === 'not_confirmed') {
+                $this->operatorNotifier->notify(
+                    telegram: $telegram,
+                    check: $check,
+                    report: $message,
+                );
+            }
         } catch (Throwable $e) {
             Log::error(
                 'Failed to send driver check reply',
                 [
                     'check_id'
-                        => $check->id,
+                    => $check->id,
 
                     'chat_id'
-                        => $check->telegram_chat_id,
+                    => $check->telegram_chat_id,
 
                     'message_id'
-                        => $check->telegram_message_id,
+                    => $check->telegram_message_id,
 
                     'error'
-                        => $e->getMessage(),
+                    => $e->getMessage(),
 
                     'exception'
-                        => $e::class,
+                    => $e::class,
                 ],
             );
 
@@ -288,10 +289,10 @@ final class TelegramDriverCheckReporter
             $statusLine ?? $this->statusLine($check),
 
             '<b>ID проверки:</b> '
-            . $check->id,
+                . $check->id,
 
             '<b>ID сообщения:</b> '
-            . $check->telegram_message_id,
+                . $check->telegram_message_id,
 
             ...$this->decisionLines($check),
 
@@ -301,7 +302,7 @@ final class TelegramDriverCheckReporter
 
             $this->escape(
                 $check->phone_normalized
-                ?? '-',
+                    ?? '-',
             ),
 
             '',
@@ -310,7 +311,7 @@ final class TelegramDriverCheckReporter
 
             $this->escape(
                 $check->driver_name
-                ?? '-',
+                    ?? '-',
             ),
 
             '',
@@ -526,7 +527,7 @@ final class TelegramDriverCheckReporter
                     $partScore
                         = $this->normalizeScore(
                             $part['score']
-                            ?? 0,
+                                ?? 0,
                         );
 
                     $lines[]
@@ -677,8 +678,8 @@ final class TelegramDriverCheckReporter
 
         if ($check->isManuallyDecided()) {
             $lines[] = ($check->status === TelegramDriverCheckStatus::Confirmed
-                    ? '<b>Подтвердил вручную:</b> '
-                    : '<b>Отклонил вручную:</b> ')
+                ? '<b>Подтвердил вручную:</b> '
+                : '<b>Отклонил вручную:</b> ')
                 . $this->escape((string) $check->manual_by_name)
                 . ' · '
                 . $check->manual_at?->format('d.m.Y H:i');
@@ -713,16 +714,16 @@ final class TelegramDriverCheckReporter
     ): string {
         return match ($status) {
             'confirmed'
-                => '✅ ПОДТВЕРЖДЕНО',
+            => '✅ ПОДТВЕРЖДЕНО',
 
             'not_confirmed'
-                => '❌ НЕ ПОДТВЕРЖДЕНО',
+            => '❌ НЕ ПОДТВЕРЖДЕНО',
 
             'pending'
-                => '⏳ ОЖИДАЕТ ПРОВЕРКИ',
+            => '⏳ ОЖИДАЕТ ПРОВЕРКИ',
 
             'processing'
-                => '🔄 ПРОВЕРЯЕТСЯ',
+            => '🔄 ПРОВЕРЯЕТСЯ',
 
             default
             => '❓ НЕИЗВЕСТНЫЙ СТАТУС',
@@ -734,25 +735,25 @@ final class TelegramDriverCheckReporter
     ): string {
         return match ($level) {
             'very_strong'
-                => 'очень сильное совпадение',
+            => 'очень сильное совпадение',
 
             'strong'
-                => 'сильное совпадение',
+            => 'сильное совпадение',
 
             'likely'
-                => 'вероятное совпадение',
+            => 'вероятное совпадение',
 
             'possible'
-                => 'возможное совпадение',
+            => 'возможное совпадение',
 
             'weak'
-                => 'слабое совпадение',
+            => 'слабое совпадение',
 
             'no_match'
-                => 'совпадений нет',
+            => 'совпадений нет',
 
             'no_data'
-                => 'недостаточно данных',
+            => 'недостаточно данных',
 
             default
             => $level,
@@ -764,16 +765,16 @@ final class TelegramDriverCheckReporter
     ): string {
         return match ($confidence) {
             'high'
-                => 'высокая',
+            => 'высокая',
 
             'medium'
-                => 'средняя',
+            => 'средняя',
 
             'low'
-                => 'низкая',
+            => 'низкая',
 
             'none'
-                => 'нет',
+            => 'нет',
 
             default
             => $confidence,
@@ -785,55 +786,55 @@ final class TelegramDriverCheckReporter
     ): string {
         return match ($reason) {
             'identity_match'
-                => 'Имя и данные Telegram достаточно хорошо совпадают.',
+            => 'Имя и данные Telegram достаточно хорошо совпадают.',
 
             'surname_and_first_name_match'
-                => 'Совпали фамилия и имя.',
+            => 'Совпали фамилия и имя.',
 
             'surname_and_username_match'
-                => 'Совпали фамилия и имя пользователя Telegram.',
+            => 'Совпали фамилия и имя пользователя Telegram.',
 
             'first_name_and_username_match'
-                => 'Совпали имя и имя пользователя Telegram.',
+            => 'Совпали имя и имя пользователя Telegram.',
 
             'strong_first_name_near_surname'
-                => 'Имя совпадает уверенно, а фамилия имеет близкое написание.',
+            => 'Имя совпадает уверенно, а фамилия имеет близкое написание.',
 
             'first_name_only'
-                => 'Совпало только имя.',
+            => 'Совпало только имя.',
 
             'surname_only'
-                => 'Совпала только фамилия.',
+            => 'Совпала только фамилия.',
 
             'username_only'
-                => 'Совпало только имя пользователя Telegram.',
+            => 'Совпало только имя пользователя Telegram.',
 
             'missing_name_data'
-                => 'Недостаточно данных для проверки имени.',
+            => 'Недостаточно данных для проверки имени.',
 
             'exact_full_name'
-                => 'Полное имя совпало.',
+            => 'Полное имя совпало.',
 
             'strong_name_match'
-                => 'Обнаружено сильное совпадение имени.',
+            => 'Обнаружено сильное совпадение имени.',
 
             'exact_core'
-                => 'Основная часть имени совпала полностью.',
+            => 'Основная часть имени совпала полностью.',
 
             'leet_normalized_exact'
-                => 'Имя совпало после нормализации символов.',
+            => 'Имя совпало после нормализации символов.',
 
             'ordered_subsequence'
-                => 'Обнаружено частичное совпадение символов.',
+            => 'Обнаружено частичное совпадение символов.',
 
             'ordered_contains'
-                => 'Одно имя содержит основную часть другого.',
+            => 'Одно имя содержит основную часть другого.',
 
             'phonetic_equal'
-                => 'Имена совпадают по произношению.',
+            => 'Имена совпадают по произношению.',
 
             'fuzzy'
-                => 'Обнаружено близкое написание имени.',
+            => 'Обнаружено близкое написание имени.',
 
             default
             => $this->humanizeReason(
@@ -873,8 +874,8 @@ final class TelegramDriverCheckReporter
     ): string {
         $score
             = is_numeric($score)
-                ? (float) $score
-                : 0.0;
+            ? (float) $score
+            : 0.0;
 
         $score
             = max(
