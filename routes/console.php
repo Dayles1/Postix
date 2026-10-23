@@ -20,3 +20,13 @@ Schedule::command('telegram:sync-contacts --trigger=schedule')
     ->when(fn () => app(\App\Application\Telegram\Services\ContactSyncSettings::class)->dueNow())
     ->runInBackground()
     ->withoutOverlapping();
+
+// The Join group watchdog: one worker per account marked in the panel, each
+// finding the groups of our topic and joining them by itself. Asked every
+// minute while it is on, so it is back by itself after a reboot or a crash
+// (its lock turns a second copy away). Off until it is switched on in the
+// panel (Join group -> Settings).
+Schedule::command('telegram:group-join-watchdog')
+    ->everyMinute()
+    ->when(fn () => app(\App\Application\Telegram\Services\GroupJoinSettings::class)->enabled())
+    ->runInBackground();

@@ -77,6 +77,8 @@ final class TelegramAccountProcessService
                 $accounts = TelegramAccount::query()
                     /* Nor the accounts of the other listeners (CEO, Head Operation ...). */
                     ->whereNotIn('id', ListenerAccounts::rowIds())
+                    /* Nor the accounts the group join holds while it is on: their workers have the sessions open. */
+                    ->whereNotIn('id', GroupJoinSettings::dedicatedIds())
                     ->where(
                         'is_authorized',
                         true,
@@ -427,6 +429,8 @@ final class TelegramAccountProcessService
 
         return TelegramAccount::query()
             ->whereNotIn('id', ListenerAccounts::rowIds())
+            /* Nor the accounts the group join holds while it is on: their workers have the sessions open. */
+            ->whereNotIn('id', GroupJoinSettings::dedicatedIds())
             ->where(
                 'is_authorized',
                 true,

@@ -12,6 +12,7 @@ use App\Models\Telegram\TelegramScrapedUser;
 use App\Models\Telegram\TelegramScrapeGroup;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * The catalog behind /driver-check/contacts: every person the contact sync
@@ -165,7 +166,9 @@ final class ContactCatalogController extends Controller
         $holders = TelegramAccountContact::query()->distinct()->pluck('telegram_account_id');
 
         return [
+            /* The contact sync's own groups: Join group's thousands would make the list unusable. */
             'groups' => TelegramScrapeGroup::query()
+                ->forContacts()
                 ->orderBy('id')
                 ->get(['id', 'title', 'link'])
                 ->map(fn ($group) => ['id' => $group->id, 'title' => $group->title ?: $group->link])
@@ -194,7 +197,11 @@ final class ContactCatalogController extends Controller
             ->groupBy('status')
             ->pluck('total', 'status');
 
-        $people = TelegramScrapedUser::query()->where('is_bot', false)->count();
+        /* The contact sync's people: the table is shared with Join group, whose people are left out. */
+        $people = (int) Cache::remember('contact-catalog:people', 30, fn () => TelegramScrapedUser::query()
+            ->where('is_bot', false)
+            ->forContacts()
+            ->count());
         $held = (int) $byStatus->sum();
 
         return [

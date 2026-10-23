@@ -242,6 +242,36 @@ class MenuHelper
                     ],
                 ],
             ],
+            [
+                'title' => __('driver_check.sections.join'),
+                'items' => [
+                    [
+                        'icon' => 'dashboard',
+                        'name' => __('driver_check.menu.group_join'),
+                        'path' => '/driver-check/group-join',
+                    ],
+                    [
+                        'icon' => 'chat',
+                        'name' => __('driver_check.menu.group_join_joined'),
+                        'path' => '/driver-check/group-join/joined',
+                    ],
+                    [
+                        'icon' => 'calendar',
+                        'name' => __('driver_check.menu.group_join_queue'),
+                        'path' => '/driver-check/group-join/queue',
+                    ],
+                    [
+                        'icon' => 'user-profile',
+                        'name' => __('driver_check.menu.group_join_people'),
+                        'path' => '/driver-check/group-join/people',
+                    ],
+                    [
+                        'icon' => 'task',
+                        'name' => __('driver_check.menu.group_join_settings'),
+                        'path' => '/driver-check/group-join/settings',
+                    ],
+                ],
+            ],
         ];
     }
 

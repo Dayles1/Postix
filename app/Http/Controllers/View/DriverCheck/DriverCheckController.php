@@ -171,6 +171,43 @@ final class DriverCheckController extends Controller
         );
     }
 
+    public function groupJoin()
+    {
+        return view(
+            'pages.driver-check.group-join'
+        );
+    }
+
+    public function groupJoinJoined()
+    {
+        return view(
+            'pages.driver-check.group-join-groups',
+            ['view' => 'joined']
+        );
+    }
+
+    public function groupJoinQueue()
+    {
+        return view(
+            'pages.driver-check.group-join-groups',
+            ['view' => 'queue']
+        );
+    }
+
+    public function groupJoinPeople()
+    {
+        return view(
+            'pages.driver-check.group-join-people'
+        );
+    }
+
+    public function groupJoinSettings()
+    {
+        return view(
+            'pages.driver-check.group-join-settings'
+        );
+    }
+
     public function queue()
     {
         return view(

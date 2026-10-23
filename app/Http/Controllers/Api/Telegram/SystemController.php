@@ -75,6 +75,7 @@ final class SystemController extends Controller
             /* Their own accounts, not the listeners': a pool the panel manages. */
             ['key' => 'contact_sync', 'movable' => false, 'accounts' => [], 'link' => '/driver-check/contacts'],
             ['key' => 'phone_resolver', 'movable' => false, 'accounts' => [], 'link' => '/driver-check/sessions'],
+            ['key' => 'group_join', 'movable' => false, 'accounts' => [], 'link' => '/driver-check/group-join'],
         ];
 
         return response()->json([

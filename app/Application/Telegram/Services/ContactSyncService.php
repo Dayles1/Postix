@@ -78,7 +78,9 @@ final class ContactSyncService
 
         $totals = ['accounts' => 0, 'added' => 0, 'failed' => 0, 'members' => 0];
 
+        /* Its own groups only: what Join group keeps for the database is not saved into contacts. */
         $groups = TelegramScrapeGroup::query()
+            ->forContacts()
             ->where('is_active', true)
             ->when($groupId, fn ($q) => $q->whereKey($groupId))
             ->get();

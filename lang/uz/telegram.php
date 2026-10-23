@@ -1359,6 +1359,7 @@ return [
                 'resolver_phone' => 'Raqam bo\'yicha qidiruv',
                 'send_message' => 'Xabar yuborish',
                 'driver_check' => 'Haydovchilarni tekshirish',
+                'group_join' => 'Guruhlarga qo\'shilish',
             ],
             'states' => [
                 'ready' => 'Tayyor',
@@ -2552,6 +2553,11 @@ return [
             'phone_resolver' => [
                 'name' => 'Raqam bo\'yicha qidirish',
                 'what' => 'Haydovchining Telegramini raqam bo\'yicha akkauntlar puli orqali topadi. Listener akkauntlari ishlatilmaydi.',
+                'note' => '',
+            ],
+            'group_join' => [
+                'name' => 'Guruhlarga qo\'shilish',
+                'what' => 'Belgilangan akkauntlar, har biri alohida watchdog ostidagi o\'z jarayonida, kalit so\'zlar bo\'yicha guruhlarni o\'zi topadi, tekshiradi, to\'xtamasdan qo\'shiladi va a\'zolarini yig\'adi. Flooddan keyin o\'zi kutib davom etadi.',
                 'note' => '',
             ],
         ],

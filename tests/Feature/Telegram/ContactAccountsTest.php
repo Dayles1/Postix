@@ -56,6 +56,8 @@ final class ContactAccountsTest extends TestCase
         (include database_path('migrations/2026_10_05_100000_create_telegram_settings_table.php'))->up();
         (include database_path('migrations/2026_10_14_100000_create_telegram_contact_sync_tables.php'))->up();
         (include database_path('migrations/2026_10_17_100000_create_telegram_account_contacts_state_tables.php'))->up();
+        /* The group types and Join group's columns: the contact sync reads only its own groups. */
+        (include database_path('migrations/2026_10_20_100000_create_telegram_group_join_tables.php'))->up();
 
         DB::table('telegram_accounts')->insert([
             ['id' => 1, 'phone' => '+998900000001', 'session_path' => '/sessions/1'],

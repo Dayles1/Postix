@@ -24,6 +24,10 @@ import { contactSyncPage } from './contact-sync';
 import { contactsPage } from './contacts';
 import { contactReportPage } from './contact-report';
 import { contactSettingsPage } from './contact-settings';
+import { groupJoinPage } from './group-join';
+import { groupJoinGroupsPage } from './group-join-groups';
+import { groupJoinPeoplePage } from './group-join-people';
+import { groupJoinSettingsPage } from './group-join-settings';
 import { contactAccountsPage } from './contact-accounts';
 import { statusType } from './status';
 
@@ -1236,4 +1240,8 @@ export function registerDriverCheck(Alpine) {
     Alpine.data('dcContactReport', contactReportPage);
     Alpine.data('dcContactSettings', contactSettingsPage);
     Alpine.data('dcContactAccounts', contactAccountsPage);
+    Alpine.data('dcGroupJoin', groupJoinPage);
+    Alpine.data('dcGroupJoinGroups', groupJoinGroupsPage);
+    Alpine.data('dcGroupJoinPeople', groupJoinPeoplePage);
+    Alpine.data('dcGroupJoinSettings', groupJoinSettingsPage);
 }

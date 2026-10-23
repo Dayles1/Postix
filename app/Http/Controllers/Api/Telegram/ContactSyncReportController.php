@@ -40,7 +40,7 @@ final class ContactSyncReportController extends Controller
             'schedule' => $this->schedule(),
             'days' => $this->days($days),
             'accounts_today' => $this->accountsToday(),
-            'groups' => TelegramScrapeGroup::query()->orderBy('id')->get(['id', 'title', 'link', 'is_active']),
+            'groups' => TelegramScrapeGroup::query()->forContacts()->orderBy('id')->get(['id', 'title', 'link', 'is_active']),
         ]]);
     }
 
@@ -119,11 +119,14 @@ final class ContactSyncReportController extends Controller
             ->get(['event', 'context', 'created_at'])
             ->groupBy(fn (TelegramContactSyncLog $log) => $log->created_at->toDateString());
 
+        /* Counted by the database, not loaded: the people table is shared with Join group and large. */
         $found = TelegramScrapedUser::query()
             ->where('is_bot', false)
             ->where('created_at', '>=', $from)
-            ->get(['created_at'])
-            ->countBy(fn (TelegramScrapedUser $user) => $user->created_at->toDateString());
+            ->forContacts()
+            ->selectRaw('DATE(created_at) as day, COUNT(*) as total')
+            ->groupBy('day')
+            ->pluck('total', 'day');
 
         $rows = [];
 

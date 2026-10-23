@@ -1371,6 +1371,7 @@ return [
                 'resolver_phone' => 'Phone lookup',
                 'send_message' => 'Mailing',
                 'driver_check' => 'Driver check',
+                'group_join' => 'Group join',
             ],
             'states' => [
                 'ready' => 'Ready',
@@ -2564,6 +2565,11 @@ return [
             'phone_resolver' => [
                 'name' => 'Phone lookup',
                 'what' => 'Finds a driver\'s Telegram by phone number through the account pool. The listener accounts are not used.',
+                'note' => '',
+            ],
+            'group_join' => [
+                'name' => 'Group join',
+                'what' => 'The marked accounts, each in its own process under a separate watchdog, find groups by the keywords, check them, join them without stopping and collect their members. After a flood wait they go on by themselves.',
                 'note' => '',
             ],
         ],

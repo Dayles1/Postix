@@ -17,6 +17,7 @@ use App\Models\Telegram\TelegramScrapeGroup;
 use App\Telegram\TelegramProcessLock;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Behind the contact sync page: is a sync running, the groups it reads, how
@@ -82,9 +83,24 @@ final class ContactSyncController extends Controller
             ->values();
 
         $groups = TelegramScrapeGroup::query()
+            ->forContacts()
             ->withCount('users')
             ->orderBy('id')
             ->get();
+
+        /*
+         * The people of the contact sync's own groups: the people table is
+         * shared with Join group and holds far more. Counted once every
+         * half a minute, not on every poll of the page.
+         */
+        $people = Cache::remember('contact-sync:people-totals', 30, fn (): array => [
+            'users' => TelegramScrapedUser::query()->forContacts()->count(),
+            'unassigned' => TelegramScrapedUser::query()
+                ->where('is_bot', false)
+                ->forContacts()
+                ->whereDoesntHave('contact')
+                ->count(),
+        ]);
 
         $lastRun = TelegramContactSyncLog::query()
             ->whereIn('event', ['started', 'finished'])
@@ -101,13 +117,10 @@ final class ContactSyncController extends Controller
                 'context' => $lastRun->context,
             ] : null,
             'totals' => [
-                'users' => TelegramScrapedUser::query()->count(),
+                'users' => $people['users'],
                 'added' => (int) $perAccount->sum('added'),
                 'failed' => (int) $perAccount->sum('failed'),
-                'unassigned' => TelegramScrapedUser::query()
-                    ->where('is_bot', false)
-                    ->whereDoesntHave('contact')
-                    ->count(),
+                'unassigned' => $people['unassigned'],
             ],
             'accounts' => $accounts,
             'groups' => $groups,
@@ -193,6 +206,11 @@ final class ContactSyncController extends Controller
         }
 
         $group = TelegramScrapeGroup::query()->firstOrCreate(['link' => $link]);
+
+        /* Join group found it already: from now on it is read for contacts too. */
+        if ($group->type !== TelegramScrapeGroup::TYPE_CONTACTS) {
+            $group->update(['type' => TelegramScrapeGroup::TYPE_CONTACTS, 'is_active' => true]);
+        }
 
         return response()->json(
             ['data' => $group],

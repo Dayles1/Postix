@@ -7,6 +7,8 @@ use App\Http\Controllers\Api\Telegram\ContactSyncController;
 use App\Http\Controllers\Api\Telegram\ContactSyncReportController;
 use App\Http\Controllers\Api\Telegram\ContactSyncRunController;
 use App\Http\Controllers\Api\Telegram\ContactSyncSettingsController;
+use App\Http\Controllers\Api\Telegram\GroupJoinController;
+use App\Http\Controllers\Api\Telegram\GroupJoinSettingsController;
 use App\Http\Controllers\Api\Telegram\AutoReplyController;
 use App\Http\Controllers\Api\Telegram\ClientCheckRulesController;
 use App\Http\Controllers\Api\Telegram\DriverCheckChatController;
@@ -346,6 +348,36 @@ Route::middleware(['auth', 'role:driverCheck,superadmin'])
             '/contact-accounts',
             [DriverCheckController::class, 'contactAccounts']
         )->name('driver-check.contact-accounts');
+
+        /*
+         * Join group: the marked accounts find groups and join them by
+         * themselves. The status, the joined groups, the ones waiting,
+         * the people read from them, the settings.
+         */
+        Route::get(
+            '/group-join',
+            [DriverCheckController::class, 'groupJoin']
+        )->name('driver-check.group-join');
+
+        Route::get(
+            '/group-join/joined',
+            [DriverCheckController::class, 'groupJoinJoined']
+        )->name('driver-check.group-join.joined');
+
+        Route::get(
+            '/group-join/queue',
+            [DriverCheckController::class, 'groupJoinQueue']
+        )->name('driver-check.group-join.queue');
+
+        Route::get(
+            '/group-join/people',
+            [DriverCheckController::class, 'groupJoinPeople']
+        )->name('driver-check.group-join.people');
+
+        Route::get(
+            '/group-join/settings',
+            [DriverCheckController::class, 'groupJoinSettings']
+        )->name('driver-check.group-join.settings');
 
         /*
          * Telegram sessions
@@ -693,6 +725,27 @@ Route::middleware(['auth', 'role:driverCheck,superadmin'])
                 Route::post('/groups', 'storeGroup')->name('api.telegram.contact-sync.groups.store');
                 Route::patch('/groups/{group}', 'updateGroup')->name('api.telegram.contact-sync.groups.update');
                 Route::delete('/groups/{group}', 'destroyGroup')->name('api.telegram.contact-sync.groups.destroy');
+            });
+
+        /*
+         * Join group: keywords, the groups found, the accounts joining them, the people
+         */
+        Route::prefix('/group-join')
+            ->controller(GroupJoinController::class)
+            ->group(function () {
+                Route::get('/', 'show')->name('api.telegram.group-join.show');
+                Route::get('/groups', 'groups')->name('api.telegram.group-join.groups');
+                Route::patch('/groups/{group}', 'updateGroup')->name('api.telegram.group-join.groups.update');
+                Route::get('/people', 'people')->name('api.telegram.group-join.people');
+                Route::post('/keywords', 'storeKeyword')->name('api.telegram.group-join.keywords.store');
+                Route::post('/keywords/search-now', 'searchNow')->name('api.telegram.group-join.keywords.search-now');
+                Route::patch('/keywords/{keyword}', 'updateKeyword')->name('api.telegram.group-join.keywords.update');
+                Route::delete('/keywords/{keyword}', 'destroyKeyword')->name('api.telegram.group-join.keywords.destroy');
+                Route::post('/accounts/{account}/enable', 'enableAccount')->name('api.telegram.group-join.accounts.enable');
+                Route::get('/logs', 'logs')->name('api.telegram.group-join.logs');
+                Route::get('/settings', [GroupJoinSettingsController::class, 'show'])->name('api.telegram.group-join.settings');
+                Route::put('/settings', [GroupJoinSettingsController::class, 'update'])->name('api.telegram.group-join.settings.update');
+                Route::delete('/settings', [GroupJoinSettingsController::class, 'reset'])->name('api.telegram.group-join.settings.reset');
             });
 
         /*

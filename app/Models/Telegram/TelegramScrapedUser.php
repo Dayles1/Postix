@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models\Telegram;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -42,6 +43,18 @@ class TelegramScrapedUser extends Model
 
             return $normalised === '' ? null : $normalised;
         });
+    }
+
+    /**
+     * The contact sync's people: in one of its groups, or in none (saved
+     * from an account's contacts). Those only Join group found - in groups
+     * of type database alone - are left out.
+     */
+    public function scopeForContacts(Builder $query): Builder
+    {
+        return $query->where(fn ($q) => $q
+            ->whereDoesntHave('groups')
+            ->orWhereHas('groups', fn ($g) => $g->where('type', TelegramScrapeGroup::TYPE_CONTACTS)));
     }
 
     public function groups(): BelongsToMany

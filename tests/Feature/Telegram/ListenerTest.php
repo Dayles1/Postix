@@ -512,7 +512,7 @@ class ListenerTest extends TestCase
         $logics = collect($json['logics'])->keyBy('key');
 
         $this->assertSame(
-            ['driver_checks', 'penalty_intake', 'penalties_sales', 'penalties_operation', 'file_routes', 'scheduled_messages', 'contact_sync', 'phone_resolver'],
+            ['driver_checks', 'penalty_intake', 'penalties_sales', 'penalties_operation', 'file_routes', 'scheduled_messages', 'contact_sync', 'phone_resolver', 'group_join'],
             $logics->keys()->all(),
         );
         $this->assertSame('HEAD_SALES', $logics['penalties_sales']['accounts'][0]['name']);

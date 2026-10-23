@@ -8,4 +8,5 @@ enum TelegramAccountProcess: string
     case SendMessage = 'send_message';
     case DriverCheck = 'driver_check';
     case ContactSync = 'contact_sync';
+    case GroupJoin = 'group_join';
 }
